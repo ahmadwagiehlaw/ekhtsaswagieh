@@ -133,6 +133,7 @@ export default function Files() {
           const lastSession = getPrimaryValue(c, ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة']);
           const formattedLastSession = lastSession ? formatDateString(lastSession) : '';
           const decision = getPrimaryValue(c, ['القرار', 'قرار الجلسة', 'المنطوق']);
+          const fileLocation = getPrimaryValue(c, ['مكان الملف']);
           
           const role = String(c['الصفة'] || c['صفة'] || '').trim();
           const isAppellant = role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
@@ -142,15 +143,15 @@ export default function Files() {
           
           // Folder Tab Color Logic based on role
           const folderColorClass = isAppellant 
-            ? 'bg-emerald-500 border-emerald-600' 
+            ? 'bg-rose-500 border-rose-600' 
             : isAppellee 
-              ? 'bg-rose-500 border-rose-600' 
+              ? 'bg-emerald-500 border-emerald-600' 
               : 'bg-amber-500 border-amber-600';
 
           const folderBg = isAppellant 
-            ? 'bg-emerald-50/30 border-emerald-200' 
+            ? 'bg-rose-50/30 border-rose-200' 
             : isAppellee 
-              ? 'bg-rose-50/30 border-rose-200' 
+              ? 'bg-emerald-50/30 border-emerald-200' 
               : 'bg-amber-50/30 border-amber-200';
 
           return (
@@ -170,13 +171,18 @@ export default function Files() {
                 {/* Header: Number & Year */}
                 <div className="flex items-start justify-between mb-4 border-b border-black/5 pb-3">
                   <div className="flex items-center gap-2">
-                    <FolderClosed className={`w-6 h-6 ${isAppellant ? 'text-emerald-600' : isAppellee ? 'text-rose-600' : 'text-amber-600'}`} />
+                    <FolderClosed className={`w-6 h-6 ${isAppellant ? 'text-rose-600' : isAppellee ? 'text-emerald-600' : 'text-amber-600'}`} />
                     <div>
                       <h3 className="font-black text-lg text-navy-900 leading-tight">
                          {caseNum || 'بدون رقم'} {year ? <span className="text-sm font-bold text-slate-500">لسنة {year}</span> : ''}
                       </h3>
                     </div>
                   </div>
+                  {fileLocation && (
+                    <span className="px-2 py-1 rounded-md text-[9px] font-black bg-white border border-slate-200 text-slate-600 shadow-sm shrink-0">
+                      📂 {fileLocation}
+                    </span>
+                  )}
                 </div>
 
                 {/* Opponents */}

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import AddSessionModal from '../components/AddSessionModal';
-import { formatDateString } from '../utils/dateUtils';
+import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 
 export default function CaseDetails() {
   const { id } = useParams();
@@ -16,6 +16,10 @@ export default function CaseDetails() {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(caseData || {});
   const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
+
+  // Extract unique values for autocomplete
+  const uniqueDecisions = [...new Set(cases.map(c => c['القرار'] || c['قرار الجلسة'] || c['المنطوق']).filter(Boolean))];
+  const uniqueCourts = [...new Set(cases.map(c => c['المحكمة']).filter(Boolean))];
 
   if (!caseData) {
     return (
@@ -165,52 +169,144 @@ export default function CaseDetails() {
         </div>
 
         {/* Dynamic Fields from Schema */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
           {schema.filter(f => {
-             const hiddenFields = ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'المدعي', 'الطاعن', 'المستأنف', 'المدعى_عليه', 'المدعى عليه', 'المطعون ضده', 'المطعون', 'آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'القرار', 'قرار الجلسة', 'المنطوق', 'الصفة', 'صفة'];
+             const hiddenFields = ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'المدعي', 'الطاعن', 'المستأنف', 'المدعى_عليه', 'المدعى عليه', 'المطعون ضده', 'المطعون', 'آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'القرار', 'قرار الجلسة', 'المنطوق', 'الصفة', 'صفة', 'المقر المختار', 'عنوان المدعى عليه'];
              return f.visible && !hiddenFields.includes(f.id);
           }).map((field) => {
             const val = editData[field.id] || '';
-            // Skip empty fields if not editing
             if (!isEditing && (val === null || val === '')) return null;
 
             const isDateField = field.type === 'date' || field.id.includes('تاريخ') || field.id.includes('جلسة');
             const displayVal = isDateField ? formatDateString(val) : val;
+            
+            let colSpan = 'md:col-span-2';
+            if (field.id === 'الرول') colSpan = 'md:col-span-1';
+            else if (field.id === 'مكان الملف') colSpan = 'md:col-span-4';
 
             return (
-              <div key={field.id} className="space-y-1.5 md:col-span-2">
+              <div key={field.id} className={`space-y-1.5 ${colSpan}`}>
                 <label className="text-[11px] font-black text-slate-500 block">{field.label}</label>
                 {isEditing ? (
-                  field.type === 'textarea' ? (
+                  field.id === 'الصفة' || field.id === 'صفة' ? (
+                    <div className="flex gap-2 flex-wrap mt-1">
+                      {['طاعن', 'مطعون ضده', 'خصم مدخل'].map(opt => (
+                        <button 
+                          key={opt}
+                          type="button" 
+                          onClick={() => setEditData({...editData, [field.id]: opt})} 
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${val === opt ? (opt === 'طاعن' ? 'bg-rose-500 text-white' : opt === 'مطعون ضده' ? 'bg-emerald-500 text-white' : 'bg-navy-900 text-white') : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  ) : field.id === 'نوع الجلسة' ? (
+                    <div className="flex gap-2 flex-wrap mt-1">
+                      {['فحص', 'موضوع', 'حكم', 'خبير'].map(opt => (
+                        <button 
+                          key={opt}
+                          type="button" 
+                          onClick={() => setEditData({...editData, [field.id]: opt})} 
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${val === opt ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  ) : field.id === 'مكان الملف' ? (
+                    <div className="flex gap-2 flex-wrap mt-1">
+                      {['غير موجود', 'أصلي', 'مؤقت', 'شعبة الحفظ', 'شعبة الشغل', 'الأحكام', 'في البيت'].map(opt => (
+                        <button 
+                          key={opt}
+                          type="button" 
+                          onClick={() => setEditData({...editData, [field.id]: opt})} 
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${val === opt ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                      {/* Allow custom input if they type something not in the options */}
+                      <input 
+                        type="text" 
+                        placeholder="أو اكتب مكان آخر..."
+                        value={!['غير موجود', 'أصلي', 'مؤقت', 'شعبة الحفظ', 'شعبة الشغل', 'الأحكام', 'في البيت'].includes(val) ? val : ''}
+                        onChange={(e) => setEditData({...editData, [field.id]: e.target.value})}
+                        className="bg-slate-50 border border-slate-300 rounded-lg px-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900"
+                      />
+                    </div>
+                  ) : field.type === 'textarea' ? (
                     <textarea 
                       value={val}
                       onChange={(e) => setEditData({...editData, [field.id]: e.target.value})}
                       rows={3}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 resize-none"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 resize-none mt-1"
                     />
-                  ) : field.type === 'date' ? (
+                  ) : field.type === 'date' || field.id.includes('تاريخ') || field.id.includes('جلسة') ? (
                     <input 
                       type="date"
-                      value={val}
+                      value={val && getSafeDateObj(val) ? getSafeDateObj(val).toISOString().split('T')[0] : ''}
                       onChange={(e) => setEditData({...editData, [field.id]: e.target.value})}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 mt-1"
                     />
                   ) : (
-                    <input 
-                      type="text"
-                      value={val}
-                      onChange={(e) => setEditData({...editData, [field.id]: e.target.value})}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900"
-                    />
+                    <>
+                      <input 
+                        type="text"
+                        value={val}
+                        list={`list-${field.id}`}
+                        onChange={(e) => setEditData({...editData, [field.id]: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 mt-1"
+                      />
+                      {(field.id === 'القرار' || field.id === 'قرار الجلسة' || field.id === 'المنطوق') && (
+                        <datalist id={`list-${field.id}`}>
+                          {uniqueDecisions.map((opt, i) => <option key={i} value={opt} />)}
+                        </datalist>
+                      )}
+                      {(field.id === 'المحكمة' || field.id === 'الدائرة') && (
+                        <datalist id={`list-${field.id}`}>
+                          {uniqueCourts.map((opt, i) => <option key={i} value={opt} />)}
+                        </datalist>
+                      )}
+                    </>
                   )
                 ) : (
-                  <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 whitespace-pre-wrap break-words min-h-[42px]" dir={isDateField ? "ltr" : "auto"}>
+                  <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 whitespace-pre-wrap break-words min-h-[42px] mt-1" dir={isDateField ? "ltr" : "auto"}>
                     {displayVal}
                   </div>
                 )}
               </div>
             );
           })}
+        </div>
+
+        {/* Additional Secondary Fields */}
+        <div className="pt-6 border-t border-slate-100 mt-4">
+          <h3 className="text-xs font-black text-slate-400 mb-3">بيانات إضافية:</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {schema.filter(f => ['المقر المختار', 'عنوان المدعى عليه'].includes(f.id)).map(field => {
+              const val = editData[field.id] || '';
+              if (!isEditing && (val === null || val === '')) return null;
+              
+              return (
+                <div key={field.id} className="space-y-1.5">
+                  <label className="text-[11px] font-black text-slate-500 block">{field.label}</label>
+                  {isEditing ? (
+                    <input 
+                      type="text"
+                      value={val}
+                      onChange={(e) => setEditData({...editData, [field.id]: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900"
+                    />
+                  ) : (
+                    <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 whitespace-pre-wrap break-words min-h-[42px]">
+                      {val}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         {/* Custom fields not in schema (legacy/extra) */}
