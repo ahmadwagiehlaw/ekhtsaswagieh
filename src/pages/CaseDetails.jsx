@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus } from 'lucide-react';
+import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import AddSessionModal from '../components/AddSessionModal';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
@@ -8,7 +8,7 @@ import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 export default function CaseDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { cases, schema, isAdmin, saveCaseToFirebase } = useAppContext();
+  const { cases, schema, isAdmin, saveCaseToFirebase, settings } = useAppContext();
 
   // In the new architecture, id is the document id, not the array index.
   const caseData = cases.find(c => c.id === id);
@@ -16,9 +16,13 @@ export default function CaseDetails() {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(caseData || {});
   const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
+  
+  // Task state
+  const [newTask, setNewTask] = useState({ assignee: '', title: '' });
+  const [isAddingTask, setIsAddingTask] = useState(false);
 
   // Extract unique values for autocomplete
-  const uniqueDecisions = [...new Set(cases.map(c => c['القرار'] || c['قرار الجلسة'] || c['المنطوق']).filter(Boolean))];
+  const defaultDecisions = settings?.decisions || [];
   const uniqueCourts = [...new Set(cases.map(c => c['المحكمة']).filter(Boolean))];
 
   if (!caseData) {
@@ -259,9 +263,23 @@ export default function CaseDetails() {
                         className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 mt-1"
                       />
                       {(field.id === 'القرار' || field.id === 'قرار الجلسة' || field.id === 'المنطوق') && (
-                        <datalist id={`list-${field.id}`}>
-                          {uniqueDecisions.map((opt, i) => <option key={i} value={opt} />)}
-                        </datalist>
+                        <div className="mt-2">
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {defaultDecisions.map((opt, i) => (
+                              <button 
+                                key={i}
+                                type="button" 
+                                onClick={() => setEditData({...editData, [field.id]: opt})} 
+                                className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all ${val === opt ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}
+                              >
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                          <datalist id={`list-${field.id}`}>
+                            {defaultDecisions.map((opt, i) => <option key={i} value={opt} />)}
+                          </datalist>
+                        </div>
                       )}
                       {(field.id === 'المحكمة' || field.id === 'الدائرة') && (
                         <datalist id={`list-${field.id}`}>
@@ -387,6 +405,109 @@ export default function CaseDetails() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Task Management Section (Admin Only for assigning, everyone for viewing) */}
+      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mx-4 sm:mx-0 mt-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+               <ClipboardList className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="font-black text-lg text-navy-900">المهام والتكليفات</h2>
+              <p className="text-[11px] text-slate-500 font-bold">إسناد المهام للموظفين ومتابعتها</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-2 space-y-4">
+          {(!caseData.tasks || caseData.tasks.length === 0) ? (
+            <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
+               <p className="text-xs font-bold text-slate-500">لا توجد مهام مسندة في هذا الملف.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {caseData.tasks.map((task, idx) => (
+                <div key={task.id || idx} className={`p-4 rounded-xl border ${task.status === 'completed' ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <span className="text-[10px] font-black text-slate-500 bg-white px-2 py-1 rounded-md border border-slate-100 mb-2 inline-block">
+                        المكلف: {task.assignee}
+                      </span>
+                      <h4 className={`text-sm font-black ${task.status === 'completed' ? 'text-emerald-900 line-through opacity-70' : 'text-navy-900'}`}>
+                        {task.title}
+                      </h4>
+                    </div>
+                    {task.status === 'completed' ? (
+                      <div className="flex items-center gap-1 text-emerald-600 bg-emerald-100 px-2 py-1 rounded-md text-[10px] font-bold">
+                        <CheckCircle2 className="w-3 h-3" /> تم التنفيذ
+                      </div>
+                    ) : (
+                      <div className="text-amber-600 bg-amber-50 px-2 py-1 rounded-md text-[10px] font-bold border border-amber-200">
+                        قيد التنفيذ
+                      </div>
+                    )}
+                  </div>
+                  {task.notes && (
+                    <p className="text-xs font-bold text-slate-600 bg-white p-2 rounded-lg border border-slate-100 mt-2">
+                      ملاحظة التنفيذ: {task.notes}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-4">
+              <h4 className="text-xs font-black text-navy-900 mb-3">إسناد مهمة جديدة:</h4>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <select 
+                  value={newTask.assignee} 
+                  onChange={e => setNewTask({...newTask, assignee: e.target.value})}
+                  className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 flex-[1]"
+                >
+                  <option value="">اختر الموظف...</option>
+                  {settings?.employees?.map(emp => (
+                    <option key={emp.name} value={emp.name}>{emp.name}</option>
+                  ))}
+                </select>
+                <input 
+                  type="text" 
+                  placeholder="وصف المهمة (مثال: تصوير الملف، إعلان الصحيفة...)" 
+                  value={newTask.title}
+                  onChange={e => setNewTask({...newTask, title: e.target.value})}
+                  className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 flex-[3]"
+                />
+                <button 
+                  onClick={async () => {
+                    if(!newTask.assignee || !newTask.title) {
+                      alert('يرجى اختيار الموظف وكتابة وصف المهمة.');
+                      return;
+                    }
+                    setIsAddingTask(true);
+                    const taskObj = {
+                      id: Date.now().toString(),
+                      assignee: newTask.assignee,
+                      title: newTask.title,
+                      status: 'pending',
+                      notes: '',
+                      createdAt: new Date().toISOString()
+                    };
+                    const updatedTasks = [...(caseData.tasks || []), taskObj];
+                    await saveCaseToFirebase(caseData.id, { tasks: updatedTasks });
+                    setNewTask({ assignee: '', title: '' });
+                    setIsAddingTask(false);
+                  }}
+                  disabled={isAddingTask}
+                  className="bg-navy-900 text-white font-bold px-4 py-2 rounded-xl text-xs flex-[1] disabled:opacity-50"
+                >
+                  {isAddingTask ? 'جاري الحفظ...' : 'حفظ وإسناد'}
+                </button>
+              </div>
             </div>
           )}
         </div>

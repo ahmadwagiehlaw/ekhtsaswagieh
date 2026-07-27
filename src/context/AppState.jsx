@@ -7,8 +7,15 @@ const AppContext = createContext();
 export const AppProvider = ({ children }) => {
   const [cases, setCases] = useState([]);
   const [schema, setSchema] = useState([]);
-  const [settings, setSettings] = useState({ consultantName: "أحمد وجيه", adminPassword: "444" });
+  const [settings, setSettings] = useState({ 
+    consultantName: "أحمد وجيه", 
+    adminPassword: "444",
+    employees: [],
+    decisions: ['للحكم', 'تصريح', 'للإطلاع', 'للإعلان', 'آخر أجل', 'للمستندات', 'للمذكرات', 'لورود التقرير', 'استبعاد', 'لتنفيذ قرار الإعادة']
+  });
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('isAdmin') === 'true');
+  const [isEmployee, setIsEmployee] = useState(() => localStorage.getItem('isEmployee') === 'true');
+  const [currentUser, setCurrentUser] = useState(() => localStorage.getItem('currentUser') || '');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -57,15 +64,36 @@ export const AppProvider = ({ children }) => {
   const loginAdmin = (password) => {
     if (password === 'a4450422') {
       setIsAdmin(true);
+      setIsEmployee(false);
+      setCurrentUser('المدير');
       localStorage.setItem('isAdmin', 'true');
+      localStorage.setItem('isEmployee', 'false');
+      localStorage.setItem('currentUser', 'المدير');
       return true;
     }
+
+    // Check employee
+    const employee = settings.employees?.find(emp => emp.password === password);
+    if (employee) {
+      setIsAdmin(false);
+      setIsEmployee(true);
+      setCurrentUser(employee.name);
+      localStorage.setItem('isAdmin', 'false');
+      localStorage.setItem('isEmployee', 'true');
+      localStorage.setItem('currentUser', employee.name);
+      return true;
+    }
+    
     return false;
   };
 
   const logoutAdmin = () => {
     setIsAdmin(false);
+    setIsEmployee(false);
+    setCurrentUser('');
     localStorage.removeItem('isAdmin');
+    localStorage.removeItem('isEmployee');
+    localStorage.removeItem('currentUser');
   };
 
   const sanitizeId = (str) => String(str).replace(/[\/\\?%*:|"<>\s]/g, '_');
@@ -109,8 +137,14 @@ export const AppProvider = ({ children }) => {
 
   const deleteCaseFromFirebase = async (caseId) => {
     try {
-      // Logic for delete if needed
-    } catch (error) {}
+      const safeId = sanitizeId(caseId);
+      const { deleteDoc } = await import('firebase/firestore');
+      await deleteDoc(doc(CASES_COLLECTION_REF, safeId));
+      return true;
+    } catch (error) {
+      console.error("Error deleting case:", error);
+      return false;
+    }
   };
 
   // Helper for excel sync
@@ -148,20 +182,32 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Legacy Migration (Admin only, manual trigger)
-  const migrateLegacyData = async () => {
+  const saveSettingsToFirebase = async (newSettings) => {
     try {
-      const { getDoc } = await import('firebase/firestore');
-      const docSnap = await getDoc(LEGACY_MAIN_DOC_REF);
-      if (docSnap.exists() && docSnap.data().casesData) {
-        const legacyCases = docSnap.data().casesData;
-        await saveBatchCasesToFirebase(legacyCases);
-        alert(`تم ترحيل ${legacyCases.length} قضية بنجاح للبنية الجديدة!`);
-      } else {
-        alert('لا توجد بيانات قديمة لترحيلها.');
-      }
+      await setDoc(SETTINGS_DOC_REF, newSettings, { merge: true });
+      return true;
+    } catch (error) {
+      console.error("Settings save error:", error);
+      return false;
+    }
+  };
+
+  // Factory Reset (Admin only)
+  const deleteAllCases = async () => {
+    try {
+      const { deleteDoc } = await import('firebase/firestore');
+      const snapshot = await getDocs(CASES_COLLECTION_REF);
+      const batch = writeBatch(db);
+      
+      snapshot.docs.forEach((docSnap) => {
+        batch.delete(docSnap.ref);
+      });
+      
+      await batch.commit();
+      return true;
     } catch (e) {
-      alert('خطأ في الترحيل: ' + e.message);
+      console.error('Error deleting all cases:', e);
+      return false;
     }
   };
 
@@ -171,6 +217,8 @@ export const AppProvider = ({ children }) => {
       schema,
       settings,
       isAdmin,
+      isEmployee,
+      currentUser,
       loading,
       loginAdmin,
       logoutAdmin,
@@ -178,7 +226,9 @@ export const AppProvider = ({ children }) => {
       createNewCase,
       saveBatchCasesToFirebase,
       saveSchemaToFirebase,
-      migrateLegacyData
+      saveSettingsToFirebase,
+      deleteAllCases,
+      deleteCaseFromFirebase
     }}>
       {children}
     </AppContext.Provider>

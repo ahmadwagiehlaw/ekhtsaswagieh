@@ -1,13 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, TrendingUp, Users, CalendarDays, AlertTriangle, Building2, Scale, Info, PieChart } from 'lucide-react';
+import { Search, TrendingUp, Users, CalendarDays, AlertTriangle, Building2, Scale, Info, PieChart, ClipboardList, CheckCircle2, ChevronLeft } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { getSafeDateObj } from '../utils/dateUtils';
 
 export default function Dashboard() {
-  const { cases } = useAppContext();
+  const { cases, isEmployee, currentUser, saveCaseToFirebase } = useAppContext();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [employeeNotes, setEmployeeNotes] = useState({});
 
   const stats = useMemo(() => {
     let appellantCount = 0;
@@ -113,16 +114,16 @@ export default function Dashboard() {
     const topOpponents = Object.entries(opponentsCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
     const topJudgments = Object.entries(judgmentsCount).sort((a, b) => b[1] - a[1]);
 
-    return {
-      all: cases.length,
-      appellant: appellantCount,
+    return { 
+      all: cases.length, 
+      appellant: appellantCount, 
       appellee: appelleeCount,
       judged: judgedCount,
       reserved: reservedCount,
       ongoing: ongoingCount,
       activeThisMonth,
-      topYears,
       topOpponents,
+      topYears,
       topJudgments,
       alerts
     };
@@ -131,11 +132,127 @@ export default function Dashboard() {
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate(`/files?q=${encodeURIComponent(searchQuery.trim())}`);
+      navigate('/files', { state: { searchQuery } });
     } else {
       navigate(`/files`);
     }
   };
+
+  const handleCompleteTask = async (caseId, taskId) => {
+    const caseToUpdate = cases.find(c => c.id === caseId);
+    if (!caseToUpdate) return;
+    
+    const updatedTasks = caseToUpdate.tasks.map(t => {
+      if (t.id === taskId) {
+        return { ...t, status: 'completed', notes: employeeNotes[taskId] || '' };
+      }
+      return t;
+    });
+
+    await saveCaseToFirebase(caseId, { tasks: updatedTasks });
+    setEmployeeNotes(prev => {
+      const next = {...prev};
+      delete next[taskId];
+      return next;
+    });
+  };
+
+  if (isEmployee) {
+    const myTasks = [];
+    cases.forEach(c => {
+      if (c.tasks) {
+        c.tasks.forEach(t => {
+          if (t.assignee === currentUser) {
+            myTasks.push({ ...t, caseId: c.id, caseNum: c['رقم الدعوى'] || c.id, year: c['السنة'] });
+          }
+        });
+      }
+    });
+
+    const pendingTasks = myTasks.filter(t => t.status !== 'completed').sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const completedTasks = myTasks.filter(t => t.status === 'completed').sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return (
+      <div className="space-y-6 animate-fade-in pb-10">
+        <div className="bg-emerald-600 rounded-3xl p-6 relative overflow-hidden shadow-sm">
+          <div className="absolute right-0 top-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4"></div>
+          <div className="relative z-10 text-white">
+            <h1 className="text-3xl font-black mb-2">مرحباً، {currentUser} 👋</h1>
+            <p className="text-sm font-bold text-emerald-100">إليك المهام المطلوبة منك اليوم</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h2 className="text-lg font-black text-navy-900 px-2 flex items-center gap-2">
+            <ClipboardList className="w-5 h-5 text-emerald-600" />
+            مهام قيد التنفيذ ({pendingTasks.length})
+          </h2>
+          
+          {pendingTasks.length === 0 ? (
+            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center text-slate-500 font-bold text-sm">
+              لا توجد مهام جديدة مطلوبة منك حالياً.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pendingTasks.map(task => (
+                <div key={task.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 flex flex-col">
+                  <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+                    <div>
+                      <span className="text-[10px] font-black bg-slate-100 text-slate-600 px-2 py-1 rounded-md mb-2 inline-block">
+                        رقم {task.caseNum} {task.year && `لسنة ${task.year}`}
+                      </span>
+                      <h3 className="font-black text-navy-900 text-sm leading-relaxed">{task.title}</h3>
+                    </div>
+                    <button onClick={() => navigate(`/case/${task.caseId}`)} className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-navy-900 hover:bg-slate-100 transition shrink-0">
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                  </div>
+                  
+                  <div className="flex-1 space-y-2">
+                    <label className="text-[10px] font-bold text-slate-500">ملاحظات بعد التنفيذ (اختياري)</label>
+                    <textarea 
+                      value={employeeNotes[task.id] || ''}
+                      onChange={e => setEmployeeNotes({...employeeNotes, [task.id]: e.target.value})}
+                      placeholder="اكتب ماذا حدث..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-navy-900 focus:outline-none focus:border-emerald-500 resize-none"
+                      rows={2}
+                    ></textarea>
+                  </div>
+
+                  <button 
+                    onClick={() => handleCompleteTask(task.caseId, task.id)}
+                    className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl text-xs hover:bg-emerald-700 transition flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4" /> تأشير كـ تم التنفيذ
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {completedTasks.length > 0 && (
+          <div className="space-y-4 pt-6 border-t border-slate-200">
+            <h2 className="text-sm font-black text-slate-400 px-2">مهام تم إنجازها حديثاً</h2>
+            <div className="space-y-2">
+              {completedTasks.slice(0, 5).map(task => (
+                <div key={task.id} className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <div>
+                    <h3 className="font-black text-slate-600 text-xs mb-1 line-through">{task.title}</h3>
+                    <p className="text-[10px] font-bold text-slate-400">رقم {task.caseNum}</p>
+                    {task.notes && <p className="text-[10px] font-bold text-emerald-600 mt-1 bg-emerald-50 px-2 py-1 rounded-md inline-block">ملاحظة: {task.notes}</p>}
+                  </div>
+                  <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md shrink-0">
+                    تم التنفيذ
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-20">

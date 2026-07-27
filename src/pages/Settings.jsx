@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { useAppContext } from '../context/AppState';
-import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp } from 'lucide-react';
+import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function Settings() {
-  const { isAdmin, loginAdmin, logoutAdmin, cases, schema, saveBatchCasesToFirebase, saveSchemaToFirebase, migrateLegacyData } = useAppContext();
+  const { isAdmin, loginAdmin, logoutAdmin, cases, schema, settings, saveSettingsToFirebase, deleteAllCases, saveBatchCasesToFirebase, saveSchemaToFirebase } = useAppContext();
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const fileInputRef = useRef(null);
@@ -16,6 +16,46 @@ export default function Settings() {
   // Schema state
   const [localSchema, setLocalSchema] = useState(schema || []);
   const [activeTab, setActiveTab] = useState('sync'); // sync, schema, advanced
+
+  // Advanced state
+  const [localEmployees, setLocalEmployees] = useState(settings?.employees || []);
+  const [localDecisions, setLocalDecisions] = useState(settings?.decisions || []);
+  const [deletePassword, setDeletePassword] = useState('');
+  
+  // Sync settings when loaded
+  React.useEffect(() => {
+    setLocalEmployees(settings?.employees || []);
+    setLocalDecisions(settings?.decisions || []);
+  }, [settings]);
+
+  const handleSaveSettings = async () => {
+    setIsProcessing(true);
+    await saveSettingsToFirebase({
+      ...settings,
+      employees: localEmployees,
+      decisions: localDecisions
+    });
+    setIsProcessing(false);
+    alert('تم حفظ الإعدادات المتقدمة بنجاح');
+  };
+
+  const handleDeleteAll = async () => {
+    if (deletePassword !== 'a4450422') {
+      alert('كلمة المرور غير صحيحة!');
+      return;
+    }
+    if (window.confirm('تحذير نهائي: هل أنت متأكد من مسح جميع البيانات بشكل لا رجعة فيه؟')) {
+      setIsProcessing(true);
+      const success = await deleteAllCases();
+      setIsProcessing(false);
+      if (success) {
+        alert('تم مسح جميع البيانات بنجاح.');
+        setDeletePassword('');
+      } else {
+        alert('حدث خطأ أثناء المسح.');
+      }
+    }
+  };
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -328,15 +368,93 @@ export default function Settings() {
 
       {/* ADVANCED TAB */}
       {activeTab === 'advanced' && (
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4 animate-in fade-in zoom-in duration-300">
-           <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-            <ArrowDownUp className="w-5 h-5 text-rose-600" />
-            <h3 className="font-black text-sm text-navy-900">مرحلة الانتقال للبنية الجديدة</h3>
+        <div className="space-y-6 animate-in fade-in zoom-in duration-300">
+          
+          {/* Decisions Management */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <SettingsIcon className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-black text-sm text-navy-900">إدارة القرارات الافتراضية</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {localDecisions.map((dec, i) => (
+                <div key={i} className="flex items-center gap-1 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+                  <span>{dec}</span>
+                  <button onClick={() => setLocalDecisions(localDecisions.filter((_, idx) => idx !== i))} className="text-indigo-400 hover:text-rose-500 mr-2">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <button 
+                onClick={() => {
+                  const newDec = window.prompt('أدخل القرار الجديد:');
+                  if (newDec?.trim()) setLocalDecisions([...localDecisions, newDec.trim()]);
+                }} 
+                className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
+              >
+                <Plus className="w-3 h-3" /> إضافة قرار
+              </button>
+            </div>
           </div>
-          <p className="text-xs font-bold text-slate-600">إذا كنت قد قمت بحفظ قضايا باستخدام الإصدار القديم من التطبيق (الذي كان يستخدم ملف واحد لحفظ كل القضايا)، يمكنك ترحيلها إلى البنية الجديدة (Collections) بالضغط هنا لمرة واحدة فقط.</p>
-          <button onClick={migrateLegacyData} className="w-full bg-rose-50 text-rose-600 font-bold border border-rose-200 py-3 rounded-xl hover:bg-rose-100">
-            ترحيل البيانات القديمة للبنية الجديدة
+
+          {/* Employees Management */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <Users className="w-5 h-5 text-emerald-600" />
+              <h3 className="font-black text-sm text-navy-900">إدارة الموظفين والصلاحيات</h3>
+            </div>
+            
+            <div className="space-y-3">
+              {localEmployees.map((emp, index) => (
+                <div key={index} className="flex gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 items-center">
+                  <input type="text" placeholder="الاسم" value={emp.name} onChange={e => {
+                    const newEmp = [...localEmployees];
+                    newEmp[index].name = e.target.value;
+                    setLocalEmployees(newEmp);
+                  }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300" />
+                  <input type="text" placeholder="كلمة المرور" value={emp.password} onChange={e => {
+                    const newEmp = [...localEmployees];
+                    newEmp[index].password = e.target.value;
+                    setLocalEmployees(newEmp);
+                  }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300" />
+                  <button onClick={() => setLocalEmployees(localEmployees.filter((_, idx) => idx !== index))} className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg">
+                    <Trash2 className="w-4 h-4"/>
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={() => setLocalEmployees([...localEmployees, { name: '', password: '' }])} className="w-full border-2 border-dashed border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-2">
+              <Plus className="w-4 h-4"/> إضافة موظف جديد
+            </button>
+          </div>
+
+          {/* Save Settings Button */}
+          <button onClick={handleSaveSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">
+            {isProcessing ? 'جاري الحفظ...' : 'حفظ الإعدادات المتقدمة'}
           </button>
+
+          {/* Factory Reset */}
+          <div className="bg-rose-50 rounded-2xl p-5 border border-rose-200 shadow-sm space-y-4 mt-8">
+            <div className="flex items-center gap-2 pb-3 border-b border-rose-200/50">
+              <ShieldAlert className="w-5 h-5 text-rose-600" />
+              <h3 className="font-black text-sm text-rose-900">منطقة الخطر: مسح البيانات</h3>
+            </div>
+            <p className="text-[11px] font-bold text-rose-700">تحذير: سيتم حذف جميع القضايا والملفات بشكل نهائي. تأكد من عمل نسخة احتياطية (Excel) قبل القيام بهذه الخطوة.</p>
+            
+            <div className="flex gap-2">
+              <input 
+                type="password" 
+                placeholder="أدخل باسوورد المدير للتأكيد" 
+                value={deletePassword}
+                onChange={e => setDeletePassword(e.target.value)}
+                className="flex-1 text-xs font-bold p-2 rounded-lg border border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-500" 
+              />
+              <button onClick={handleDeleteAll} disabled={isProcessing || !deletePassword} className="bg-rose-600 text-white font-bold px-4 py-2 rounded-lg text-xs hover:bg-rose-700 disabled:opacity-50 shadow-sm">
+                مسح جميع البيانات
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
