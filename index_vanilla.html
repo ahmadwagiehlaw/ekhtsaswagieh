@@ -1,0 +1,1835 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>اختصاصي - مستشار أحمد وجيه</title>
+    <!-- v2.5 - Agenda Calendar Update 2026-07-27 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    <meta name="theme-color" content="#0a131c">
+
+    <!-- Tailwind CSS for Modern Responsive Legal UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        navy: {
+                            800: '#0f2027',
+                            900: '#0a131c',
+                            950: '#050a0f',
+                        },
+                        legal: {
+                            gold: '#c5a059',
+                            goldLight: '#e5c378',
+                            goldBg: '#fefcf6',
+                            cardBg: '#ffffff',
+                            slateBg: '#f4f6f9',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Cairo', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Cairo Google Font & FontAwesome Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- SheetJS Excel Parser -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f4f6f9;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Deluxe Legal Dossier Folder Card */
+        .case-folder-card {
+            background: #ffffff;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease-in-out;
+            position: relative;
+            box-shadow: 0 4px 12px rgba(10, 19, 28, 0.03);
+            overflow: hidden;
+        }
+        .case-folder-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 6px;
+            height: 100%;
+            background: #c5a059;
+        }
+        .case-folder-card.appellant-folder::before {
+            background: #2563eb; /* Blue tab for Appellants */
+        }
+        .case-folder-card:active {
+            transform: scale(0.98);
+        }
+
+        /* Hide scrollbars for slick mobile look */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; color: black; font-size: 10pt; }
+            .case-folder-card { border: 1px solid #ccc; box-shadow: none; }
+        }
+    </style>
+</head>
+<body class="text-slate-900 antialiased min-h-screen flex flex-col bg-slate-100 pb-20">
+
+    <!-- Admin Settings Modal -->
+    <div id="adminSettingsModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <h2 class="text-sm font-black text-navy-900 flex items-center gap-2">
+                    <i class="fa-solid fa-cogs text-rose-700"></i> إعدادات النظام (للأدمن)
+                </h2>
+                <button onclick="closeAdminSettings()" class="text-slate-400 hover:text-slate-600 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <div class="p-5 overflow-y-auto space-y-6">
+                <!-- Data Upload -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-700">رفع أو تحديث البيانات:</label>
+                    <label for="excelFileInput" class="cursor-pointer w-full bg-navy-900 hover:bg-navy-800 text-amber-300 font-bold py-3 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-2 border border-amber-400/30">
+                        <i class="fa-solid fa-file-excel text-base text-emerald-400"></i>
+                        رفع شيت القضايا (Excel)
+                    </label>
+                    <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelUpload(event)">
+                </div>
+
+                <hr class="border-slate-200">
+
+                <!-- Field Toggles -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-700">تخصيص العرض (إظهار وإخفاء الحقول):</label>
+                    <div id="fieldsToggleContainer" class="max-h-48 overflow-y-auto space-y-2 pr-1 no-scrollbar text-xs border border-slate-200 p-2 rounded-xl bg-slate-50">
+                        <!-- Dynamic Checkboxes injected here -->
+                    </div>
+                    <div class="flex items-center justify-between pt-1">
+                        <button onclick="selectAllFields(true)" class="text-[11px] font-bold text-blue-700 hover:underline px-2 py-1">تحديد الكل</button>
+                        <button onclick="selectAllFields(false)" class="text-[11px] font-bold text-slate-500 hover:underline px-2 py-1">إلغاء الكل</button>
+                    </div>
+                </div>
+
+                <hr class="border-slate-200">
+                <!-- Change Consultant Name -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-700">تغيير اسم المستشار في المطبوعات:</label>
+                    <div class="flex items-center gap-2">
+                        <input type="text" id="consultantNameInput" class="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900">
+                        <button onclick="saveConsultantName()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-sm">حفظ</button>
+                    </div>
+                </div>
+
+                <hr class="border-slate-200">
+
+                <!-- Danger Zone -->
+                <div class="space-y-3">
+                    <h3 class="text-xs font-black text-rose-700 flex items-center gap-1.5"><i class="fa-solid fa-triangle-exclamation"></i> منطقة الخطر</h3>
+                    <p class="text-[11px] text-slate-500 font-bold">هذا الإجراء سيقوم بمسح كافة البيانات من التطبيق لجميع المستخدمين فوراً.</p>
+                    <button onclick="deleteAllData()" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-trash-can"></i> مسح كافة البيانات نهائياً
+                    </button>
+                </div>
+                
+                <hr class="border-slate-200">
+                
+                <button onclick="handleLogout()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2.5 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal Removed, using native prompt for now -->
+
+    <!-- Edit Case Modal -->
+    <div id="editCaseModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <h2 class="text-sm font-black text-navy-900 flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-blue-600"></i> تعديل بيانات القضية
+                </h2>
+                <button type="button" onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div id="editCaseFormContainer" class="p-5 overflow-y-auto space-y-3 flex-1 text-xs font-bold text-navy-900">
+                <!-- Dynamically generated inputs -->
+            </div>
+            <div class="p-4 border-t border-slate-100 bg-slate-50 flex items-center gap-2">
+                <button onclick="saveCaseEdits()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition shadow-sm">حفظ التعديلات</button>
+                <button onclick="closeEditModal()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2.5 rounded-xl transition shadow-sm">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openAdminSettings() {
+            try {
+                document.getElementById('consultantNameInput').value = window.consultantName || "أحمد وجيه";
+                renderSettingsModal();
+                document.getElementById('adminSettingsModal').classList.remove('hidden');
+            } catch(e) {
+                console.error("Error opening admin settings:", e);
+                alert("حدث خطأ أثناء فتح الإعدادات.");
+            }
+        }
+        function closeAdminSettings() {
+            document.getElementById('adminSettingsModal').classList.add('hidden');
+        }
+        function saveConsultantName() {
+            const newName = document.getElementById('consultantNameInput').value.trim();
+            if(newName && window.updateConsultantName) {
+                window.updateConsultantName(newName);
+            }
+        }
+
+        let currentEditIndex = -1;
+        function openEditCaseModal(index) {
+            currentEditIndex = index;
+            const cObj = window.currentFilteredCases[index];
+            const container = document.getElementById('editCaseFormContainer');
+            container.innerHTML = '';
+            
+            window.appHeaders.forEach(header => {
+                const val = cObj[header] || '';
+                const div = document.createElement('div');
+                div.className = "space-y-1";
+                div.innerHTML = `
+                    <label class="block text-[11px] text-slate-500 uppercase">${header}</label>
+                    <input type="text" data-header="${header}" value="${val.replace(/"/g, '&quot;')}" class="edit-input w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent">
+                `;
+                container.appendChild(div);
+            });
+            
+            document.getElementById('editCaseModal').classList.remove('hidden');
+        }
+        function closeEditModal() {
+            document.getElementById('editCaseModal').classList.add('hidden');
+        }
+        function saveCaseEdits() {
+            if(currentEditIndex < 0 || !window.isAdmin) return;
+            const inputs = document.querySelectorAll('.edit-input');
+            const newData = {};
+            inputs.forEach(inp => {
+                newData[inp.getAttribute('data-header')] = inp.value.trim();
+            });
+            if(window.updateCaseData) {
+                window.updateCaseData(currentEditIndex, newData);
+                closeEditModal();
+            }
+        }
+    </script>
+
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 pb-4 space-y-4">
+
+
+        <!-- Upload Status Alert -->
+        <div id="dataStatusAlert" class="hidden bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-2xl flex items-center justify-between no-print shadow-sm text-xs sm:text-sm">
+            <div class="flex items-center gap-2.5">
+                <i class="fa-solid fa-circle-check text-emerald-600 text-lg"></i>
+                <span id="dataStatusText" class="font-bold">تم رفع وتحميل ملف القضايا بنجاح.</span>
+            </div>
+            <button onclick="dismissStatusAlert()" class="text-emerald-700 hover:text-emerald-950 p-1">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+        </div>
+
+        <!-- The Tabs were moved to the bottom navbar -->
+
+        <!-- FILES TAB CONTAINER -->
+        <div id="filesTabContainer" class="space-y-4">
+            <section class="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-slate-200 no-print space-y-3">
+            
+            <!-- Global Instant Search Field -->
+            <div class="relative">
+                <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+                    <i class="fa-solid fa-magnifying-glass text-base"></i>
+                </div>
+                <input type="text" id="searchInput" oninput="filterCases()" 
+                       placeholder="ابحث برقم الدعوى، الخصوم (طاعن/مطعون ضده)، المحكمة، تاريخ الجلسة، القرار..." 
+                       class="w-full pr-10 pl-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:bg-white transition placeholder-slate-400 shadow-inner">
+                
+                <button id="clearSearchBtn" onclick="resetSearch()" class="hidden absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-circle-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Quick Action Filters (طاعنين / مطعون ضدهم / الكل) -->
+            <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1">
+                <span class="text-[11px] font-extrabold text-slate-500 whitespace-nowrap pl-1">صفة الموكل:</span>
+                
+                <button id="filterAllBtn" onclick="setRoleFilter('all')" class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border bg-navy-900 text-white border-navy-900 transition flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-layer-group text-[10px]"></i>
+                    <span>جميع القضايا (<span id="countAllBadge">0</span>)</span>
+                </button>
+
+                <button id="filterAppellantBtn" onclick="setRoleFilter('طاعن')" class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-shield-halved text-blue-600 text-[10px]"></i>
+                    <span>قضايا الطاعنين (<span id="countAppellantBadge">0</span>)</span>
+                </button>
+
+                <button id="filterAppelleeBtn" onclick="setRoleFilter('مطعون')" class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-scale-unbalanced text-amber-700 text-[10px]"></i>
+                    <span>المطعون ضدهم (<span id="countAppelleeBadge">0</span>)</span>
+                </button>
+            </div>
+
+            <!-- View Switcher Tabs (For Files Tab) -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 mt-3">
+                <div class="flex items-center bg-slate-100 p-1 rounded-xl gap-1 border border-slate-200/80 text-xs font-semibold w-full sm:w-auto">
+                    <button id="btnViewFolders" onclick="switchView('folders')" class="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition bg-white text-navy-900 shadow-sm font-bold">
+                        <i class="fa-solid fa-folder-closed text-amber-600"></i>
+                        <span>عرض الفولدرات</span>
+                    </button>
+                    <button id="btnViewTable" onclick="switchView('table')" class="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition text-slate-600 hover:text-slate-900">
+                        <i class="fa-solid fa-table-cells text-slate-500"></i>
+                        <span>جدول القضايا</span>
+                    </button>
+                </div>
+
+                <div class="text-[11px] font-extrabold text-slate-500 mr-auto">
+                    المعروض: <span id="currentDisplayCount" class="text-navy-900 font-black">0</span> قضية
+                </div>
+            </div>
+            </section>
+
+        <section id="foldersView" class="space-y-3">
+            <div class="flex items-center justify-end no-print">
+                <button onclick="window.print()" class="text-xs text-navy-900 bg-slate-100 hover:bg-slate-200 font-bold px-3 py-1.5 rounded-xl border border-slate-300 transition flex items-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-print"></i>
+                    <span>طباعة القضايا الظاهرة (PDF)</span>
+                </button>
+            </div>
+            <div id="foldersGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                <!-- Dynamic Legal Folder Cards injected here -->
+            </div>
+            
+            <!-- Pagination Controls for Folders -->
+            <div id="foldersPagination" class="flex items-center justify-center gap-2 mt-4 no-print text-xs font-bold">
+            </div>
+        </section>
+
+        <section id="tableView" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                <p class="text-xs font-extrabold text-navy-900">جدول القضايا والسجل المباشر</p>
+                <div class="flex gap-2">
+                    <button onclick="window.print()" class="text-xs text-navy-900 bg-slate-100 hover:bg-slate-200 font-bold px-3 py-1.5 rounded-xl border border-slate-300 transition flex items-center gap-1">
+                        <i class="fa-solid fa-print"></i>
+                        <span>طباعة (PDF)</span>
+                    </button>
+                    <button onclick="exportToCSV()" class="text-xs text-emerald-800 bg-emerald-100 hover:bg-emerald-200 font-bold px-3 py-1.5 rounded-xl border border-emerald-300 transition flex items-center gap-1">
+                        <i class="fa-solid fa-file-csv"></i>
+                        <span>تصدير CSV</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto max-h-[70vh] no-scrollbar">
+                <table class="w-full text-right text-xs">
+                    <thead id="tableHeader" class="bg-navy-900 text-white sticky top-0 z-10 font-bold">
+                        <!-- Dynamic Excel Headers -->
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-100 font-medium">
+                        <!-- Dynamic Table Rows -->
+                    </tbody>
+                </table>
+            </div>
+            <!-- Pagination Controls for Table -->
+            <div id="tablePagination" class="flex items-center justify-center gap-2 p-3 border-t border-slate-100 no-print text-xs font-bold bg-slate-50">
+            </div>
+        </section>
+        </div> <!-- End of Files Tab Container -->
+        
+        <div id="agendaTabContainer" class="hidden space-y-4 pb-[80px]">
+
+            <!-- Agenda Sub-tabs -->
+            <div class="flex items-center bg-white rounded-2xl border border-slate-200 shadow-sm p-1.5 gap-1 no-print">
+                <button id="agendaTabCalendar" onclick="switchAgendaTab('calendar')" class="flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 bg-navy-900 text-amber-300 shadow transition">
+                    <i class="fa-solid fa-calendar-days"></i><span>التقويم الشهري</span>
+                </button>
+                <button id="agendaTabFilter" onclick="switchAgendaTab('filter')" class="flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 text-slate-500 hover:text-navy-900 transition">
+                    <i class="fa-solid fa-filter"></i><span>الفلترة الذكية</span>
+                </button>
+            </div>
+
+            <!-- TAB 1: Interactive Monthly Calendar -->
+            <div id="agendaCalendarTab" class="space-y-3">
+                <!-- Calendar Card -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <!-- Calendar Header: Month Navigation -->
+                    <div class="bg-navy-900 text-white px-4 py-3 flex items-center justify-between">
+                        <button onclick="changeCalendarMonth(-1)" class="w-8 h-8 rounded-lg bg-navy-800 hover:bg-navy-700 flex items-center justify-center transition active:scale-95">
+                            <i class="fa-solid fa-chevron-right text-amber-300 text-xs"></i>
+                        </button>
+                        <div class="text-center">
+                            <h2 id="calendarMonthTitle" class="font-black text-base text-white">يوليو 2026</h2>
+                            <p class="text-[10px] text-amber-300 font-bold mt-0.5" id="calendarSessionCount">جاري حساب الجلسات...</p>
+                        </div>
+                        <button onclick="changeCalendarMonth(1)" class="w-8 h-8 rounded-lg bg-navy-800 hover:bg-navy-700 flex items-center justify-center transition active:scale-95">
+                            <i class="fa-solid fa-chevron-left text-amber-300 text-xs"></i>
+                        </button>
+                    </div>
+
+                    <!-- Day Names Header -->
+                    <div class="grid grid-cols-7 bg-slate-50 border-b border-slate-200">
+                        <div class="text-center py-2 text-[10px] font-black text-rose-600">أحد</div>
+                        <div class="text-center py-2 text-[10px] font-black text-slate-500">إثن</div>
+                        <div class="text-center py-2 text-[10px] font-black text-slate-500">ثلا</div>
+                        <div class="text-center py-2 text-[10px] font-black text-slate-500">أرب</div>
+                        <div class="text-center py-2 text-[10px] font-black text-slate-500">خمي</div>
+                        <div class="text-center py-2 text-[10px] font-black text-slate-500">جمع</div>
+                        <div class="text-center py-2 text-[10px] font-black text-rose-600">سبت</div>
+                    </div>
+
+                    <!-- Calendar Grid -->
+                    <div id="calendarGrid" class="grid grid-cols-7 gap-0 border-b border-slate-100">
+                        <!-- Dynamically rendered days -->
+                    </div>
+                </div>
+
+                <!-- Session Details Panel (shown on day click) -->
+                <div id="calendarDayPanel" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div id="calendarDayPanelHeader" class="bg-amber-50 border-b border-amber-200 px-4 py-3 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 bg-amber-400 rounded-xl flex items-center justify-center">
+                                <i class="fa-solid fa-gavel text-navy-900 text-sm"></i>
+                            </div>
+                            <div>
+                                <h3 id="calendarDayPanelDate" class="font-black text-sm text-navy-900">جلسات يوم الاثنين</h3>
+                                <p id="calendarDayPanelCount" class="text-[11px] text-amber-700 font-bold">0 ملف</p>
+                            </div>
+                        </div>
+                        <button onclick="document.getElementById('calendarDayPanel').classList.add('hidden')" class="text-slate-400 hover:text-slate-700 p-1">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div id="calendarDayPanelList" class="divide-y divide-slate-100 max-h-80 overflow-y-auto">
+                        <!-- Case rows injected here -->
+                    </div>
+                    <div class="p-3 bg-slate-50 border-t border-slate-100 no-print">
+                        <button id="calendarDayRollBtn" class="w-full bg-navy-900 hover:bg-navy-800 text-amber-300 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-sm">
+                            <i class="fa-solid fa-print"></i> طباعة رول هذه الجلسة
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: Smart Date Filter -->
+            <div id="agendaFilterTab" class="hidden space-y-3">
+                <!-- Quick Filters -->
+                <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+                    <p class="text-xs font-black text-navy-900 flex items-center gap-2">
+                        <i class="fa-solid fa-bolt text-amber-500"></i> فلترة سريعة
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="applySmartFilter('today')" class="px-3 py-2 rounded-xl text-xs font-bold border bg-slate-100 text-slate-700 border-slate-200 hover:bg-navy-900 hover:text-amber-300 hover:border-navy-900 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-circle-dot text-amber-500 text-[10px]"></i> اليوم
+                        </button>
+                        <button onclick="applySmartFilter('thisWeek')" class="px-3 py-2 rounded-xl text-xs font-bold border bg-slate-100 text-slate-700 border-slate-200 hover:bg-navy-900 hover:text-amber-300 hover:border-navy-900 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-calendar-week text-blue-500 text-[10px]"></i> هذا الأسبوع
+                        </button>
+                        <button onclick="applySmartFilter('currentMonth')" class="px-3 py-2 rounded-xl text-xs font-bold border bg-slate-100 text-slate-700 border-slate-200 hover:bg-navy-900 hover:text-amber-300 hover:border-navy-900 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-calendar text-indigo-500 text-[10px]"></i> الشهر الحالي
+                        </button>
+                        <button onclick="applySmartFilter('nextSession')" class="px-3 py-2 rounded-xl text-xs font-bold border bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-forward-step text-[10px]"></i> أقرب جلسة قادمة
+                        </button>
+                        <button onclick="applySmartFilter('prevSession')" class="px-3 py-2 rounded-xl text-xs font-bold border bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-backward-step text-[10px]"></i> أقرب جلسة سابقة
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Date Range Filter -->
+                <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+                    <p class="text-xs font-black text-navy-900 flex items-center gap-2">
+                        <i class="fa-solid fa-calendar-range text-navy-900"></i> فلترة بنطاق تاريخ
+                    </p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-extrabold text-slate-500">من تاريخ</label>
+                            <input type="date" id="filterDateFrom" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-extrabold text-slate-500">إلى تاريخ</label>
+                            <input type="date" id="filterDateTo" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900">
+                        </div>
+                    </div>
+                    <button onclick="applySmartFilter('range')" class="w-full bg-navy-900 hover:bg-navy-800 text-amber-300 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-sm">
+                        <i class="fa-solid fa-magnifying-glass"></i> عرض النتائج
+                    </button>
+                </div>
+
+                <!-- Filter Results -->
+                <div id="smartFilterResults" class="space-y-2">
+                    <!-- Results injected here -->
+                </div>
+            </div>
+
+            <!-- Roll View (kept for print functionality) -->
+            <section id="rollView" class="hidden space-y-4">
+                <!-- Hidden input used by generateSessionRoll for print -->
+                <input type="text" id="rollDatePicker" class="hidden" aria-hidden="true">
+                <div id="rollContainer" class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm min-h-[250px]"></div>
+            </section>
+        </div> <!-- End of Agenda Tab Container -->
+
+        <section id="detailsView" class="hidden space-y-4 pb-[70px]">
+            
+            <!-- Sticky Return Navigation Bar -->
+            <div class="flex items-center justify-between bg-white/95 backdrop-blur-md p-3 rounded-2xl border border-slate-200 shadow-sm no-print sticky top-[76px] z-40 transition-all">
+                <button onclick="closeDetailsPage()" class="bg-navy-900 hover:bg-navy-800 text-amber-300 text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition active:scale-95 shadow">
+                    <i class="fa-solid fa-arrow-right"></i>
+                    <span>الرجوع لقائمة الفولدرات</span>
+                </button>
+                <div class="flex items-center gap-2">
+                    <button id="editCaseDetailsBtn" class="hidden admin-only bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold px-3.5 py-2 rounded-xl border border-blue-300 flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-pen text-blue-700"></i>
+                        <span>تعديل</span>
+                    </button>
+                    <button onclick="window.print()" class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold px-3.5 py-2 rounded-xl border border-slate-300 flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-print text-navy-900"></i>
+                        <span>طباعة الملف</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Formatted Case File Sheet -->
+            <div id="caseDetailContent" class="space-y-4">
+                <!-- Dynamically populated legal case layout -->
+            </div>
+
+        </section>
+
+        <!-- Empty Results Fallback -->
+        <div id="noResultsState" class="hidden text-center py-12 bg-white rounded-2xl border border-dashed border-slate-300 px-4">
+            <div class="w-14 h-14 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i class="fa-solid fa-folder-open text-2xl"></i>
+            </div>
+            <h3 class="font-extrabold text-slate-800 text-sm mb-1">لم يتم العثور على أي قضايا مطابقة</h3>
+            <p class="text-xs text-slate-500 max-w-sm mx-auto mb-4">تأكد من كتابة أرقام الدعوى أو اسم الخصم بشكل صحيح أو قم برفع شيت Excel الجديد.</p>
+            <button onclick="resetAllFilters()" class="text-xs font-bold bg-navy-900 text-amber-300 px-4 py-2 rounded-xl hover:bg-navy-800 transition">
+                عرض كافة البيانات
+            </button>
+        </div>
+
+    </main>
+    <!-- Footer -->
+    <footer class="bg-navy-950 text-slate-400 text-[11px] py-3 text-center border-t border-navy-900 no-print mt-auto pb-[70px]">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-1">
+            <p>تطبيق اختصاص &copy; جميع الحقوق محفوظة للمستشار أحمد وجيه.</p>
+            <p class="font-semibold text-slate-300">السجل القضائي الإلكتروني <span id="currentYear"></span></p>
+        </div>
+    </footer>
+
+    <script>
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+
+        /* Dynamic Excel Sheet Headers, Data State, & Field Visibility Settings */
+        var appHeaders = [
+            "caseID", "year", "الصفة", "الطاعن", "المطعون ضده", "session_date", "القرار", "الملاحظات"
+        ];
+        
+        var visibleFieldsMap = {}; // Tracks visibility per header (true/false)
+
+        window.initFieldVisibility = function() {
+            appHeaders.forEach(h => {
+                if (visibleFieldsMap[h] === undefined) {
+                    visibleFieldsMap[h] = true;
+                }
+            });
+        };
+
+        var casesData = [];
+
+        var currentFilteredCases = [];
+        window.currentFilteredCases = currentFilteredCases;
+        var activeView = 'folders';
+        var activeRoleFilter = 'all'; // 'all', 'طاعن', 'مطعون'
+        var currentPage = 1;
+        var itemsPerPage = 12;
+
+        window.filterCases = function(resetPage = true) {
+            if (resetPage) currentPage = 1;
+            const query = document.getElementById('searchInput').value.trim().toLowerCase();
+            document.getElementById('clearSearchBtn').classList.toggle('hidden', query === '');
+
+            // Calculate Role Counts
+            let appellantCount = 0;
+            let appelleeCount = 0;
+
+            window.casesData.forEach(cObj => {
+                const roleVal = getFieldValue(cObj, ["role", "status", "client_role", "الصفة", "صفة", "صفة الموكل", "الصفه"]).toLowerCase();
+                if (roleVal.includes("طاعن") || roleVal.includes("مدعي") || roleVal.includes("مستأنف")) {
+                    appellantCount++;
+                } else if (roleVal.includes("مطعون") || roleVal.includes("مدعى عليه") || roleVal.includes("مستأنف ضده")) {
+                    appelleeCount++;
+                }
+            });
+
+            document.getElementById('countAllBadge').textContent = window.casesData.length;
+            document.getElementById('countAppellantBadge').textContent = appellantCount;
+            document.getElementById('countAppelleeBadge').textContent = appelleeCount;
+
+            currentFilteredCases = window.casesData.filter(cObj => {
+                if (activeRoleFilter !== 'all') {
+                    const roleVal = getFieldValue(cObj, ["role", "status", "client_role", "الصفة", "صفة", "صفة الموكل", "الصفه"]).toLowerCase();
+                    if (activeRoleFilter === 'طاعن' && !(roleVal.includes("طاعن") || roleVal.includes("مدعي") || roleVal.includes("مستأنف"))) {
+                        return false;
+                    }
+                    if (activeRoleFilter === 'مطعون' && !(roleVal.includes("مطعون") || roleVal.includes("مدعى عليه") || roleVal.includes("مستأنف ضده"))) {
+                        return false;
+                    }
+                }
+
+                if (!query) return true;
+                return Object.values(cObj).some(val => String(val).toLowerCase().includes(query));
+            });
+            window.currentFilteredCases = currentFilteredCases; // keep in sync
+
+            document.getElementById('currentDisplayCount').textContent = currentFilteredCases.length;
+
+            renderFoldersView();
+            renderTableView();
+            // generateSessionRoll is called only when printing from calendar day panel
+
+            const noRes = document.getElementById('noResultsState');
+            if (currentFilteredCases.length === 0) {
+                noRes.classList.remove('hidden');
+                document.getElementById('foldersGrid').classList.add('hidden');
+                document.getElementById('tableView').classList.add('hidden');
+            } else {
+                noRes.classList.add('hidden');
+                document.getElementById('foldersGrid').classList.remove('hidden');
+                if (activeView === 'table') document.getElementById('tableView').classList.remove('hidden');
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initFieldVisibility();
+            if (localStorage.getItem('ekhtsasi_admin') === 'true') {
+                window.isAdmin = true;
+                const adminEls = document.querySelectorAll('.admin-only');
+                adminEls.forEach(el => el.classList.remove('hidden'));
+            }
+            filterCases();
+        });
+
+
+        function renderSettingsModal() {
+            const container = document.getElementById('fieldsToggleContainer');
+            if(!container) return;
+            container.innerHTML = '';
+
+            const headersToRender = window.appHeaders || appHeaders || [];
+            headersToRender.forEach(headerName => {
+                const isChecked = visibleFieldsMap[headerName] !== false;
+                const div = document.createElement('label');
+                div.className = "flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition";
+                div.innerHTML = `
+                    <span class="font-bold text-slate-800 text-xs">${headerName}</span>
+                    <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleFieldVisibility('${headerName}', this.checked)" class="w-4 h-4 accent-navy-900 rounded cursor-pointer">
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function toggleFieldVisibility(headerName, isVisible) {
+            visibleFieldsMap[headerName] = isVisible;
+            filterCases();
+        }
+
+        function selectAllFields(status) {
+            appHeaders.forEach(h => {
+                visibleFieldsMap[h] = status;
+            });
+            renderSettingsModal();
+            filterCases();
+        }
+
+        /* Handle Dynamic Excel File Upload - NOTE: Firebase module overrides this */
+        function handleExcelUpload(event) {
+            // This function is overridden by the Firebase module below.
+            // It exists as a placeholder to avoid errors before Firebase loads.
+            alert("جاري تحميل نظام Firebase... حاول مرة تانية.");
+        }
+
+        function dismissStatusAlert() {
+            document.getElementById('dataStatusAlert').classList.add('hidden');
+        }
+
+        /* Helper to get value matching possible dynamic header variations */
+        function getFieldValue(cObj, keywords) {
+            if (!cObj) return "";
+            const keys = Object.keys(cObj);
+            const cleanKeywords = keywords.map(kw => kw.toLowerCase().replace(/[\s_]/g, ''));
+
+            // Pass 1: Exact Match (prioritize exact column names)
+            for (let cleanKw of cleanKeywords) {
+                const foundKey = keys.find(k => k.toLowerCase().replace(/[\s_]/g, '') === cleanKw);
+                if (foundKey && cObj[foundKey] !== undefined && String(cObj[foundKey]).trim() !== "") {
+                    return String(cObj[foundKey]).trim();
+                }
+            }
+            
+            // Pass 2: Partial Match (fallback if no exact match found)
+            for (let cleanKw of cleanKeywords) {
+                const foundKey = keys.find(k => k.toLowerCase().replace(/[\s_]/g, '').includes(cleanKw));
+                if (foundKey && cObj[foundKey] !== undefined && String(cObj[foundKey]).trim() !== "") {
+                    return String(cObj[foundKey]).trim();
+                }
+            }
+            return "";
+        }
+
+
+
+        function setRoleFilter(role) {
+            activeRoleFilter = role;
+
+            const btnAll = document.getElementById('filterAllBtn');
+            const btnApp = document.getElementById('filterAppellantBtn');
+            const btnAple = document.getElementById('filterAppelleeBtn');
+
+            btnAll.className = "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200 transition flex items-center gap-1.5";
+            btnApp.className = "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100 transition flex items-center gap-1.5";
+            btnAple.className = "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100 transition flex items-center gap-1.5";
+
+            if (role === 'all') {
+                btnAll.className = "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border bg-navy-900 text-white border-navy-900 transition flex items-center gap-1.5 shadow-sm";
+            } else if (role === 'طاعن') {
+                btnApp.className = "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border bg-blue-600 text-white border-blue-600 transition flex items-center gap-1.5 shadow-sm";
+            } else if (role === 'مطعون') {
+                btnAple.className = "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border bg-amber-600 text-white border-amber-600 transition flex items-center gap-1.5 shadow-sm";
+            }
+
+            filterCases();
+        }
+
+        function resetSearch() {
+            document.getElementById('searchInput').value = '';
+            filterCases();
+        }
+
+        var consultantName = "أحمد وجيه"; // Default Consultant Name
+
+        window.switchMainTab = function(tabName) {
+            const filesTab = document.getElementById('filesTabContainer');
+            const agendaTab = document.getElementById('agendaTabContainer');
+            
+            const btnFiles = document.getElementById('navFilesBtn');
+            const btnAgenda = document.getElementById('navAgendaBtn');
+            const iconFiles = document.getElementById('navFilesIcon');
+            const iconAgenda = document.getElementById('navAgendaIcon');
+            const textFiles = document.getElementById('navFilesText');
+            const textAgenda = document.getElementById('navAgendaText');
+
+            if(tabName === 'files') {
+                filesTab.classList.remove('hidden');
+                agendaTab.classList.add('hidden');
+                
+                iconFiles.classList.replace('text-slate-400', 'text-amber-500');
+                textFiles.classList.replace('text-slate-500', 'text-navy-900');
+                
+                iconAgenda.classList.replace('text-amber-500', 'text-slate-400');
+                textAgenda.classList.replace('text-navy-900', 'text-slate-500');
+            } else {
+                filesTab.classList.add('hidden');
+                agendaTab.classList.remove('hidden');
+                
+                iconAgenda.classList.replace('text-slate-400', 'text-amber-500');
+                textAgenda.classList.replace('text-slate-500', 'text-navy-900');
+                
+                iconFiles.classList.replace('text-amber-500', 'text-slate-400');
+                textFiles.classList.replace('text-navy-900', 'text-slate-500');
+
+                // Render calendar when switching to agenda
+                renderCalendar();
+            }
+        };
+
+        // ─────────────────────────────────────────────
+        // AGENDA SUB-TAB SWITCHER
+        // ─────────────────────────────────────────────
+        window.switchAgendaTab = function(tab) {
+            const calTab = document.getElementById('agendaCalendarTab');
+            const filtTab = document.getElementById('agendaFilterTab');
+            const btnCal = document.getElementById('agendaTabCalendar');
+            const btnFilt = document.getElementById('agendaTabFilter');
+
+            if (tab === 'calendar') {
+                calTab.classList.remove('hidden');
+                filtTab.classList.add('hidden');
+                btnCal.className = 'flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 bg-navy-900 text-amber-300 shadow transition';
+                btnFilt.className = 'flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 text-slate-500 hover:text-navy-900 transition';
+            } else {
+                calTab.classList.add('hidden');
+                filtTab.classList.remove('hidden');
+                btnFilt.className = 'flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 bg-navy-900 text-amber-300 shadow transition';
+                btnCal.className = 'flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 text-slate-500 hover:text-navy-900 transition';
+            }
+        };
+
+        // ─────────────────────────────────────────────
+        // CALENDAR ENGINE
+        // ─────────────────────────────────────────────
+        var calendarYear = new Date().getFullYear();
+        var calendarMonth = new Date().getMonth(); // 0-indexed
+        var selectedCalendarDate = null;
+
+        var ARABIC_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+        var ARABIC_DAYS_LONG = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+
+        function getSessionDateKey(cObj) {
+            return getFieldValue(cObj, ['آخر جلسة','أخر جلسة','اخر جلسة','تاريخ الجلسة','session_date','sessiondate','next_session']);
+        }
+
+        // Build a map: "YYYY-MM-DD" → [array of cases]
+        function buildSessionsMap() {
+            const map = {};
+            (window.casesData || []).forEach(cObj => {
+                const dStr = getSessionDateKey(cObj);
+                if (!dStr) return;
+                // Normalize to YYYY-MM-DD
+                const d = new Date(dStr);
+                if (isNaN(d)) return;
+                const key = d.toISOString().split('T')[0];
+                if (!map[key]) map[key] = [];
+                map[key].push(cObj);
+            });
+            return map;
+        }
+
+        window.renderCalendar = function() {
+            const grid = document.getElementById('calendarGrid');
+            const title = document.getElementById('calendarMonthTitle');
+            const countEl = document.getElementById('calendarSessionCount');
+            if (!grid) return;
+
+            const sessionsMap = buildSessionsMap();
+            const today = new Date();
+            today.setHours(0,0,0,0);
+
+            title.textContent = `${ARABIC_MONTHS[calendarMonth]} ${calendarYear}`;
+
+            // Count sessions this month
+            let monthSessionDays = 0;
+            let monthSessionFiles = 0;
+            const prefix = `${calendarYear}-${String(calendarMonth + 1).padStart(2,'0')}`;
+            Object.keys(sessionsMap).forEach(k => {
+                if (k.startsWith(prefix)) {
+                    monthSessionDays++;
+                    monthSessionFiles += sessionsMap[k].length;
+                }
+            });
+            countEl.textContent = monthSessionDays > 0
+                ? `${monthSessionDays} يوم جلسة • ${monthSessionFiles} ملف هذا الشهر`
+                : 'لا توجد جلسات مسجلة هذا الشهر';
+
+            // First day of month (0=Sun)
+            const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
+            const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+
+            grid.innerHTML = '';
+
+            // Empty cells before first day
+            for (let i = 0; i < firstDay; i++) {
+                const empty = document.createElement('div');
+                empty.className = 'h-12 border-b border-r border-slate-100 bg-slate-50/50';
+                grid.appendChild(empty);
+            }
+
+            // Day cells
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateKey = `${calendarYear}-${String(calendarMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const cases = sessionsMap[dateKey] || [];
+                const hasSession = cases.length > 0;
+                const cellDate = new Date(calendarYear, calendarMonth, d);
+                cellDate.setHours(0,0,0,0);
+                const isToday = cellDate.getTime() === today.getTime();
+                const isPast = cellDate < today;
+                const isSelected = selectedCalendarDate === dateKey;
+                const dayOfWeek = cellDate.getDay();
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+                const cell = document.createElement('div');
+                cell.className = [
+                    'relative h-12 border-b border-r border-slate-100 flex flex-col items-center justify-center cursor-pointer transition-all select-none',
+                    hasSession ? 'hover:bg-amber-50 active:bg-amber-100' : 'hover:bg-slate-50',
+                    isSelected ? 'bg-amber-50 ring-2 ring-inset ring-amber-400' : '',
+                    isToday && !isSelected ? 'bg-navy-900/5' : '',
+                ].join(' ');
+
+                if (hasSession) {
+                    cell.onclick = () => openCalendarDay(dateKey, cases);
+                }
+
+                const dayNum = document.createElement('span');
+                dayNum.className = [
+                    'text-xs font-black leading-none',
+                    isToday ? 'w-6 h-6 rounded-full bg-navy-900 text-amber-300 flex items-center justify-center' : '',
+                    !isToday && isWeekend ? 'text-rose-500' : '',
+                    !isToday && !isWeekend && isPast ? 'text-slate-400' : '',
+                    !isToday && !isWeekend && !isPast ? 'text-slate-800' : '',
+                ].join(' ');
+                dayNum.textContent = d;
+                cell.appendChild(dayNum);
+
+                if (hasSession) {
+                    const badge = document.createElement('span');
+                    badge.className = 'absolute bottom-1 right-1/2 translate-x-1/2 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-black flex items-center justify-center ' +
+                        (isPast ? 'bg-slate-300 text-slate-600' : 'bg-amber-400 text-navy-900');
+                    badge.textContent = cases.length;
+                    cell.appendChild(badge);
+                }
+
+                grid.appendChild(cell);
+            }
+        };
+
+        window.changeCalendarMonth = function(delta) {
+            calendarMonth += delta;
+            if (calendarMonth > 11) { calendarMonth = 0; calendarYear++; }
+            if (calendarMonth < 0) { calendarMonth = 11; calendarYear--; }
+            selectedCalendarDate = null;
+            document.getElementById('calendarDayPanel').classList.add('hidden');
+            renderCalendar();
+        };
+
+        function openCalendarDay(dateKey, cases) {
+            selectedCalendarDate = dateKey;
+            renderCalendar(); // re-render to show selection
+
+            const panel = document.getElementById('calendarDayPanel');
+            const dateObj = new Date(dateKey + 'T00:00:00');
+            const dayName = ARABIC_DAYS_LONG[dateObj.getDay()];
+            const formattedDate = `${dateObj.getDate()} ${ARABIC_MONTHS[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+
+            document.getElementById('calendarDayPanelDate').textContent = `جلسات يوم ${dayName} ${formattedDate}`;
+            document.getElementById('calendarDayPanelCount').textContent = `${cases.length} ملف قضائي`;
+
+            const list = document.getElementById('calendarDayPanelList');
+            list.innerHTML = '';
+
+            cases.forEach((cObj, idx) => {
+                const caseNo = getFieldValue(cObj, ['رقم الدعوى','رقم القضية','رقم_الدعوى','caseid','case_id']);
+                const year = getFieldValue(cObj, ['السنة','سنة','year','case_year']);
+                const appellant = getFieldValue(cObj, ['المدعي','الطاعن','المستأنف','appellant','claimant']);
+                const appellee = getFieldValue(cObj, ['المدعى_عليه','المدعى عليه','المطعون ضده','المطعون','appellee','defendant']);
+                const decision = getFieldValue(cObj, ['القرار','قرار الجلسة','المنطوق','قرار','decision','verdict']);
+                const role = getFieldValue(cObj, ['الصفة','صفة','role','status']) || '';
+
+                const realIdx = (window.currentFilteredCases || []).indexOf(cObj);
+                const canOpen = realIdx > -1;
+
+                const row = document.createElement('div');
+                row.className = 'p-3 flex items-start justify-between gap-3 hover:bg-slate-50 transition';
+                row.innerHTML = `
+                    <div class="flex items-start gap-2.5 flex-1 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-navy-900 text-amber-300 text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">${idx+1}</span>
+                        <div class="min-w-0">
+                            <p class="text-xs font-black text-navy-900 leading-snug">
+                                دعوى ${caseNo ? `رقم ${caseNo}` : ''} ${year ? `لسنة ${year}` : ''}
+                                ${role ? `<span class="mr-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">${role}</span>` : ''}
+                            </p>
+                            ${appellant ? `<p class="text-[11px] text-slate-600 font-bold mt-0.5 truncate"><span class="text-slate-400">المدعي:</span> ${appellant}</p>` : ''}
+                            ${appellee ? `<p class="text-[11px] text-slate-600 font-bold truncate"><span class="text-slate-400">ضد:</span> ${appellee}</p>` : ''}
+                            ${decision ? `<p class="text-[11px] text-amber-700 font-bold mt-1 truncate">📋 ${decision}</p>` : ''}
+                        </div>
+                    </div>
+                    ${canOpen ? `<button onclick="openCaseDetails(${realIdx})" class="shrink-0 bg-navy-900 hover:bg-navy-700 text-amber-300 text-[10px] font-black px-2.5 py-1.5 rounded-lg transition flex items-center gap-1"><i class="fa-solid fa-eye text-[9px]"></i> عرض</button>` : ''}
+                `;
+                list.appendChild(row);
+            });
+
+            // Print button
+            document.getElementById('calendarDayRollBtn').onclick = () => {
+                const input = document.getElementById('rollDatePicker');
+                if (input) input.value = dateKey;
+                generateSessionRoll();
+                window.print();
+            };
+
+            panel.classList.remove('hidden');
+            setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+        }
+
+        // ─────────────────────────────────────────────
+        // SMART FILTER ENGINE
+        // ─────────────────────────────────────────────
+        window.applySmartFilter = function(mode) {
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const sessionsMap = buildSessionsMap();
+            const allKeys = Object.keys(sessionsMap).sort();
+
+            let filteredKeys = [];
+
+            if (mode === 'today') {
+                const key = today.toISOString().split('T')[0];
+                if (sessionsMap[key]) filteredKeys = [key];
+            } else if (mode === 'thisWeek') {
+                const weekStart = new Date(today);
+                weekStart.setDate(today.getDate() - today.getDay());
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekStart.getDate() + 6);
+                filteredKeys = allKeys.filter(k => {
+                    const d = new Date(k);
+                    return d >= weekStart && d <= weekEnd;
+                });
+            } else if (mode === 'currentMonth') {
+                const prefix = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
+                filteredKeys = allKeys.filter(k => k.startsWith(prefix));
+            } else if (mode === 'nextSession') {
+                const future = allKeys.filter(k => new Date(k) >= today).sort();
+                if (future.length) filteredKeys = [future[0]];
+            } else if (mode === 'prevSession') {
+                const past = allKeys.filter(k => new Date(k) < today).sort().reverse();
+                if (past.length) filteredKeys = [past[0]];
+            } else if (mode === 'range') {
+                const from = document.getElementById('filterDateFrom').value;
+                const to = document.getElementById('filterDateTo').value;
+                if (!from && !to) { alert('يرجى تحديد نطاق التاريخ أولاً.'); return; }
+                filteredKeys = allKeys.filter(k => {
+                    if (from && k < from) return false;
+                    if (to && k > to) return false;
+                    return true;
+                });
+            }
+
+            renderSmartFilterResults(filteredKeys, sessionsMap, mode);
+        };
+
+        function renderSmartFilterResults(keys, sessionsMap, mode) {
+            const container = document.getElementById('smartFilterResults');
+            if (!container) return;
+
+            if (keys.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center space-y-2">
+                        <i class="fa-solid fa-calendar-xmark text-3xl text-slate-300"></i>
+                        <p class="text-sm font-bold text-slate-500">لا توجد جلسات مطابقة لهذا الفلتر</p>
+                    </div>`;
+                return;
+            }
+
+            const totalFiles = keys.reduce((s, k) => s + sessionsMap[k].length, 0);
+            let html = `
+                <div class="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center justify-between">
+                    <span class="text-xs font-black text-amber-900">
+                        <i class="fa-solid fa-calendar-check text-amber-600 ml-1"></i>
+                        ${keys.length} يوم جلسة • ${totalFiles} ملف إجمالاً
+                    </span>
+                </div>`;
+
+            keys.forEach(dateKey => {
+                const cases = sessionsMap[dateKey];
+                const dateObj = new Date(dateKey + 'T00:00:00');
+                const dayName = ARABIC_DAYS_LONG[dateObj.getDay()];
+                const formattedDate = `${dayName} ${dateObj.getDate()} ${ARABIC_MONTHS[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+                const isPast = dateObj < new Date();
+
+                html += `
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 ${isPast ? 'bg-slate-50' : 'bg-emerald-50'}">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-9 h-9 rounded-xl ${isPast ? 'bg-slate-200 text-slate-600' : 'bg-emerald-500 text-white'} flex items-center justify-center font-black text-sm">
+                                    ${dateObj.getDate()}
+                                </div>
+                                <div>
+                                    <p class="text-xs font-black text-navy-900">${formattedDate}</p>
+                                    <p class="text-[11px] font-bold ${isPast ? 'text-slate-400' : 'text-emerald-700'}">${cases.length} ملف قضائي</p>
+                                </div>
+                            </div>
+                            <button onclick="openCalendarDay('${dateKey}', ${JSON.stringify(cases).replace(/"/g, '&quot;')}); switchAgendaTab('calendar');" class="text-[10px] font-black bg-navy-900 text-amber-300 px-2.5 py-1.5 rounded-xl flex items-center gap-1 hover:bg-navy-800 transition">
+                                <i class="fa-solid fa-calendar-day"></i> التقويم
+                            </button>
+                        </div>
+                        <div class="divide-y divide-slate-100">
+                            ${cases.slice(0,3).map((cObj) => {
+                                const caseNo = getFieldValue(cObj, ['رقم الدعوى','رقم القضية','caseid']);
+                                const year = getFieldValue(cObj, ['السنة','سنة','year']);
+                                const appellant = getFieldValue(cObj, ['المدعي','الطاعن','appellant']);
+                                const decision = getFieldValue(cObj, ['القرار','قرار','decision']);
+                                const realIdx = (window.currentFilteredCases||[]).indexOf(cObj);
+                                return `<div class="px-4 py-2.5 flex items-center justify-between gap-2">
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-xs font-black text-navy-900 truncate">دعوى ${caseNo ? 'رقم '+caseNo : ''} ${year ? 'لسنة '+year : ''}</p>
+                                        ${appellant ? `<p class="text-[11px] text-slate-500 font-bold truncate">${appellant}</p>` : ''}
+                                        ${decision ? `<p class="text-[11px] text-amber-700 font-bold truncate">📋 ${decision}</p>` : ''}
+                                    </div>
+                                    ${realIdx > -1 ? `<button onclick="openCaseDetails(${realIdx})" class="shrink-0 bg-slate-100 hover:bg-navy-900 hover:text-amber-300 text-navy-900 text-[10px] font-black px-2 py-1.5 rounded-lg transition flex items-center gap-1"><i class="fa-solid fa-eye text-[9px]"></i> عرض</button>` : ''}
+                                </div>`;
+                            }).join('')}
+                            ${cases.length > 3 ? `<div class="px-4 py-2 text-[11px] font-bold text-slate-400 text-center">+${cases.length-3} ملفات أخرى</div>` : ''}
+                        </div>
+                    </div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function resetAllFilters() {
+            document.getElementById('searchInput').value = '';
+            setRoleFilter('all');
+        }
+
+        window.filterByDateMode = function(mode) {
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            let targetDates = [];
+            
+            // Extract all valid dates
+            const allDates = window.casesData.map(c => {
+                const dStr = getFieldValue(c, ["session_date", "sessiondate", "next_session", "آخر جلسة", "أخر جلسة", "اخر جلسة", "تاريخ الجلسة", "تاريخ_الجلسة", "الجلسة", "جلسة"]);
+                if(dStr) {
+                    const d = new Date(dStr);
+                    if(!isNaN(d)) return { str: dStr, date: d };
+                }
+                return null;
+            }).filter(Boolean);
+
+            if(mode === 'currentMonth') {
+                targetDates = allDates.filter(d => d.date.getMonth() === today.getMonth() && d.date.getFullYear() === today.getFullYear()).map(d => d.str);
+            } else if (mode === 'nextSession') {
+                const futureDates = allDates.filter(d => d.date >= today);
+                if(futureDates.length > 0) {
+                    futureDates.sort((a,b) => a.date - b.date);
+                    targetDates = [futureDates[0].str];
+                }
+            } else if (mode === 'prevSession') {
+                const pastDates = allDates.filter(d => d.date < today);
+                if(pastDates.length > 0) {
+                    pastDates.sort((a,b) => b.date - a.date);
+                    targetDates = [pastDates[0].str];
+                }
+            }
+
+            if(targetDates.length > 0) {
+                document.getElementById('searchInput').value = targetDates[0];
+                filterCases();
+            } else {
+                alert("لا توجد جلسات مطابقة لهذا الفلتر.");
+            }
+        };
+
+        function switchView(viewName) {
+            activeView = viewName;
+
+            const foldersView = document.getElementById('foldersView');
+            const tableView = document.getElementById('tableView');
+            const rollView = document.getElementById('rollView');
+            const detailsView = document.getElementById('detailsView');
+
+            const btnFolders = document.getElementById('btnViewFolders');
+            const btnTable = document.getElementById('btnViewTable');
+            const btnRoll = document.getElementById('btnViewRoll');
+
+            foldersView.classList.add('hidden');
+            tableView.classList.add('hidden');
+            rollView.classList.add('hidden');
+            detailsView.classList.add('hidden');
+
+            [btnFolders, btnTable, btnRoll].forEach(b => {
+                b.className = "flex-1 sm:flex-initial px-3 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition text-slate-600 hover:text-slate-900";
+            });
+
+            if (viewName === 'folders') {
+                foldersView.classList.remove('hidden');
+                btnFolders.className = "flex-1 sm:flex-initial px-3 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition bg-white text-navy-900 shadow-sm font-bold border border-slate-200";
+            } else if (viewName === 'table') {
+                tableView.classList.remove('hidden');
+                btnTable.className = "flex-1 sm:flex-initial px-3 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition bg-white text-navy-900 shadow-sm font-bold border border-slate-200";
+            } else if (viewName === 'roll') {
+                rollView.classList.remove('hidden');
+                btnRoll.className = "flex-1 sm:flex-initial px-3 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition bg-white text-navy-900 shadow-sm font-bold border border-slate-200";
+            }
+        }
+
+        function renderPaginationControls(containerId) {
+            const container = document.getElementById(containerId);
+            if(!container) return;
+            const totalPages = Math.ceil(currentFilteredCases.length / itemsPerPage);
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+
+            let html = `
+                <button onclick="changePage(${currentPage - 1})" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}" ${currentPage === 1 ? 'disabled' : ''}>السابق</button>
+                <span class="px-2 text-slate-600">صفحة ${currentPage} من ${totalPages}</span>
+                <button onclick="changePage(${currentPage + 1})" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}" ${currentPage === totalPages ? 'disabled' : ''}>التالي</button>
+            `;
+            container.innerHTML = html;
+        }
+
+        window.changePage = function(newPage) {
+            const totalPages = Math.ceil(currentFilteredCases.length / itemsPerPage);
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                renderFoldersView();
+                renderTableView();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        };
+
+        function renderFoldersView() {
+            const grid = document.getElementById('foldersGrid');
+            grid.innerHTML = '';
+
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const paginatedCases = currentFilteredCases.slice(startIndex, startIndex + itemsPerPage);
+
+            paginatedCases.forEach((cObj, idx) => {
+                const index = startIndex + idx; // Real index in currentFilteredCases
+                const caseNo = getFieldValue(cObj, ["caseid", "case_id", "caseno", "case_no", "case_number", "case_num", "رقم الدعوى", "رقم القضية", "رقم_الدعوى", "رقم"]);
+                const yearVal = getFieldValue(cObj, ["year", "case_year", "السنة", "سنة"]);
+                const caseYear = yearVal ? `لسنة ${yearVal}` : "";
+                
+                const role = getFieldValue(cObj, ["role", "status", "client_role", "الصفة", "صفة", "صفة الموكل", "الصفه"]) || "دعوى قضائية";
+                
+                const appellant = getFieldValue(cObj, ["المدعي", "الطاعن", "المستأنف", "اسم الطاعن", "appellant", "claimant", "plaintiff"]);
+                const appellee = getFieldValue(cObj, ["المدعى_عليه", "المدعى عليه", "المطعون ضده", "المستأنف ضده", "المطعون", "appellee", "respondent", "defendant"]);
+                
+                const lastSession = getFieldValue(cObj, ["آخر جلسة", "أخر جلسة", "اخر جلسة", "تاريخ الجلسة", "session_date", "sessiondate", "next_session", "تاريخ_الجلسة", "الجلسة", "جلسة"]);
+                const decision = getFieldValue(cObj, ["القرار", "قرار الجلسة", "المنطوق", "قرار", "decision", "verdict", "ruling"]);
+
+                const isAppellantRole = role.toLowerCase().includes("طاعن") || role.toLowerCase().includes("مدعي") || role.toLowerCase().includes("مستأنف");
+
+                let caseTitleBadge = "دعوى قضائية";
+                if (caseNo) {
+                    caseTitleBadge = `دعوى رقم (${caseNo}) ${caseYear}`.trim();
+                } else if (caseYear) {
+                    caseTitleBadge = `دعوى ${caseYear}`.trim();
+                }
+
+                const card = document.createElement('div');
+                card.className = `case-folder-card p-4 cursor-pointer flex flex-col justify-between space-y-3 ${isAppellantRole ? 'appellant-folder' : ''}`;
+                card.onclick = () => openCaseDetails(index);
+
+                card.innerHTML = `
+                    <div class="space-y-3">
+                        <!-- Top Header Badge: Case No & Year -->
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                            <span class="bg-navy-900 text-amber-300 text-xs font-black px-3 py-1 rounded-xl shadow-sm flex items-center gap-1.5">
+                                <i class="fa-solid fa-gavel text-amber-400 text-[11px]"></i>
+                                ${caseTitleBadge}
+                            </span>
+                            <span class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                                isAppellantRole 
+                                ? 'bg-blue-50 text-blue-800 border-blue-200' 
+                                : 'bg-amber-50 text-amber-900 border-amber-200'
+                            }">
+                                ${role}
+                            </span>
+                        </div>
+
+                        <!-- Core Hero Data Card: Litigants (الطاعن والمطعون ضده) -->
+                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-2">
+                            ${(appellant && visibleFieldsMap['الطاعن'] !== false) ? `
+                                <div class="text-xs font-bold text-blue-950 flex items-start gap-1">
+                                    <span class="text-slate-400 font-extrabold min-w-[70px]">الطاعن:</span>
+                                    <span class="text-blue-900 font-black leading-snug">${appellant}</span>
+                                </div>
+                            ` : ''}
+
+                            ${(appellee && visibleFieldsMap['المطعون ضده'] !== false) ? `
+                                <div class="text-xs font-bold text-amber-950 flex items-start gap-1 ${appellant ? 'pt-1.5 border-t border-slate-200/60' : ''}">
+                                    <span class="text-slate-400 font-extrabold min-w-[70px]">المطعون ضده:</span>
+                                    <span class="text-amber-900 font-black leading-snug">${appellee}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <!-- Core Hero Data Card: Last Session Date & Decision -->
+                        <div class="bg-amber-50/70 p-3 rounded-xl border border-amber-200/70 space-y-1.5">
+                            ${lastSession ? `
+                                <div class="flex items-center justify-between text-xs font-black text-navy-900">
+                                    <span class="flex items-center gap-1.5">
+                                        <i class="fa-regular fa-calendar-check text-amber-600 text-sm"></i>
+                                        <span>آخر جلسة:</span>
+                                    </span>
+                                    <span class="bg-amber-200/80 text-amber-950 px-2.5 py-0.5 rounded-lg text-xs font-extrabold">${lastSession}</span>
+                                </div>
+                            ` : ''}
+
+                            ${decision ? `
+                                <p class="text-xs font-bold text-slate-800 leading-relaxed pt-1">
+                                    <span class="text-amber-800 font-extrabold">القرار:</span> ${decision}
+                                </p>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Footer Action -->
+                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-navy-900">
+                        <span class="text-slate-400 text-[11px]">عرض باقي التفاصيل</span>
+                        <div class="flex items-center gap-3">
+                            ${isAdmin ? `<button onclick="event.stopPropagation(); deleteCase(${index})" class="text-rose-600 hover:text-rose-800 transition p-1" title="حذف القضية"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+                            <span class="text-amber-600 flex items-center gap-1 font-black">
+                                فتح القضية &larr;
+                            </span>
+                            ${lastSession ? `<span class="text-[10px] text-amber-700 font-bold">📅 ${lastSession}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            renderPaginationControls('foldersPagination');
+        }
+
+        function renderTableView() {
+            const tableHeader = document.getElementById('tableHeader');
+            const tableBody = document.getElementById('tableBody');
+            // Render visible headers only
+            const activeHeaders = appHeaders.filter(h => visibleFieldsMap[h] !== false);
+
+            let headerHtml = '<tr><th class="p-3 border-b border-navy-800 text-center">م</th>';
+            activeHeaders.forEach(headerName => {
+                headerHtml += `<th class="p-3 border-b border-navy-800 whitespace-nowrap">${headerName}</th>`;
+            });
+            headerHtml += `<th class="p-3 border-b border-navy-800 text-center">الإجراء</th></tr>`;
+            tableHeader.innerHTML = headerHtml;
+
+            tableBody.innerHTML = '';
+            
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const paginatedCases = currentFilteredCases.slice(startIndex, startIndex + itemsPerPage);
+
+            paginatedCases.forEach((cObj, idx) => {
+                const index = startIndex + idx; // Real index in currentFilteredCases
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition border-b border-slate-100 cursor-pointer text-xs";
+                tr.onclick = (e) => {
+                    if (e.target.closest('button')) return;
+                    openCaseDetails(index);
+                };
+
+                let rowHtml = `<td class="p-3 font-extrabold text-center text-slate-400">${index + 1}</td>`;
+                activeHeaders.forEach(headerName => {
+                    const val = cObj[headerName] || '-';
+                    rowHtml += `<td class="p-3 text-slate-800 whitespace-nowrap max-w-xs truncate">${val}</td>`;
+                });
+
+                rowHtml += `
+                    <td class="p-3 text-center flex items-center justify-center gap-2">
+                        <button onclick="openCaseDetails(${index})" class="bg-navy-900 hover:bg-navy-800 text-amber-300 text-xs font-bold px-3 py-1 rounded-lg transition shadow-sm whitespace-nowrap">
+                            عرض
+                        </button>
+                        ${isAdmin ? `<button onclick="event.stopPropagation(); deleteCase(${index})" class="text-rose-600 hover:text-rose-800 text-sm transition p-1" title="حذف القضية"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+                    </td>
+                `;
+
+                tr.innerHTML = rowHtml;
+                tableBody.appendChild(tr);
+            });
+            renderPaginationControls('tablePagination');
+        }
+
+        /* Generate Session Roll for specific date */
+        function generateSessionRoll() {
+            const rollInput = document.getElementById('rollDatePicker');
+            if (!rollInput) return;
+            const rollQuery = rollInput.value.trim().toLowerCase();
+            const container = document.getElementById('rollContainer');
+            if (!container) return;
+
+            if (!rollQuery) {
+                container.innerHTML = `
+                    <div class="print-header hidden mb-4 text-center">
+                        <h1 class="text-xl font-bold border-b pb-2" id="printHeaderTitle">مكتب المستشار / ${consultantName} - رول الجلسات</h1>
+                        <p class="mt-2 font-bold" id="printHeaderDate"></p>
+                    </div>
+                    <div class="text-center py-10 text-slate-400 space-y-2">
+                        <i class="fa-solid fa-calendar-alt text-3xl"></i>
+                        <p class="font-bold text-xs sm:text-sm">أدخل تاريخ الجلسة المطلوب لرصد ورول الملفات الخاصة بتلك الجلسة.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const rollCases = casesData.filter(cObj => {
+                return Object.values(cObj).some(v => String(v).toLowerCase().includes(rollQuery));
+            });
+
+            if (rollCases.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 text-slate-400 space-y-2">
+                        <i class="fa-solid fa-folder-minus text-3xl text-amber-500"></i>
+                        <p class="font-bold text-slate-700 text-sm">لا توجد قضايا مقيدة بتاريخ الجلسة (${rollQuery})</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const activeHeaders = appHeaders.filter(h => visibleFieldsMap[h] !== false);
+
+            let html = `
+                <div class="space-y-4">
+                    <div class="text-center border-b-2 border-navy-900 pb-3 space-y-1">
+                        <h2 class="text-base sm:text-lg font-black text-navy-900" id="rollViewTitle">رول الجلسات المجمع - مكتب المستشار ${consultantName}</h2>
+                        <p class="text-xs font-bold text-amber-700">بيان جلسات بتاريخ: (${rollQuery}) - إجمالي الدعاوى: (${rollCases.length})</p>
+                    </div>
+
+                    <div class="overflow-x-auto no-scrollbar">
+                        <table class="w-full text-right text-xs border-collapse">
+                            <thead>
+                                <tr class="bg-navy-900 text-white font-bold">
+                                    <th class="p-2 border border-slate-300">م</th>
+            `;
+
+            activeHeaders.forEach(h => {
+                html += `<th class="p-2 border border-slate-300">${h}</th>`;
+            });
+
+            html += `</tr></thead><tbody>`;
+
+            rollCases.forEach((cObj, idx) => {
+                html += `<tr class="border-b border-slate-200"><td class="p-2 font-bold border text-center">${idx + 1}</td>`;
+                activeHeaders.forEach(h => {
+                    html += `<td class="p-2 border">${cObj[h] || '-'}</td>`;
+                });
+                html += `</tr>`;
+            });
+
+            html += `</tbody></table></div></div>`;
+            container.innerHTML = html;
+        }
+
+        function openCaseDetails(caseIndex) {
+            const cObj = currentFilteredCases[caseIndex];
+            if (!cObj) return;
+
+            document.getElementById('foldersView').classList.add('hidden');
+            document.getElementById('tableView').classList.add('hidden');
+            document.getElementById('rollView').classList.add('hidden');
+            document.getElementById('noResultsState').classList.add('hidden');
+            document.getElementById('filesTabContainer').classList.add('hidden');
+            document.getElementById('agendaTabContainer').classList.add('hidden');
+
+            const detailsView = document.getElementById('detailsView');
+            const container = document.getElementById('caseDetailContent');
+            const editBtn = document.getElementById('editCaseDetailsBtn');
+            if (editBtn) {
+                editBtn.onclick = () => openEditCaseModal(caseIndex);
+            }
+
+            const caseNo = getFieldValue(cObj, ["caseid", "case_id", "caseno", "case_no", "case_number", "case_num", "رقم الدعوى", "رقم القضية", "رقم_الدعوى", "رقم"]);
+            const yearVal = getFieldValue(cObj, ["year", "case_year", "السنة", "سنة"]);
+            const caseYear = yearVal ? `لسنة ${yearVal}` : "";
+            
+            const role = getFieldValue(cObj, ["role", "status", "client_role", "الصفة", "صفة", "صفة الموكل", "الصفه"]) || "الصفة غير محددة";
+            
+            const appellant = getFieldValue(cObj, ["المدعي", "الطاعن", "المستأنف", "اسم الطاعن", "appellant", "claimant", "plaintiff"]);
+            const appellee = getFieldValue(cObj, ["المدعى_عليه", "المدعى عليه", "المطعون ضده", "المستأنف ضده", "المطعون", "appellee", "respondent", "defendant"]);
+            
+            const sessionDate = getFieldValue(cObj, ["آخر جلسة", "أخر جلسة", "اخر جلسة", "تاريخ الجلسة", "session_date", "sessiondate", "next_session", "تاريخ_الجلسة", "الجلسة", "جلسة"]);
+            const decision = getFieldValue(cObj, ["القرار", "قرار الجلسة", "المنطوق", "قرار", "decision", "verdict", "ruling"]);
+
+            let caseTitleBadge = "دعوى قضائية";
+            if (caseNo) {
+                caseTitleBadge = `دعوى رقم (${caseNo}) ${caseYear}`.trim();
+            } else if (caseYear) {
+                caseTitleBadge = `دعوى ${caseYear}`.trim();
+            }
+
+            let html = `
+                <!-- Prominent Core Data Dossier Card (كارت البيانات الأساسية البارز) -->
+                <div class="bg-navy-900 text-white rounded-2xl p-5 shadow-md space-y-4 relative overflow-hidden">
+                    <div class="absolute -left-6 -bottom-6 w-32 h-32 bg-amber-400/10 rounded-full blur-xl pointer-events-none"></div>
+                    
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-navy-800 pb-3">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 text-navy-950 flex items-center justify-center font-black text-lg shadow">
+                                <i class="fa-solid fa-scale-balanced"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-base sm:text-lg font-black text-white">${caseTitleBadge}</h1>
+                                <p class="text-xs text-amber-300 font-bold">اختصاص - المستشار أحمد وجيه</p>
+                            </div>
+                        </div>
+                        <span class="bg-amber-400/20 text-amber-300 border border-amber-400/40 font-black text-xs px-3 py-1 rounded-xl">
+                            الصفة: ${role}
+                        </span>
+                    </div>
+
+                    <!-- Hero Data Grid: الخصوم وأحدث جلسة والقرار -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
+                        <div class="bg-navy-800/80 p-3 rounded-xl border border-navy-700/80 space-y-2">
+                            <span class="text-amber-400 font-extrabold text-[11px] block border-b border-navy-700/60 pb-1">أطراف الدعوى والخصوم:</span>
+                            ${appellant ? `<div class="text-slate-100 font-bold"><span class="text-slate-400">الطاعن:</span> ${appellant}</div>` : ''}
+                            ${appellee ? `<div class="text-slate-100 font-bold"><span class="text-slate-400">المطعون ضده:</span> ${appellee}</div>` : ''}
+                        </div>
+
+                        <div class="bg-navy-800/80 p-3 rounded-xl border border-navy-700/80 space-y-2">
+                            <span class="text-amber-400 font-extrabold text-[11px] block border-b border-navy-700/60 pb-1">موقف آخر جلسة والقرار:</span>
+                            ${sessionDate ? `<div class="text-slate-100 font-bold"><span class="text-slate-400">تاريخ أخر جلسة:</span> ${sessionDate}</div>` : ''}
+                            ${decision ? `<div class="text-slate-100 font-bold"><span class="text-slate-400">منطوق القرار:</span> ${decision}</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Secondary Dynamic Excel Fields (Excluding redundant & hidden fields) -->
+                <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+                    <div class="flex items-center gap-2 border-b border-slate-100 pb-2 text-navy-900 font-extrabold text-xs">
+                        <i class="fa-solid fa-list-check text-amber-600 text-sm"></i>
+                        <span>كافة بيانات السجل المقيدة</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            `;
+
+            appHeaders.forEach(h => {
+                // Render only enabled fields that exist in the object
+                if (visibleFieldsMap[h] === false) return;
+                
+                const val = cObj[h];
+                if (!val || String(val).trim() === "") return;
+
+                html += `
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1">
+                        <span class="text-slate-400 font-extrabold block text-[10px] uppercase">${h}</span>
+                        <p class="font-bold text-slate-900 leading-relaxed">${val}</p>
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+            detailsView.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function closeDetailsPage() {
+            document.getElementById('detailsView').classList.add('hidden');
+            if (activeView === 'roll') {
+                document.getElementById('agendaTabContainer').classList.remove('hidden');
+            } else {
+                document.getElementById('filesTabContainer').classList.remove('hidden');
+            }
+            switchView(activeView);
+        }
+
+        function exportToCSV() {
+            if (currentFilteredCases.length === 0) {
+                alert("لا توجد بيانات متاحة للتصدير.");
+                return;
+            }
+
+            const activeHeaders = appHeaders.filter(h => visibleFieldsMap[h] !== false);
+
+            const rows = currentFilteredCases.map(cObj => {
+                return activeHeaders.map(h => `"${(cObj[h] || '').replace(/"/g, '""')}"`).join(",");
+            });
+
+            const csvContent = "\uFEFF" + [activeHeaders.map(h => `"${h}"`).join(","), ...rows].join("\n");
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `سجل_قضايا_اختصاص_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').then(reg => {
+                    console.log('SW registered!', reg);
+                }).catch(err => console.log('SW registration failed', err));
+            });
+        }
+
+        // Admin Auth State
+        window.isAdmin = false;
+        function promptAdminLogin() {
+            const pass = prompt("أدخل كلمة مرور الأدمن:");
+            if (pass === "a4450422") {
+                window.isAdmin = true;
+                localStorage.setItem('ekhtsasi_admin', 'true');
+                const adminEls = document.querySelectorAll('.admin-only');
+                adminEls.forEach(el => el.classList.remove('hidden'));
+                openAdminSettings();
+            } else if (pass !== null) {
+                alert("كلمة المرور غير صحيحة!");
+            }
+        }
+
+        function handleSettingsNavClick() {
+            if (window.isAdmin) {
+                openAdminSettings();
+            } else {
+                promptAdminLogin();
+            }
+        }
+    </script>
+
+    <!-- Firebase Integration - Single Source of Truth -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDpil-ZG7qzutPNK9A04Hrmv4DOXF2RgnA",
+            authDomain: "ekhtsasi-light.firebaseapp.com",
+            projectId: "ekhtsasi-light",
+            storageBucket: "ekhtsasi-light.firebasestorage.app",
+            messagingSenderId: "713907672870",
+            appId: "1:713907672870:web:9204f3330ff9085aa713e7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const dataDocRef = doc(db, "appData", "main");
+        const settingsDocRef = doc(db, "appData", "settings");
+
+        // ──────────────────────────────────────────────
+        // REAL-TIME LISTENER: Load data when Firebase updates
+        // ──────────────────────────────────────────────
+        onSnapshot(dataDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data.casesData && Array.isArray(data.casesData) && data.casesData.length > 0) {
+                    window.casesData = data.casesData;
+                    window.appHeaders = data.appHeaders || [];
+                    window.visibleFieldsMap = window.visibleFieldsMap || {};
+                    window.appHeaders.forEach(h => {
+                        if (window.visibleFieldsMap[h] === undefined) window.visibleFieldsMap[h] = true;
+                    });
+                    window.filterCases(false);
+                    console.log(`✅ Firebase loaded ${data.casesData.length} cases.`);
+                }
+            }
+        }, (error) => {
+            console.error("Firebase listener error:", error);
+        });
+
+        onSnapshot(settingsDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data.consultantName) {
+                    window.consultantName = data.consultantName;
+                }
+            }
+        });
+
+        // ──────────────────────────────────────────────
+        // UPLOAD EXCEL → SAVE TO FIREBASE (overrides placeholder)
+        // ──────────────────────────────────────────────
+        window.handleExcelUpload = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const loadingText = document.getElementById('dataStatusText');
+                const alertBox = document.getElementById('dataStatusAlert');
+                alertBox.classList.remove('hidden');
+                loadingText.textContent = "⏳ جاري قراءة الملف ورفعه...";
+
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+
+                    if (!rawRows || rawRows.length < 2) {
+                        alert("الملف فارغ أو لا يحتوي على بيانات.");
+                        alertBox.classList.add('hidden');
+                        return;
+                    }
+
+                    const extractedHeaders = rawRows[0].map(h => String(h).trim()).filter(h => h !== "");
+                    const parsedCases = [];
+
+                    for (let i = 1; i < rawRows.length; i++) {
+                        const rowArr = rawRows[i];
+                        if (rowArr.every(cell => String(cell).trim() === "")) continue;
+                        const rowObj = {};
+                        extractedHeaders.forEach((headerName, idx) => {
+                            let cellVal = rowArr[idx] !== undefined ? String(rowArr[idx]).trim() : "";
+                            // Convert Excel serial dates
+                            if (cellVal && !isNaN(cellVal) && Number(cellVal) > 30000 && Number(cellVal) < 60000) {
+                                const dateObj = new Date((Number(cellVal) - (25567 + 2)) * 86400 * 1000);
+                                cellVal = dateObj.toISOString().split('T')[0];
+                            }
+                            rowObj[headerName] = cellVal;
+                        });
+                        parsedCases.push(rowObj);
+                    }
+
+                    if (parsedCases.length === 0) {
+                        alert("لم يتم العثور على بيانات داخل الملف.");
+                        alertBox.classList.add('hidden');
+                        return;
+                    }
+
+                    // Merge with existing data intelligently
+                    let existingCases = [...(window.casesData || [])];
+                    let newAppHeaders = [...new Set([...(window.appHeaders || []), ...extractedHeaders])];
+                    let addedCount = 0, updatedCount = 0;
+
+                    const SESSION_KEY = "آخر جلسة";
+                    const CASE_NO_KEY = "رقم الدعوى";
+                    const YEAR_KEY = "السنة";
+
+                    parsedCases.forEach(newCase => {
+                        const newNo = newCase[CASE_NO_KEY] || newCase["رقم_الدعوى"] || "";
+                        const newYr = newCase[YEAR_KEY] || newCase["سنة"] || "";
+                        const existingIdx = existingCases.findIndex(c => {
+                            const cNo = c[CASE_NO_KEY] || c["رقم_الدعوى"] || "";
+                            const cYr = c[YEAR_KEY] || c["سنة"] || "";
+                            return cNo === newNo && cYr === newYr && cNo !== "";
+                        });
+                        if (existingIdx > -1) {
+                            existingCases[existingIdx] = { ...existingCases[existingIdx], ...newCase };
+                            updatedCount++;
+                        } else {
+                            existingCases.push(newCase);
+                            addedCount++;
+                        }
+                    });
+
+                    // Save to Firestore
+                    loadingText.textContent = `⏳ جاري الحفظ في Firebase (${existingCases.length} قضية)...`;
+                    await setDoc(dataDocRef, {
+                        appHeaders: newAppHeaders,
+                        casesData: existingCases,
+                        updatedAt: new Date().toISOString(),
+                        totalCount: existingCases.length
+                    });
+
+                    // Update local state immediately
+                    window.casesData = existingCases;
+                    window.appHeaders = newAppHeaders;
+                    window.visibleFieldsMap = window.visibleFieldsMap || {};
+                    newAppHeaders.forEach(h => {
+                        if (window.visibleFieldsMap[h] === undefined) window.visibleFieldsMap[h] = true;
+                    });
+                    window.filterCases(true);
+
+                    loadingText.textContent = `✅ تم الحفظ في Firebase بنجاح! (أضيف: ${addedCount} • تحديث: ${updatedCount} • الإجمالي: ${existingCases.length})`;
+
+                } catch (err) {
+                    console.error("Upload error:", err);
+                    loadingText.textContent = `❌ خطأ: ${err.message}`;
+                    alert(`حدث خطأ أثناء الرفع:\n${err.message}\n\nتأكد من إعدادات Firebase Rules.`);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
+        // ──────────────────────────────────────────────
+        // OTHER FIREBASE OPERATIONS
+        // ──────────────────────────────────────────────
+        window.updateConsultantName = async function(newName) {
+            if (!window.isAdmin) return;
+            await setDoc(settingsDocRef, { consultantName: newName }, { merge: true });
+            alert("✅ تم تحديث اسم المستشار بنجاح");
+        };
+
+        window.deleteCase = async function(index) {
+            if (!window.isAdmin) return;
+            if (!confirm("هل أنت متأكد من حذف هذه الدعوى؟")) return;
+            const realIndex = window.casesData.indexOf(window.currentFilteredCases[index]);
+            if (realIndex > -1) {
+                window.casesData.splice(realIndex, 1);
+                await setDoc(dataDocRef, { casesData: window.casesData }, { merge: true });
+                alert("✅ تم الحذف بنجاح.");
+            }
+        };
+
+        window.deleteAllData = async function() {
+            if (!window.isAdmin) return;
+            if (!confirm("تحذير: سيتم مسح كافة البيانات نهائياً من السحابة!")) return;
+            await setDoc(dataDocRef, { casesData: [], appHeaders: [], totalCount: 0 });
+            window.casesData = [];
+            window.appHeaders = [];
+            window.filterCases(true);
+            alert("✅ تم مسح كافة البيانات.");
+        };
+
+        window.updateCaseData = async function(index, newData) {
+            if (!window.isAdmin) return;
+            const realIndex = window.casesData.indexOf(window.currentFilteredCases[index]);
+            if (realIndex > -1) {
+                window.casesData[realIndex] = { ...window.casesData[realIndex], ...newData };
+                await setDoc(dataDocRef, { casesData: window.casesData }, { merge: true });
+                alert("✅ تم حفظ التعديلات بنجاح");
+                if (!document.getElementById('detailsView').classList.contains('hidden')) {
+                    openCaseDetails(index);
+                }
+            }
+        };
+
+        window.handleLogout = function() {
+            window.isAdmin = false;
+            localStorage.removeItem('ekhtsasi_admin');
+            document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
+            closeAdminSettings();
+        };
+
+    </script>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="fixed bottom-0 w-full bg-white border-t border-slate-200 z-[90] flex justify-around items-center p-2 pb-safe no-print shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+        <button id="navFilesBtn" onclick="switchMainTab('files')" class="flex flex-col items-center justify-center w-20 py-1 transition active:scale-95">
+            <i id="navFilesIcon" class="fa-solid fa-folder-open text-xl mb-1 text-amber-500"></i>
+            <span id="navFilesText" class="text-[10px] font-bold text-navy-900">الملفات</span>
+        </button>
+
+        <button id="navAgendaBtn" onclick="switchMainTab('agenda')" class="flex flex-col items-center justify-center w-20 py-1 transition active:scale-95">
+            <i id="navAgendaIcon" class="fa-solid fa-calendar-days text-xl mb-1 text-slate-400"></i>
+            <span id="navAgendaText" class="text-[10px] font-bold text-slate-500">الأجندة</span>
+        </button>
+
+        <button onclick="window.scrollTo({ top: 0, behavior: 'smooth' })" class="flex flex-col items-center justify-center w-20 py-1 transition active:scale-95">
+            <i class="fa-solid fa-arrow-up text-xl mb-1 text-slate-400"></i>
+            <span class="text-[10px] font-bold text-slate-500">أعلى الصفحة</span>
+        </button>
+        
+        <button onclick="handleSettingsNavClick()" class="flex flex-col items-center justify-center w-20 py-1 transition active:scale-95">
+            <i class="fa-solid fa-gear text-xl mb-1 text-slate-400"></i>
+            <span class="text-[10px] font-bold text-slate-500">الإعدادات</span>
+        </button>
+    </nav>
+</body>
+</html>
