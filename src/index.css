@@ -25,3 +25,38 @@ body {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+/* Print Styles */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 1cm;
+  }
+  
+  body {
+    background-color: white !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-area {
+    width: 100% !important;
+    max-width: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  .report-table th, .report-table td {
+    border: 1px solid black !important;
+  }
+  
+  .report-table th {
+    background-color: #f1f5f9 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

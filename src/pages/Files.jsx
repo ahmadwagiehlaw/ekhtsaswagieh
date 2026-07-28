@@ -28,6 +28,7 @@ export default function Files() {
   const [showWithAttachmentsOnly, setShowWithAttachmentsOnly] = useState(false);
   const [showImportantOnly, setShowImportantOnly] = useState(false);
   const [ignoreNoInterest, setIgnoreNoInterest] = useState(false);
+  const [showPastSessionsOnly, setShowPastSessionsOnly] = useState(false);
 
   const itemsPerPage = 20;
 
@@ -73,6 +74,18 @@ export default function Files() {
 
     if (showImportantOnly) {
       result = result.filter(c => c.isImportant);
+    }
+
+    if (showPastSessionsOnly) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      result = result.filter(c => {
+        const dateStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'];
+        if (!dateStr) return false;
+        const d = getSafeDateObj(dateStr);
+        if (!d) return false;
+        return d < today;
+      });
     }
 
     if (showOngoingOnly) {
@@ -252,14 +265,14 @@ export default function Files() {
         </div>
 
         {/* Filters */}
-        <div className="flex gap-2 w-full sm:w-auto shrink-0">
+        <div className="flex gap-2 w-full sm:w-auto shrink-0 flex-wrap sm:flex-nowrap">
           <button 
              onClick={() => setRoleFilter(prev => prev === 'all' ? 'appellant' : prev === 'appellant' ? 'appellee' : 'all')}
              className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${roleFilter === 'all' ? 'bg-slate-100 text-slate-600 border-slate-200' : roleFilter === 'appellant' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}`}
              title="تصفية حسب الصفة"
           >
             <User className="w-4 h-4" />
-            <span className={roleFilter === 'all' ? 'hidden sm:inline' : 'inline'}>{roleFilter === 'all' ? 'كل الصفات' : roleFilter === 'appellant' ? 'الطاعنين' : 'المطعون ضدهم'}</span>
+            <span className={roleFilter === 'all' ? 'hidden' : 'inline'}>{roleFilter === 'appellant' ? 'الطاعنين' : 'المطعون ضدهم'}</span>
           </button>
           
           <button 
@@ -268,7 +281,16 @@ export default function Files() {
              title="عرض المتداول فقط"
           >
             <Clock className="w-4 h-4" />
-            <span className={showOngoingOnly ? 'inline' : 'hidden sm:inline'}>المتداول</span>
+            <span className={showOngoingOnly ? 'inline' : 'hidden'}>المتداول</span>
+          </button>
+
+          <button 
+             onClick={() => setShowPastSessionsOnly(!showPastSessionsOnly)}
+             className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showPastSessionsOnly ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
+             title="جلسات سابقة (للمتابعة)"
+          >
+            <CalendarDays className="w-4 h-4" />
+            <span className={showPastSessionsOnly ? 'inline' : 'hidden'}>جلسات سابقة</span>
           </button>
 
           <button 
@@ -277,7 +299,7 @@ export default function Files() {
              title="يحتوي على مرفقات/غلاف"
           >
             <FileBox className="w-4 h-4" />
-            <span className={showWithAttachmentsOnly ? 'inline' : 'hidden sm:inline'}>مرفقات</span>
+            <span className={showWithAttachmentsOnly ? 'inline' : 'hidden'}>مرفقات</span>
           </button>
 
           <button 
@@ -286,7 +308,7 @@ export default function Files() {
              title="الدعاوى الهامة فقط"
           >
             <Sparkles className={`w-4 h-4 ${showImportantOnly ? 'fill-amber-700' : ''}`} />
-            <span className={showImportantOnly ? 'inline' : 'hidden sm:inline'}>هامة</span>
+            <span className={showImportantOnly ? 'inline' : 'hidden'}>هامة</span>
           </button>
 
           <button 
@@ -295,7 +317,7 @@ export default function Files() {
              title="إخفاء دعاوى لا شأن"
           >
             <X className="w-4 h-4" />
-            <span className={ignoreNoInterest ? 'inline' : 'hidden sm:inline'}>بدون (لا شأن)</span>
+            <span className={ignoreNoInterest ? 'inline' : 'hidden'}>بدون لا شأن</span>
           </button>
 
           <button 

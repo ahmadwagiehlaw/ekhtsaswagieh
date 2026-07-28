@@ -9,6 +9,7 @@ import Agenda from './pages/Agenda';
 import Settings from './pages/Settings';
 import CaseDetails from './pages/CaseDetails';
 import RollsLibrary from './pages/RollsLibrary';
+import Reports from './pages/Reports';
 import DayRoll from './pages/DayRoll';
 import Tasks from './pages/Tasks';
 import RequireAuth from './components/RequireAuth';
@@ -35,6 +36,7 @@ function AppContent() {
             <Route path="settings" element={<Settings />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="case/:id" element={<CaseDetails />} />
+            <Route path="reports" element={<Reports />} />
           </Route>
           {/* Rolls pages are public */}
           <Route path="rolls" element={<RollsLibrary />} />

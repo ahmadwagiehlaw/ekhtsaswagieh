@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { BookOpen, Upload, Trash2, Calendar, FileText, X, ExternalLink, Gavel, RotateCw } from 'lucide-react';
+import { BookOpen, Upload, Trash2, Edit3, Calendar, FileText, X, ExternalLink, Gavel, RotateCw } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { uploadToR2, deleteFromR2 } from '../lib/r2';
@@ -26,6 +26,7 @@ export default function RollsLibrary() {
   const [listFilter, setListFilter] = useState('الكل');
   const [monthFilter, setMonthFilter] = useState('الكل');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [editingRoll, setEditingRoll] = useState(null);
 
   const getFieldValue = (obj, keys) => {
     for (let key of keys) {
@@ -77,6 +78,33 @@ export default function RollsLibrary() {
     } catch (error) {
       console.error(error);
       toast(`حدث خطأ أثناء الرفع: ${error.message}`, 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!rollDate) {
+      toast('يرجى تحديد التاريخ', 'error');
+      return;
+    }
+    const finalRollType = `${baseType} - ${circuitType}`;
+    
+    setIsUploading(true);
+    try {
+      const updatedRoll = {
+        ...editingRoll,
+        date: rollDate,
+        type: finalRollType
+      };
+      await saveRollToFirebase(editingRoll.id, updatedRoll);
+      toast('تم تعديل بيانات الرول بنجاح', 'success');
+      setEditingRoll(null);
+      setRollDate('');
+      setBaseType('رول جلسة');
+      setCircuitType('فحص');
+    } catch (err) {
+      toast('حدث خطأ أثناء التعديل', 'error');
     } finally {
       setIsUploading(false);
     }
@@ -258,15 +286,25 @@ export default function RollsLibrary() {
         </div>
       </div>
 
-      {/* Upload Modal */}
-      {isAdmin && isUploadModalOpen && (
+      {/* Upload/Edit Modal */}
+      {isAdmin && (isUploadModalOpen || editingRoll) && (
         <div className="fixed inset-0 bg-navy-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <h3 className="text-sm font-black text-navy-900 flex items-center gap-2">
-                <Upload className="w-4 h-4 text-indigo-600" /> إضافة رول جديد
+                {editingRoll ? <Edit3 className="w-4 h-4 text-indigo-600" /> : <Upload className="w-4 h-4 text-indigo-600" />}
+                {editingRoll ? 'تعديل بيانات الرول' : 'إضافة رول جديد'}
               </h3>
-              <button onClick={() => setIsUploadModalOpen(false)} className="text-slate-400 hover:text-rose-500 transition bg-white rounded-full p-1 border border-slate-200">
+              <button 
+                onClick={() => {
+                  setIsUploadModalOpen(false);
+                  setEditingRoll(null);
+                  setRollDate('');
+                  setBaseType('رول جلسة');
+                  setCircuitType('فحص');
+                }} 
+                className="text-slate-400 hover:text-rose-500 transition bg-white rounded-full p-1 border border-slate-200"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -316,24 +354,31 @@ export default function RollsLibrary() {
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500">ملف الرول (PDF أو صورة)</label>
-                <input 
-                  type="file"
-                  accept=".pdf,image/*"
-                  ref={fileInputRef}
-                  onChange={e => setSelectedFile(e.target.files[0])}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-indigo-100 file:text-indigo-700 hover:file:bg-indigo-200"
-                />
-              </div>
+              {!editingRoll && (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500">اختر الملف (صورة أو PDF)</label>
+                  <input 
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={e => setSelectedFile(e.target.files[0])}
+                    accept="image/*,.pdf"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-navy-900 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                  />
+                  {selectedFile && (
+                    <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 mt-1">
+                      <FileText className="w-3 h-3" /> تم تحديد: {selectedFile.name}
+                    </p>
+                  )}
+                </div>
+              )}
               
               <button
-                onClick={handleUpload}
-                disabled={isUploading || !selectedFile}
+                onClick={editingRoll ? handleSaveEdit : handleUpload}
+                disabled={isUploading || (!editingRoll && !selectedFile)}
                 className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition"
               >
-                {isUploading ? <span className="animate-spin text-lg">⏳</span> : <Upload className="w-4 h-4" />}
-                {isUploading ? 'جاري الرفع والتجهيز...' : 'حفظ الرول'}
+                {isUploading ? <span className="animate-spin text-lg">⏳</span> : (editingRoll ? <Edit3 className="w-4 h-4" /> : <Upload className="w-4 h-4" />)}
+                {isUploading ? 'جاري الحفظ...' : (editingRoll ? 'حفظ التعديلات' : 'حفظ الرول')}
               </button>
             </div>
           </div>
@@ -350,12 +395,26 @@ export default function RollsLibrary() {
             <div className={`absolute top-0 inset-x-0 h-1.5 ${style.accent}`}></div>
             
             {isAdmin && (
-              <button
-                onClick={() => handleDelete(roll)}
-                className="absolute top-3 right-3 bg-rose-50 text-rose-500 p-1.5 rounded-lg opacity-100 sm:opacity-0 group-hover:opacity-100 transition hover:bg-rose-500 hover:text-white"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="absolute top-3 right-3 flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition z-10">
+                <button
+                  onClick={() => {
+                    const parts = roll.type.split(' - ');
+                    setBaseType(parts[0] || 'رول جلسة');
+                    setCircuitType(parts[1] || 'فحص');
+                    setRollDate(roll.date);
+                    setEditingRoll(roll);
+                  }}
+                  className="bg-indigo-50 text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition shadow-sm"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDelete(roll)}
+                  className="bg-rose-50 text-rose-500 p-1.5 rounded-lg hover:bg-rose-500 hover:text-white transition shadow-sm"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             )}
             
             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-3 transition mt-2 ${style.iconBg} ${style.iconColor}`}>
