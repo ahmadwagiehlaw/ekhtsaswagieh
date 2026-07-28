@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppState';
 import { Printer, ArrowRight, Gavel } from 'lucide-react';
 import { getSafeDateObj } from '../utils/dateUtils';
+import SessionTable from '../components/SessionTable';
 
 export default function DayRoll() {
   const { date } = useParams();
@@ -76,30 +77,9 @@ export default function DayRoll() {
         </div>
 
         {dayCases.length > 0 ? (
-          <table className="w-full text-right border-collapse border border-slate-200">
-            <thead className="bg-slate-100 print:bg-slate-200">
-              <tr>
-                <th className="px-4 py-3 text-xs font-black text-slate-700 border border-slate-200 w-12 text-center">م</th>
-                <th className="px-4 py-3 text-xs font-black text-slate-700 border border-slate-200">رقم الدعوى والسنة</th>
-                <th className="px-4 py-3 text-xs font-black text-slate-700 border border-slate-200">المدعي / الطاعن</th>
-                <th className="px-4 py-3 text-xs font-black text-slate-700 border border-slate-200">ضد</th>
-                <th className="px-4 py-3 text-xs font-black text-slate-700 border border-slate-200 w-1/4">القرار</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dayCases.map((cObj, idx) => (
-                <tr key={cObj.id} className="hover:bg-slate-50 transition print:hover:bg-transparent">
-                  <td className="px-4 py-3 text-sm font-black text-navy-900 border border-slate-200 text-center">{idx + 1}</td>
-                  <td className="px-4 py-3 text-sm font-black text-navy-900 border border-slate-200 cursor-pointer hover:text-indigo-600 print:pointer-events-none" onClick={() => navigate(`/case/${cObj.id}`)}>
-                    {getFieldValue(cObj, ['رقم الدعوى'])} / {getFieldValue(cObj, ['السنة'])}
-                  </td>
-                  <td className="px-4 py-3 text-xs font-bold text-slate-700 border border-slate-200">{getFieldValue(cObj, ['المدعي'])}</td>
-                  <td className="px-4 py-3 text-xs font-bold text-slate-700 border border-slate-200">{getFieldValue(cObj, ['المدعى_عليه'])}</td>
-                  <td className="px-4 py-3 text-xs font-bold text-amber-800 border border-slate-200 whitespace-pre-wrap">{getFieldValue(cObj, ['القرار'])}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="print-mode-table">
+            <SessionTable dayCases={dayCases} date={date} />
+          </div>
         ) : (
           <div className="text-center py-12 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 no-print">
             <p className="text-sm font-bold text-slate-500">لا توجد قضايا مجدولة في هذا التاريخ</p>

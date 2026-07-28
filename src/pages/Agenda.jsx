@@ -5,6 +5,7 @@ import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterv
 import { useAppContext } from '../context/AppState';
 import ExportPDFModal from '../components/ExportPDFModal';
 import BulkSessionRolloverModal from '../components/BulkSessionRolloverModal';
+import SessionTable from '../components/SessionTable';
 import { getSafeDateObj } from '../utils/dateUtils';
 
 const ARABIC_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
@@ -259,30 +260,7 @@ export default function Agenda() {
 
               <div className="max-h-80 overflow-y-auto">
                 {viewMode === 'table' ? (
-                  <table className="w-full text-right border-collapse">
-                    <thead className="bg-slate-100 sticky top-0">
-                      <tr>
-                        <th className="px-3 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200">#</th>
-                        <th className="px-3 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200">الدعوى</th>
-                        <th className="px-3 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200">المدعي</th>
-                        <th className="px-3 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200">ضد</th>
-                        <th className="px-3 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200 w-1/4">القرار</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {sessionsMap[selectedDateKey].map((cObj, idx) => (
-                        <tr key={cObj.id} onClick={() => navigate(`/case/${cObj.id}`)} className="hover:bg-slate-50 cursor-pointer transition">
-                          <td className="px-3 py-2.5 text-[10px] font-black text-navy-900">{idx+1}</td>
-                          <td className="px-3 py-2.5 text-xs font-black text-navy-900">
-                            {getFieldValue(cObj, ['رقم الدعوى'])} / {getFieldValue(cObj, ['السنة'])}
-                          </td>
-                          <td className="px-3 py-2.5 text-[11px] font-bold text-slate-700 truncate max-w-[120px]">{getFieldValue(cObj, ['المدعي'])}</td>
-                          <td className="px-3 py-2.5 text-[11px] font-bold text-slate-700 truncate max-w-[120px]">{getFieldValue(cObj, ['المدعى_عليه'])}</td>
-                          <td className="px-3 py-2.5 text-[10px] font-bold text-amber-800 line-clamp-2">{getFieldValue(cObj, ['القرار'])}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <SessionTable dayCases={sessionsMap[selectedDateKey]} date={selectedDateKey} />
                 ) : (
                   <div className="divide-y divide-slate-100">
                     {sessionsMap[selectedDateKey].map((cObj, idx) => (

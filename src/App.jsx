@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AppProvider, useAppContext } from './context/AppState';
 import { UIProvider } from './context/UIContext';
 import Layout from './components/Layout';
@@ -10,6 +10,7 @@ import Settings from './pages/Settings';
 import CaseDetails from './pages/CaseDetails';
 import RollsLibrary from './pages/RollsLibrary';
 import DayRoll from './pages/DayRoll';
+import RequireAuth from './components/RequireAuth';
 
 function AppContent() {
   const { loading } = useAppContext();
@@ -26,12 +27,15 @@ function AppContent() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="files" element={<Files />} />
-          <Route path="agenda" element={<Agenda />} />
-          <Route path="settings" element={<Settings />} />
+          <Route element={<RequireAuth><Outlet /></RequireAuth>}>
+            <Route index element={<Dashboard />} />
+            <Route path="files" element={<Files />} />
+            <Route path="agenda" element={<Agenda />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="case/:id" element={<CaseDetails />} />
+          </Route>
+          {/* Rolls pages are public */}
           <Route path="rolls" element={<RollsLibrary />} />
-          <Route path="case/:id" element={<CaseDetails />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
         <Route path="/day-roll/:date" element={<DayRoll />} />

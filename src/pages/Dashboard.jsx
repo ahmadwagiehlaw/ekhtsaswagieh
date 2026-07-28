@@ -41,15 +41,25 @@ export default function Dashboard() {
       const isAppellant = role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
       const isAppellee = role.includes('مطعون ضده') || role.includes('مستأنف ضده') || role.includes('مدعى عليه');
 
-      if (isAppellant) appellantCount++;
-      if (isAppellee) appelleeCount++;
+      const lastSessionStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'] || '';
+      const lastSessionDate = getSafeDateObj(lastSessionStr);
+
+      let isOngoingForEntity = false;
+      if (lastSessionDate) {
+        if (lastSessionDate >= today || (lastSessionDate.getMonth() === currentMonth && lastSessionDate.getFullYear() === currentYear)) {
+          isOngoingForEntity = true;
+        }
+      }
+
+      if (isOngoingForEntity) {
+        if (isAppellant) appellantCount++;
+        if (isAppellee) appelleeCount++;
+      }
 
       const year = c['السنة'] || c['سنة'] || c['year'] || 'غير محدد';
       yearCount[year] = (yearCount[year] || 0) + 1;
 
       const decision = String(c['القرار'] || c['قرار الجلسة'] || c['المنطوق'] || '');
-      const lastSessionStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'] || '';
-      const lastSessionDate = getSafeDateObj(lastSessionStr);
 
       // Status Logic
       const hasHukm = decision.includes('حكم') || decision.includes('للحكم');
@@ -287,9 +297,12 @@ export default function Dashboard() {
                         await handleCompleteTask(task.type, task.caseId, task.id, notes);
                       }
                     }}
-                    className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl text-xs hover:bg-emerald-700 transition flex items-center justify-center gap-2 mt-4"
+                    className="w-full group bg-slate-50 border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-500 text-slate-500 hover:text-white font-black py-3 rounded-xl text-sm transition-all duration-300 flex items-center justify-center gap-3 mt-4 shadow-sm hover:shadow-lg hover:shadow-emerald-500/30 active:scale-[0.98]"
                   >
-                    <CheckCircle2 className="w-4 h-4" /> تسجيل إجراء والتأشير بالتمام
+                    <div className="w-6 h-6 rounded-full border-2 border-slate-400 group-hover:border-white bg-white/50 group-hover:bg-transparent flex items-center justify-center transition-all duration-300 group-hover:scale-110">
+                      <CheckCircle2 className="w-4 h-4 text-transparent group-hover:text-white transition-colors" />
+                    </div>
+                    <span className="group-hover:-translate-x-1 transition-transform">تأشير كـ "مُنجز"</span>
                   </button>
                 </div>
               ))}
@@ -424,16 +437,58 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center space-y-2 relative overflow-hidden">
-            <div className="absolute -left-4 -top-4 w-16 h-16 bg-slate-50 rounded-full"></div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest relative z-10">المحكوم فيه</p>
-            <p className="text-xl font-black text-slate-700 relative z-10">{stats.judged}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Status Chart */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center items-center relative overflow-hidden h-full min-h-[90px]">
+            <div className="flex items-end justify-around w-full h-full px-4 border-b border-slate-100 pb-2">
+              <div className="flex flex-col items-center gap-1.5 group w-20">
+                <span className="text-base font-black text-slate-500 group-hover:text-amber-600 transition-colors">{stats.ongoing}</span>
+                <div 
+                  className="w-full bg-amber-200 rounded-t-sm transition-all duration-1000 group-hover:bg-amber-400"
+                  style={{ height: `${(stats.ongoing / Math.max(stats.ongoing, stats.judged, stats.reserved, 1)) * 100}%`, minHeight: '8px' }}
+                ></div>
+                <span className="text-xs font-bold text-slate-600 text-center mt-1 leading-none">متداول</span>
+              </div>
+              
+              <div className="flex flex-col items-center gap-1.5 group w-20">
+                <span className="text-base font-black text-slate-500 group-hover:text-indigo-600 transition-colors">{stats.reserved}</span>
+                <div 
+                  className="w-full bg-indigo-200 rounded-t-sm transition-all duration-1000 group-hover:bg-indigo-400"
+                  style={{ height: `${(stats.reserved / Math.max(stats.ongoing, stats.judged, stats.reserved, 1)) * 100}%`, minHeight: '8px' }}
+                ></div>
+                <span className="text-xs font-bold text-slate-600 text-center mt-1 leading-none">محجوز للحكم</span>
+              </div>
+              
+              <div className="flex flex-col items-center gap-1.5 group w-20">
+                <span className="text-base font-black text-slate-500 group-hover:text-emerald-600 transition-colors">{stats.judged}</span>
+                <div 
+                  className="w-full bg-emerald-200 rounded-t-sm transition-all duration-1000 group-hover:bg-emerald-400"
+                  style={{ height: `${(stats.judged / Math.max(stats.ongoing, stats.judged, stats.reserved, 1)) * 100}%`, minHeight: '8px' }}
+                ></div>
+                <span className="text-xs font-bold text-slate-600 text-center mt-1 leading-none">المحكوم فيه</span>
+              </div>
+            </div>
           </div>
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center space-y-2 relative overflow-hidden">
-            <div className="absolute -left-4 -top-4 w-16 h-16 bg-slate-50 rounded-full"></div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest relative z-10">محجوز للحكم</p>
-            <p className="text-xl font-black text-slate-700 relative z-10">{stats.reserved}</p>
+
+          {/* Entity Indicator */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center relative overflow-hidden h-full min-h-[90px]">
+            <div className="w-full flex-1 flex flex-col justify-center gap-4 mt-2">
+              <div className="w-full flex h-4 bg-slate-100 rounded-full overflow-hidden shadow-inner relative">
+                <div 
+                  className="bg-emerald-500 h-full flex items-center justify-center text-xs text-white font-bold transition-all duration-1000" 
+                  style={{ width: `${(stats.appellant / (stats.appellant + stats.appellee || 1)) * 100}%` }}
+                ></div>
+                <div 
+                  className="bg-rose-500 h-full flex items-center justify-center text-xs text-white font-bold transition-all duration-1000" 
+                  style={{ width: `${(stats.appellee / (stats.appellant + stats.appellee || 1)) * 100}%` }}
+                ></div>
+              </div>
+              
+              <div className="w-full flex justify-between text-xs font-black">
+                 <span className="text-emerald-700">طاعن ({stats.appellant})</span>
+                 <span className="text-rose-700">مطعون ضده ({stats.appellee})</span>
+              </div>
+            </div>
           </div>
         </div>
 

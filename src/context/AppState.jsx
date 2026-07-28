@@ -38,6 +38,7 @@ export const AppProvider = ({ children }) => {
       } else {
         // Default schema if none exists
         setSchema([
+          { id: 'الرول', label: 'الرول', type: 'text', visible: true, primary: true },
           { id: 'رقم الدعوى', label: 'رقم الدعوى', type: 'text', visible: true, primary: true },
           { id: 'السنة', label: 'السنة', type: 'text', visible: true, primary: true },
           { id: 'المدعي', label: 'المدعي', type: 'text', visible: true },
