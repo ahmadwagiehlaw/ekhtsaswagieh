@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2, Bell, AlertTriangle, FileText, ExternalLink, BookOpen } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
+import { useUI } from '../context/UIContext';
 import AddSessionModal from '../components/AddSessionModal';
+import CaseDocuments from '../components/CaseDocuments';
+import AlertsModal from '../components/AlertsModal';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 
 export default function CaseDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { cases, schema, isAdmin, saveCaseToFirebase, settings } = useAppContext();
+  const { cases, schema, isAdmin, saveCaseToFirebase, settings, rolls } = useAppContext();
+  const { toast, showConfirm, openRollViewer } = useUI();
 
   // In the new architecture, id is the document id, not the array index.
   const caseData = cases.find(c => c.id === id);
@@ -16,6 +20,8 @@ export default function CaseDetails() {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(caseData || {});
   const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
+  const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('details'); // 'details' | 'documents' | 'sessions' | 'tasks'
   
   // Task state
   const [newTask, setNewTask] = useState({ assignee: '', title: '' });
@@ -53,13 +59,18 @@ export default function CaseDetails() {
   const isAppellant = role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
   const isJudgment = String(decision).includes('حكم') || String(decision).includes('للحكم');
 
+  const coverImageDoc = (caseData.documents || []).find(doc => doc.type === 'غلاف الملف' && doc.fileType === 'image');
+  const coverImageUrl = coverImageDoc ? coverImageDoc.url : null;
+
   const handleSave = async () => {
     if (!isAdmin) return;
-    const success = await saveCaseToFirebase(caseData.id, editData);
-    if (success) {
+    try {
+      await saveCaseToFirebase(caseData.id, editData);
       setIsEditing(false);
-    } else {
-      alert('حدث خطأ أثناء الحفظ.');
+      toast("تم حفظ التعديلات بنجاح!", "success");
+    } catch (error) {
+      console.error(error);
+      toast("حدث خطأ أثناء الحفظ.", "error");
     }
   };
 
@@ -108,9 +119,18 @@ export default function CaseDetails() {
       </div>
 
       {/* HERO CARD - Primary Info */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mx-4 sm:mx-0">
-        <div className={`h-2 w-full ${isAppellant ? 'bg-blue-500' : 'bg-amber-500'}`}></div>
-        <div className="p-5 text-center space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mx-4 sm:mx-0 relative">
+        {coverImageUrl ? (
+          <div className="h-32 w-full relative">
+            <img src={coverImageUrl} alt="غلاف الدعوى" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-white"></div>
+            <div className={`absolute top-0 left-0 w-full h-1 ${isAppellant ? 'bg-blue-500' : 'bg-amber-500'}`}></div>
+          </div>
+        ) : (
+          <div className={`h-2 w-full ${isAppellant ? 'bg-blue-500' : 'bg-amber-500'}`}></div>
+        )}
+        
+        <div className={`text-center space-y-4 ${coverImageUrl ? 'p-5 pt-2' : 'p-5'}`}>
           <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
              {role && (
                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${isAppellant ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
@@ -124,10 +144,29 @@ export default function CaseDetails() {
              )}
           </div>
           
-          <div>
+          <div className="flex items-center gap-3 justify-center mt-1">
             <h1 className="text-2xl sm:text-3xl font-black text-navy-900">
               دعوى رقم {caseNo} <span className="text-slate-400 font-bold text-lg">لسنة</span> {year}
             </h1>
+            
+            {/* Alerts Button in Header */}
+            <button 
+              onClick={() => setIsAlertsOpen(true)}
+              className={`relative p-2 rounded-xl transition ${
+                caseData.alerts && caseData.alerts.some(a => !a.isDone) 
+                  ? 'bg-rose-100 text-rose-600 hover:bg-rose-200' 
+                  : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'
+              }`}
+              title="مواعيد وتنبيهات الملف"
+            >
+              <Bell className="w-5 h-5" />
+              {caseData.alerts && caseData.alerts.some(a => !a.isDone) && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 border border-white"></span>
+                </span>
+              )}
+            </button>
           </div>
 
           <div className="bg-slate-50 rounded-xl p-3 sm:p-4 flex items-center justify-center gap-3 border border-slate-100 text-center flex-wrap">
@@ -145,9 +184,14 @@ export default function CaseDetails() {
           {(decision || lastSession) && (
             <div className={`mt-3 p-3 rounded-xl border flex flex-row items-center justify-center gap-4 flex-wrap ${isJudgment ? 'bg-rose-50 border-rose-100 text-rose-800' : 'bg-amber-50/50 border-amber-100 text-amber-800'}`}>
               {lastSession && (
-                <p className="text-sm font-black flex items-center gap-1.5 shrink-0">
+                <button 
+                  onClick={() => openRollViewer(lastSession)}
+                  className="text-sm font-black flex items-center gap-1.5 shrink-0 hover:text-indigo-600 transition"
+                  title="عرض رول الجلسة"
+                >
                   📅 تاريخ الجلسة: <span dir="ltr">{lastSession}</span>
-                </p>
+                  <BookOpen className="w-4 h-4 text-indigo-500" />
+                </button>
               )}
               {lastSession && decision && <div className="w-px h-4 bg-current opacity-20"></div>}
               {decision && (
@@ -160,8 +204,39 @@ export default function CaseDetails() {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mx-4 sm:mx-0">
+      {/* Tabs Navigation */}
+      <div className="mx-4 sm:mx-0 sticky top-[64px] z-40 bg-slate-50/80 backdrop-blur-md pb-2 pt-2">
+        <div className="flex bg-white rounded-xl shadow-sm border border-slate-200 p-1 gap-1 overflow-x-auto hide-scrollbar">
+          <button 
+            onClick={() => setActiveTab('details')}
+            className={`flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-lg whitespace-nowrap transition-all flex items-center justify-center gap-1.5 ${activeTab === 'details' ? 'bg-navy-900 text-amber-300 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+          >
+            <Edit3 className="w-4 h-4" /> بيانات الدعوى
+          </button>
+          <button 
+            onClick={() => setActiveTab('documents')}
+            className={`flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-lg whitespace-nowrap transition-all flex items-center justify-center gap-1.5 ${activeTab === 'documents' ? 'bg-navy-900 text-amber-300 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+          >
+            <ClipboardList className="w-4 h-4" /> أوراق الدعوى
+          </button>
+          <button 
+            onClick={() => setActiveTab('sessions')}
+            className={`flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-lg whitespace-nowrap transition-all flex items-center justify-center gap-1.5 ${activeTab === 'sessions' ? 'bg-navy-900 text-amber-300 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+          >
+            <CalendarPlus className="w-4 h-4" /> الجلسات
+          </button>
+          <button 
+            onClick={() => setActiveTab('tasks')}
+            className={`flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-lg whitespace-nowrap transition-all flex items-center justify-center gap-1.5 ${activeTab === 'tasks' ? 'bg-navy-900 text-amber-300 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+          >
+            <ClipboardList className="w-4 h-4" /> المهام
+          </button>
+        </div>
+      </div>
+
+      {/* Tab Content: Details */}
+      {activeTab === 'details' && (
+      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mx-4 sm:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
           <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shrink-0">
              <Gavel className="w-6 h-6" />
@@ -185,8 +260,10 @@ export default function CaseDetails() {
             const displayVal = isDateField ? formatDateString(val) : val;
             
             let colSpan = 'md:col-span-2';
-            if (field.id === 'الرول') colSpan = 'md:col-span-1';
-            else if (field.id === 'مكان الملف') colSpan = 'md:col-span-4';
+            if (field.id === 'الرول' || field.id.includes('رقم') || field.id === 'السنة') colSpan = 'md:col-span-1 col-span-2';
+            else if (isDateField || field.id.includes('محكمة') || field.id.includes('دائرة')) colSpan = 'md:col-span-1 col-span-2';
+            else if (field.id === 'مكان الملف' || field.type === 'textarea' || field.id.includes('ملاحظات')) colSpan = 'md:col-span-4 col-span-4';
+            else if (field.id === 'الصفة' || field.id === 'صفة' || field.id === 'القرار') colSpan = 'md:col-span-4 col-span-4';
 
             return (
               <div key={field.id} className={`space-y-1.5 ${colSpan}`}>
@@ -204,6 +281,26 @@ export default function CaseDetails() {
                           {opt}
                         </button>
                       ))}
+                    </div>
+                  ) : field.id === 'القرار' && settings?.decisions ? (
+                    <div className="flex gap-2 flex-wrap mt-1">
+                      {settings.decisions.slice(0, 10).map(opt => (
+                        <button 
+                          key={opt}
+                          type="button" 
+                          onClick={() => setEditData({...editData, [field.id]: opt})} 
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${val === opt ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                      <input 
+                        type="text" 
+                        placeholder="أو اكتب قرار آخر..."
+                        value={!settings.decisions.includes(val) && val ? val : ''}
+                        onChange={(e) => setEditData({...editData, [field.id]: e.target.value})}
+                        className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900"
+                      />
                     </div>
                   ) : field.id === 'نوع الجلسة' ? (
                     <div className="flex gap-2 flex-wrap mt-1">
@@ -359,9 +456,11 @@ export default function CaseDetails() {
           </div>
         )}
       </div>
+      )}
 
-      {/* Session History Timeline */}
-      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mx-4 sm:mx-0 mt-4">
+      {/* Tab Content: Sessions */}
+      {activeTab === 'sessions' && (
+      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mx-4 sm:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
@@ -397,10 +496,43 @@ export default function CaseDetails() {
                         {session.date}
                      </span>
                      <h4 className="text-sm font-black text-navy-900 mb-2">{session.decision || 'بدون قرار'}</h4>
+                     
+                     {/* Check for matching rolls */}
+                     {(() => {
+                        const matchingRolls = rolls.filter(r => r.date === session.date);
+                        if (matchingRolls.length === 0) return null;
+                        return (
+                          <div className="flex flex-wrap gap-2 mt-2 mb-2">
+                            <button
+                                onClick={() => openRollViewer(session.date)}
+                                className="bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                            >
+                                <FileText className="w-3 h-3" /> عرض الرول
+                            </button>
+                          </div>
+                        );
+                     })()}
+
                      {session.notes && (
                        <p className="text-xs font-bold text-slate-600 bg-white p-2 rounded-lg border border-slate-100 mt-2 whitespace-pre-wrap">
                          {session.notes}
                        </p>
+                     )}
+                     {isAdmin && (
+                       <button
+                         onClick={async () => {
+                           const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذه الجلسة؟');
+                           if (confirmed) {
+                             const newSessions = [...caseData.sessions];
+                             newSessions.splice(idx, 1);
+                             await saveCaseToFirebase(caseData.id, { sessions: newSessions });
+                             toast("تم حذف الجلسة", "info");
+                           }
+                         }}
+                         className="mt-2 text-[10px] font-bold text-rose-500 hover:text-rose-700"
+                       >
+                         حذف الجلسة
+                       </button>
                      )}
                   </div>
                 </div>
@@ -409,8 +541,11 @@ export default function CaseDetails() {
           )}
         </div>
       </div>
-      {/* Task Management Section (Admin Only for assigning, everyone for viewing) */}
-      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mx-4 sm:mx-0 mt-4">
+      )}
+
+      {/* Tab Content: Tasks */}
+      {activeTab === 'tasks' && (
+      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mx-4 sm:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
@@ -485,7 +620,7 @@ export default function CaseDetails() {
                 <button 
                   onClick={async () => {
                     if(!newTask.assignee || !newTask.title) {
-                      alert('يرجى اختيار الموظف وكتابة وصف المهمة.');
+                      toast('يرجى اختيار الموظف وكتابة وصف المهمة.', 'error');
                       return;
                     }
                     setIsAddingTask(true);
@@ -512,8 +647,27 @@ export default function CaseDetails() {
           )}
         </div>
       </div>
+      )}
+      {/* Tab Content: Documents */}
+      {activeTab === 'documents' && (
+        <CaseDocuments caseId={caseData.id} />
+      )}
       
-      <AddSessionModal isOpen={isAddSessionOpen} onClose={() => setIsAddSessionOpen(false)} caseData={caseData} />
+      {/* Add Session Modal */}
+      <AddSessionModal 
+        isOpen={isAddSessionOpen}
+        onClose={() => setIsAddSessionOpen(false)}
+        caseData={caseData}
+      />
+
+      {/* Alerts Modal */}
+      <AlertsModal
+        isOpen={isAlertsOpen}
+        onClose={() => setIsAlertsOpen(false)}
+        caseData={caseData}
+      />
+
+
     </div>
   );
 }

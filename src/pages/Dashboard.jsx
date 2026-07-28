@@ -1,14 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, TrendingUp, Users, CalendarDays, AlertTriangle, Building2, Scale, Info, PieChart, ClipboardList, CheckCircle2, ChevronLeft } from 'lucide-react';
+import { Search, TrendingUp, Users, CalendarDays, AlertTriangle, Building2, Scale, Info, PieChart, ClipboardList, CheckCircle2, ChevronLeft, CalendarPlus, Activity, Sparkles } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { getSafeDateObj } from '../utils/dateUtils';
+import { useUI } from '../context/UIContext';
+import AdvancedSearchModal from '../components/AdvancedSearchModal';
+import BulkAssignTaskModal from '../components/BulkAssignTaskModal';
 
 export default function Dashboard() {
-  const { cases, isEmployee, currentUser, saveCaseToFirebase } = useAppContext();
+  const { cases, isEmployee, currentUser, saveCaseToFirebase, settings, globalTasks, saveGlobalTask } = useAppContext();
   const navigate = useNavigate();
+  const { showPrompt, toast } = useUI();
   const [searchQuery, setSearchQuery] = useState('');
-  const [employeeNotes, setEmployeeNotes] = useState({});
+  const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
+  const [isGlobalTaskModalOpen, setIsGlobalTaskModalOpen] = useState(false);
+  const [adminTasksTab, setAdminTasksTab] = useState('pending'); // 'pending' or 'completed'
 
   const stats = useMemo(() => {
     let appellantCount = 0;
@@ -68,15 +74,15 @@ export default function Dashboard() {
         // Alerts Engine
         if (decision.includes('وقف جزائي') && lastSessionDate) {
           const diffTime = Math.abs(today - lastSessionDate);
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-          
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
           if (diffDays >= 30 && diffDays <= 45) {
-             alerts.push({
-               type: 'critical_suspension',
-               case: c,
-               daysPassed: diffDays,
-               daysLeft: 45 - diffDays
-             });
+            alerts.push({
+              type: 'critical_suspension',
+              case: c,
+              daysPassed: diffDays,
+              daysLeft: 45 - diffDays
+            });
           }
         }
       }
@@ -114,9 +120,9 @@ export default function Dashboard() {
     const topOpponents = Object.entries(opponentsCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
     const topJudgments = Object.entries(judgmentsCount).sort((a, b) => b[1] - a[1]);
 
-    return { 
-      all: cases.length, 
-      appellant: appellantCount, 
+    return {
+      all: cases.length,
+      appellant: appellantCount,
       appellee: appelleeCount,
       judged: judgedCount,
       reserved: reservedCount,
@@ -132,29 +138,57 @@ export default function Dashboard() {
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate('/files', { state: { searchQuery } });
-    } else {
-      navigate(`/files`);
+      navigate(`/files?q=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
 
-  const handleCompleteTask = async (caseId, taskId) => {
+  const handleAdvancedSearch = (params) => {
+    // Navigate with URL params for advanced search
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, val]) => {
+      if (val) query.set(key, val);
+    });
+    navigate(`/files?${query.toString()}`);
+  };
+
+  const handleCompleteTask = async (taskType, caseId, taskId, notes) => {
+    const now = new Date().toISOString();
+    
+    if (taskType === 'global') {
+      const taskToUpdate = globalTasks.find(t => t.id === taskId);
+      if (taskToUpdate) {
+        await saveGlobalTask(taskId, { ...taskToUpdate, status: 'completed', notes: notes || '', completedAt: now });
+        toast('تم تسجيل الإجراء بنجاح', 'success');
+      }
+      return;
+    }
+
     const caseToUpdate = cases.find(c => c.id === caseId);
     if (!caseToUpdate) return;
-    
+
     const updatedTasks = caseToUpdate.tasks.map(t => {
       if (t.id === taskId) {
-        return { ...t, status: 'completed', notes: employeeNotes[taskId] || '' };
+        return { ...t, status: 'completed', notes: notes || '', completedAt: now };
       }
       return t;
     });
 
     await saveCaseToFirebase(caseId, { tasks: updatedTasks });
-    setEmployeeNotes(prev => {
-      const next = {...prev};
-      delete next[taskId];
-      return next;
-    });
+    toast('تم تسجيل الإجراء بنجاح', 'success');
+  };
+
+  const handleDeleteTaskAdmin = async (taskType, caseId, taskId) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذه المهمة نهائياً؟')) return;
+    if (taskType === 'global') {
+      await deleteGlobalTask(taskId);
+      toast('تم الحذف بنجاح', 'success');
+      return;
+    }
+    const caseToUpdate = cases.find(c => c.id === caseId);
+    if (!caseToUpdate) return;
+    const updatedTasks = caseToUpdate.tasks.filter(t => t.id !== taskId);
+    await saveCaseToFirebase(caseId, { tasks: updatedTasks });
+    toast('تم الحذف بنجاح', 'success');
   };
 
   if (isEmployee) {
@@ -163,31 +197,61 @@ export default function Dashboard() {
       if (c.tasks) {
         c.tasks.forEach(t => {
           if (t.assignee === currentUser) {
-            myTasks.push({ ...t, caseId: c.id, caseNum: c['رقم الدعوى'] || c.id, year: c['السنة'] });
+            myTasks.push({ ...t, caseId: c.id, caseNum: c['رقم الدعوى'] || c.id, year: c['السنة'], type: 'case', caseCover: c.coverImage });
           }
         });
       }
     });
 
-    const pendingTasks = myTasks.filter(t => t.status !== 'completed').sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-    const completedTasks = myTasks.filter(t => t.status === 'completed').sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+    globalTasks.forEach(t => {
+      if (t.assignee === currentUser) {
+        // If linked to cases, find the first case to show cover image or info
+        let caseNum = 'مهمة عامة';
+        let caseCover = null;
+        if (t.linkedCases && t.linkedCases.length > 0) {
+          const firstCase = cases.find(c => c.id === t.linkedCases[0]);
+          if (firstCase) {
+             caseNum = t.linkedCases.length > 1 ? `مرتبطة بـ ${t.linkedCases.length} ملفات` : (firstCase['رقم الدعوى'] || 'ملف');
+             caseCover = firstCase.coverImage;
+          }
+        }
+        myTasks.push({ ...t, type: 'global', caseNum, caseCover });
+      }
+    });
+
+    const pendingTasks = myTasks.filter(t => t.status !== 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const completedTasks = myTasks.filter(t => t.status === 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return (
       <div className="space-y-6 animate-fade-in pb-10">
         <div className="bg-emerald-600 rounded-3xl p-6 relative overflow-hidden shadow-sm">
           <div className="absolute right-0 top-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4"></div>
           <div className="relative z-10 text-white">
-            <h1 className="text-3xl font-black mb-2">مرحباً، {currentUser} 👋</h1>
+            <h1 className="text-3xl font-black mb-2">مرحباً، أ. {currentUser} 👋</h1>
             <p className="text-sm font-bold text-emerald-100">إليك المهام المطلوبة منك اليوم</p>
           </div>
         </div>
+
+        {/* Employee Search Bar */}
+        <form onSubmit={handleSearch} className="relative mb-6 animate-fade-in" style={{ animationDelay: '100ms' }}>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="البحث السريع عن الملفات (رقم الدعوى، الخصم، أو السنة)..."
+            className="w-full bg-white border-2 border-slate-200 rounded-2xl py-4 pl-14 pr-6 text-sm sm:text-base font-bold focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition shadow-sm text-navy-900"
+          />
+          <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white hover:bg-emerald-700 transition shadow-sm">
+            <Search className="w-5 h-5" />
+          </button>
+        </form>
 
         <div className="space-y-4">
           <h2 className="text-lg font-black text-navy-900 px-2 flex items-center gap-2">
             <ClipboardList className="w-5 h-5 text-emerald-600" />
             مهام قيد التنفيذ ({pendingTasks.length})
           </h2>
-          
+
           {pendingTasks.length === 0 ? (
             <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center text-slate-500 font-bold text-sm">
               لا توجد مهام جديدة مطلوبة منك حالياً.
@@ -197,33 +261,35 @@ export default function Dashboard() {
               {pendingTasks.map(task => (
                 <div key={task.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 flex flex-col">
                   <div className="flex justify-between items-start border-b border-slate-100 pb-3">
-                    <div>
-                      <span className="text-[10px] font-black bg-slate-100 text-slate-600 px-2 py-1 rounded-md mb-2 inline-block">
-                        رقم {task.caseNum} {task.year && `لسنة ${task.year}`}
-                      </span>
-                      <h3 className="font-black text-navy-900 text-sm leading-relaxed">{task.title}</h3>
+                    <div className="flex gap-3">
+                      {task.caseCover && (
+                         <div className="w-12 h-16 shrink-0 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shadow-sm flex items-center justify-center">
+                            <img src={task.caseCover} alt="Cover" className="w-full h-full object-cover" />
+                         </div>
+                      )}
+                      <div>
+                        <span className={`text-[10px] font-black px-2 py-1 rounded-md mb-2 inline-block ${task.type === 'global' && !task.linkedCases?.length ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+                          {task.type === 'global' && !task.linkedCases?.length ? 'مهمة عامة' : `رقم ${task.caseNum} ${task.year ? `لسنة ${task.year}` : ''}`}
+                        </span>
+                        <h3 className="font-black text-navy-900 text-sm leading-relaxed">{task.title}</h3>
+                      </div>
                     </div>
-                    <button onClick={() => navigate(`/case/${task.caseId}`)} className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-navy-900 hover:bg-slate-100 transition shrink-0">
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
+                    {task.type === 'case' && (
+                      <button onClick={() => navigate(`/case/${task.caseId}`)} className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-navy-900 hover:bg-slate-100 transition shrink-0">
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
-                  
-                  <div className="flex-1 space-y-2">
-                    <label className="text-[10px] font-bold text-slate-500">ملاحظات بعد التنفيذ (اختياري)</label>
-                    <textarea 
-                      value={employeeNotes[task.id] || ''}
-                      onChange={e => setEmployeeNotes({...employeeNotes, [task.id]: e.target.value})}
-                      placeholder="اكتب ماذا حدث..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-navy-900 focus:outline-none focus:border-emerald-500 resize-none"
-                      rows={2}
-                    ></textarea>
-                  </div>
-
-                  <button 
-                    onClick={() => handleCompleteTask(task.caseId, task.id)}
-                    className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl text-xs hover:bg-emerald-700 transition flex items-center justify-center gap-2"
+                  <button
+                    onClick={async () => {
+                      const notes = await showPrompt('تسجيل إجراء', 'اكتب ملاحظات حول تنفيذ هذه المهمة (اختياري):');
+                      if (notes !== null) {
+                        await handleCompleteTask(task.type, task.caseId, task.id, notes);
+                      }
+                    }}
+                    className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl text-xs hover:bg-emerald-700 transition flex items-center justify-center gap-2 mt-4"
                   >
-                    <CheckCircle2 className="w-4 h-4" /> تأشير كـ تم التنفيذ
+                    <CheckCircle2 className="w-4 h-4" /> تسجيل إجراء والتأشير بالتمام
                   </button>
                 </div>
               ))}
@@ -272,9 +338,19 @@ export default function Dashboard() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="ابحث هنا..."
-              className="w-full bg-white/10 text-white placeholder-slate-400 border-2 border-white/20 rounded-2xl py-4 pl-4 pr-14 text-lg font-bold focus:outline-none focus:border-amber-400 focus:bg-white/20 transition-all backdrop-blur-sm"
+              className="w-full bg-white/10 text-white placeholder-slate-400 border-2 border-white/20 rounded-2xl py-4 pl-14 pr-24 text-lg font-bold focus:outline-none focus:border-amber-400 focus:bg-white/20 transition-all backdrop-blur-sm"
             />
-            <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white hover:bg-amber-600 transition">
+            
+            <button 
+              type="button" 
+              onClick={() => setIsAdvancedSearchOpen(true)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-amber-300 hover:bg-white/20 transition"
+              title="بحث متقدم (ذكي)"
+            >
+              <Sparkles className="w-5 h-5" />
+            </button>
+
+            <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white hover:bg-amber-600 transition">
               <Search className="w-5 h-5" />
             </button>
           </form>
@@ -437,6 +513,141 @@ export default function Dashboard() {
           </div>
 
         </div>
+      </div>
+
+      {/* Admin Employee Performance Report */}
+      <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm space-y-4 animate-fade-in mt-6">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Activity className="w-6 h-6 text-indigo-600" />
+            <div>
+              <h2 className="font-black text-lg text-navy-900">تقارير أداء الموظفين</h2>
+              <p className="text-[11px] font-bold text-slate-500">سجل بجميع المهام المنفذة مؤخراً</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setIsGlobalTaskModalOpen(true)}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-sm flex items-center gap-2"
+          >
+            <ClipboardList className="w-4 h-4" /> إنشاء مهمة عامة
+          </button>
+        </div>
+
+        <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit">
+          <button 
+            onClick={() => setAdminTasksTab('pending')}
+            className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${adminTasksTab === 'pending' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-navy-900'}`}
+          >
+            مهام قيد التنفيذ
+          </button>
+          <button 
+            onClick={() => setAdminTasksTab('completed')}
+            className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${adminTasksTab === 'completed' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-navy-900'}`}
+          >
+            مهام تم تنفيذها
+          </button>
+        </div>
+
+        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+          {(() => {
+            const allTasks = [];
+            cases.forEach(c => {
+              if (c.tasks) {
+                c.tasks.forEach(t => {
+                  allTasks.push({
+                    ...t,
+                    caseId: c.id,
+                    caseNum: c['رقم الدعوى'] || c.id,
+                    year: c['السنة'],
+                    type: 'case'
+                  });
+                });
+              }
+            });
+            globalTasks.forEach(t => {
+              allTasks.push({ ...t, type: 'global', caseNum: t.linkedCases?.length ? `مرتبطة بـ ${t.linkedCases.length} ملفات` : 'مهمة عامة' });
+            });
+
+            const displayedTasks = allTasks
+              .filter(t => adminTasksTab === 'completed' ? t.status === 'completed' : t.status !== 'completed')
+              .sort((a, b) => new Date(b.completedAt || b.createdAt) - new Date(a.completedAt || a.createdAt));
+
+            if (displayedTasks.length === 0) {
+              return (
+                <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
+                  <p className="text-xs font-bold text-slate-500">
+                    {adminTasksTab === 'completed' ? 'لم يتم تنفيذ أي مهام حتى الآن.' : 'لا توجد مهام قيد التنفيذ حالياً.'}
+                  </p>
+                </div>
+              );
+            }
+
+            return displayedTasks.map(task => {
+              const d = new Date(task.completedAt || task.createdAt);
+              const dateStr = d.toLocaleDateString('ar-EG');
+              const timeStr = d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+
+              return (
+                <div key={`${task.caseId}-${task.id}`} className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col sm:flex-row justify-between gap-4 transition hover:bg-slate-100">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="bg-navy-900 text-white px-2 py-0.5 rounded-md text-[10px] font-bold">{task.assignee}</span>
+                      <h4 className="font-black text-sm text-navy-900">{task.title}</h4>
+                    </div>
+                    <p className="text-[11px] font-bold text-slate-500 mb-2">رقم الدعوى: {task.caseNum} {task.year && `لسنة ${task.year}`}</p>
+                    {task.notes && (
+                      <p className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-1.5 rounded-lg border border-indigo-100 inline-block">
+                        ملاحظة: {task.notes}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 shrink-0">
+                    {task.status === 'completed' ? (
+                      <>
+                        <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md flex items-center gap-1 border border-emerald-100">
+                          <CheckCircle2 className="w-3 h-3" /> تم التنفيذ
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400">
+                          {dateStr} - {timeStr}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-md flex items-center gap-1 border border-amber-100">
+                          قيد التنفيذ
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400">
+                          {dateStr} - {timeStr}
+                        </span>
+                        <button 
+                          onClick={() => handleDeleteTaskAdmin(task.type, task.caseId, task.id)}
+                          className="mt-2 text-[10px] font-bold text-rose-500 hover:text-white hover:bg-rose-500 px-2 py-1 rounded-md transition"
+                        >
+                          حذف المهمة
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )
+            });
+          })()}
+        </div>
+
+        {isAdvancedSearchOpen && (
+          <AdvancedSearchModal
+            isOpen={isAdvancedSearchOpen}
+            onClose={() => setIsAdvancedSearchOpen(false)}
+            onSearch={handleAdvancedSearch}
+          />
+        )}
+
+        <BulkAssignTaskModal
+          isOpen={isGlobalTaskModalOpen}
+          onClose={() => setIsGlobalTaskModalOpen(false)}
+          selectedCases={[]}
+          onClearSelection={() => {}}
+        />
       </div>
     </div>
   );

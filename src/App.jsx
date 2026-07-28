@@ -1,12 +1,15 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useAppContext } from './context/AppState';
+import { UIProvider } from './context/UIContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Files from './pages/Files';
 import Agenda from './pages/Agenda';
 import Settings from './pages/Settings';
 import CaseDetails from './pages/CaseDetails';
+import RollsLibrary from './pages/RollsLibrary';
+import DayRoll from './pages/DayRoll';
 
 function AppContent() {
   const { loading } = useAppContext();
@@ -27,9 +30,11 @@ function AppContent() {
           <Route path="files" element={<Files />} />
           <Route path="agenda" element={<Agenda />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="rolls" element={<RollsLibrary />} />
           <Route path="case/:id" element={<CaseDetails />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
+        <Route path="/day-roll/:date" element={<DayRoll />} />
       </Routes>
     </BrowserRouter>
   );
@@ -38,7 +43,9 @@ function AppContent() {
 function App() {
   return (
     <AppProvider>
-      <AppContent />
+      <UIProvider>
+        <AppContent />
+      </UIProvider>
     </AppProvider>
   );
 }

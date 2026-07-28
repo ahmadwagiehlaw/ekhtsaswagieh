@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { onSnapshot, setDoc, doc, writeBatch, getDocs } from 'firebase/firestore';
-import { db, SETTINGS_DOC_REF, SCHEMA_DOC_REF, CASES_COLLECTION_REF, LEGACY_MAIN_DOC_REF } from '../lib/firebase';
+import { onSnapshot, setDoc, doc, writeBatch, getDocs, deleteDoc } from 'firebase/firestore';
+import { db, SETTINGS_DOC_REF, SCHEMA_DOC_REF, CASES_COLLECTION_REF, ROLLS_COLLECTION_REF, LEGACY_MAIN_DOC_REF, TASKS_COLLECTION_REF } from '../lib/firebase';
 
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
   const [cases, setCases] = useState([]);
+  const [rolls, setRolls] = useState([]);
+  const [globalTasks, setGlobalTasks] = useState([]);
   const [schema, setSchema] = useState([]);
   const [settings, setSettings] = useState({ 
     consultantName: "أحمد وجيه", 
@@ -54,10 +56,33 @@ export const AppProvider = ({ children }) => {
       }
     });
 
+    // 4. Listen to rolls
+    const unsubRolls = onSnapshot(ROLLS_COLLECTION_REF, (snapshot) => {
+      const rollsData = [];
+      snapshot.forEach(doc => {
+        rollsData.push({ id: doc.id, ...doc.data() });
+      });
+      // Sort rolls by date descending
+      rollsData.sort((a, b) => new Date(b.date) - new Date(a.date));
+      setRolls(rollsData);
+    });
+
+    // 5. Listen to global tasks
+    const unsubTasks = onSnapshot(TASKS_COLLECTION_REF, (snapshot) => {
+      const tasksData = [];
+      snapshot.forEach(doc => {
+        tasksData.push({ id: doc.id, ...doc.data() });
+      });
+      tasksData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setGlobalTasks(tasksData);
+    });
+
     return () => {
       unsubCases();
       unsubSchema();
       unsubSettings();
+      unsubRolls();
+      unsubTasks();
     };
   }, []);
 
@@ -211,9 +236,46 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const saveRollToFirebase = async (id, data) => {
+    try {
+      await setDoc(doc(ROLLS_COLLECTION_REF, id), data, { merge: true });
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  };
+
+  const deleteRollFromFirebase = async (id) => {
+    try {
+      await deleteDoc(doc(ROLLS_COLLECTION_REF, id));
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  };
+
+  const saveGlobalTask = async (id, data) => {
+    try {
+      await setDoc(doc(TASKS_COLLECTION_REF, id), data, { merge: true });
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  };
+
+  const deleteGlobalTask = async (id) => {
+    try {
+      await deleteDoc(doc(TASKS_COLLECTION_REF, id));
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       cases,
+      rolls,
       schema,
       settings,
       isAdmin,
@@ -228,7 +290,12 @@ export const AppProvider = ({ children }) => {
       saveSchemaToFirebase,
       saveSettingsToFirebase,
       deleteAllCases,
-      deleteCaseFromFirebase
+      deleteCaseFromFirebase,
+      saveRollToFirebase,
+      deleteRollFromFirebase,
+      globalTasks,
+      saveGlobalTask,
+      deleteGlobalTask
     }}>
       {children}
     </AppContext.Provider>

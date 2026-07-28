@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { X, Save, Plus } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
+import { useUI } from '../context/UIContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function AddCaseModal({ isOpen, onClose }) {
-  const { schema, createNewCase } = useAppContext();
+  const { schema, createNewCase, settings } = useAppContext();
+  const { toast } = useUI();
   const [formData, setFormData] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
@@ -14,13 +16,19 @@ export default function AddCaseModal({ isOpen, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSaving(true);
-    const success = await createNewCase(formData);
-    setIsSaving(false);
-    if (success) {
-      setFormData({});
-      onClose();
-    } else {
-      alert("حدث خطأ أثناء حفظ القضية");
+    try {
+      const success = await createNewCase(formData);
+      setIsSaving(false);
+      if (success) {
+        setFormData({});
+        toast("تمت إضافة القضية بنجاح!", "success");
+        onClose();
+      } else {
+        toast("حدث خطأ أثناء حفظ القضية", "error");
+      }
+    } catch (error) {
+      setIsSaving(false);
+      toast("حدث خطأ غير متوقع", "error");
     }
   };
 
@@ -60,12 +68,42 @@ export default function AddCaseModal({ isOpen, onClose }) {
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition"
                   />
                 ) : (
-                  <input 
-                    type="text"
-                    value={formData[field.id] || ''}
-                    onChange={(e) => setFormData({...formData, [field.id]: e.target.value})}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition"
-                  />
+                  <div>
+                    <input 
+                      type="text"
+                      value={formData[field.id] || ''}
+                      onChange={(e) => setFormData({...formData, [field.id]: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition"
+                    />
+                    {field.id === 'القرار' && settings?.decisions && (
+                       <div className="flex flex-wrap gap-1 mt-2">
+                         {settings.decisions.slice(0, 5).map(dec => (
+                           <button key={dec} type="button" onClick={() => setFormData({...formData, [field.id]: dec})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{dec}</button>
+                         ))}
+                       </div>
+                    )}
+                    {(field.id === 'الصفة' || field.id === 'صفة') && (
+                       <div className="flex flex-wrap gap-1 mt-2">
+                         {['طاعن', 'مطعون ضده', 'خصم مدخل'].map(s => (
+                           <button key={s} type="button" onClick={() => setFormData({...formData, [field.id]: s})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{s}</button>
+                         ))}
+                       </div>
+                    )}
+                    {field.id === 'نوع الجلسة' && (
+                       <div className="flex flex-wrap gap-1 mt-2">
+                         {['موضوع', 'فحص', 'للحكم', 'أول جلسة'].map(s => (
+                           <button key={s} type="button" onClick={() => setFormData({...formData, [field.id]: s})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{s}</button>
+                         ))}
+                       </div>
+                    )}
+                    {field.id === 'مكان الملف' && (
+                       <div className="flex flex-wrap gap-1 mt-2">
+                         {['شعبة الحفظ', 'الأحكام', 'أصلي'].map(s => (
+                           <button key={s} type="button" onClick={() => setFormData({...formData, [field.id]: s})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{s}</button>
+                         ))}
+                       </div>
+                    )}
+                  </div>
                 )}
               </div>
             ))}

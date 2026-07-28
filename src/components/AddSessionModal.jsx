@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { X, Save, CalendarPlus } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
+import { useUI } from '../context/UIContext';
 
 export default function AddSessionModal({ isOpen, onClose, caseData }) {
   const { saveCaseToFirebase } = useAppContext();
+  const { toast } = useUI();
   const [sessionDate, setSessionDate] = useState('');
   const [decision, setDecision] = useState('');
   const [notes, setNotes] = useState('');
@@ -14,7 +16,7 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!sessionDate) {
-      alert("يرجى إدخال تاريخ الجلسة");
+      toast("يرجى إدخال تاريخ الجلسة", "error");
       return;
     }
     
@@ -54,9 +56,10 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
       setSessionDate('');
       setDecision('');
       setNotes('');
+      toast("تمت إضافة الجلسة بنجاح", "success");
       onClose();
     } else {
-      alert("حدث خطأ أثناء حفظ الجلسة");
+      toast("حدث خطأ أثناء حفظ الجلسة", "error");
     }
   };
 

@@ -23,6 +23,7 @@ export default function Agenda() {
   const [isRolloverModalOpen, setIsRolloverModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'list'
   const [singleDateSearch, setSingleDateSearch] = useState('');
+  const [sessionTypeSearch, setSessionTypeSearch] = useState('');
 
   const getFieldValue = (obj, keys) => {
     for (let key of keys) {
@@ -31,9 +32,80 @@ export default function Agenda() {
     return '';
   };
 
+  const handleSearch = () => {
+    if (singleDateSearch) {
+      setFilterMode('singleDate');
+      const d = parseISO(singleDateSearch);
+      if (d && !isNaN(d)) {
+        setCurrentDate(d);
+        setSelectedDateKey(singleDateSearch);
+      }
+    } else {
+      if (sessionTypeSearch) {
+        setFilterMode('all');
+      } else {
+        setFilterMode('none');
+      }
+    }
+    if (activeTab !== 'calendar') {
+      setActiveTab('filter');
+    }
+  };
+
+  const handleResetSearch = () => {
+    setSingleDateSearch('');
+    setSessionTypeSearch('');
+    setFilterMode('none');
+  };
+
+  const SearchControls = () => (
+    <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 flex-1 w-full">
+        <input 
+          type="date" 
+          value={singleDateSearch} 
+          onChange={e => setSingleDateSearch(e.target.value)} 
+          className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900" 
+        />
+        <select
+          value={sessionTypeSearch}
+          onChange={e => setSessionTypeSearch(e.target.value)}
+          className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900"
+        >
+          <option value="">كل الجلسات</option>
+          <option value="فحص">فحص</option>
+          <option value="موضوع">موضوع</option>
+          <option value="للحكم">للحكم</option>
+        </select>
+      </div>
+      <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0 shrink-0">
+        <button 
+          onClick={handleResetSearch}
+          className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-4 py-2 rounded-xl text-xs transition"
+        >
+          مسح
+        </button>
+        <button 
+          onClick={handleSearch}
+          className="bg-navy-900 hover:bg-navy-800 text-amber-300 font-bold px-6 py-2 rounded-xl text-xs transition shadow-sm flex-1 sm:flex-none flex items-center justify-center gap-2"
+        >
+          بحث
+        </button>
+      </div>
+    </div>
+  );
+
   const sessionsMap = useMemo(() => {
     const map = {};
     cases.forEach(cObj => {
+      if (sessionTypeSearch) {
+        if (sessionTypeSearch === 'للحكم') {
+          if (getFieldValue(cObj, ['القرار']) !== 'للحكم') return;
+        } else {
+          if (getFieldValue(cObj, ['نوع الجلسة']) !== sessionTypeSearch) return;
+        }
+      }
+
       const dStr = getFieldValue(cObj, ['آخر جلسة','أخر جلسة','اخر جلسة','تاريخ الجلسة']);
       if (!dStr) return;
       const d = getSafeDateObj(dStr);
@@ -45,7 +117,7 @@ export default function Agenda() {
       map[key].push(cObj);
     });
     return map;
-  }, [cases]);
+  }, [cases, sessionTypeSearch]);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
@@ -82,6 +154,8 @@ export default function Agenda() {
       return past.length ? [past[0]] : [];
     } else if (filterMode === 'singleDate') {
       return singleDateSearch && sessionsMap[singleDateSearch] ? [singleDateSearch] : [];
+    } else if (filterMode === 'all') {
+      return allKeys;
     } else if (filterMode === 'range') {
       return allKeys.filter(k => {
         if (dateRange.from && k < dateRange.from) return false;
@@ -105,6 +179,7 @@ export default function Agenda() {
 
       {activeTab === 'calendar' && (
         <div className="space-y-3">
+          <SearchControls />
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="bg-navy-900 text-white px-4 py-3 flex items-center justify-between">
               <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="w-8 h-8 rounded-lg bg-navy-800 hover:bg-navy-700 flex items-center justify-center transition active:scale-95">
@@ -169,7 +244,12 @@ export default function Agenda() {
                     <p className="text-[11px] text-amber-700 font-bold">{sessionsMap[selectedDateKey].length} ملف قضائي</p>
                   </div>
                 </div>
-                <button onClick={() => setSelectedDateKey(null)} className="text-slate-400 hover:text-slate-700 p-1"><CalendarX2 className="w-5 h-5"/></button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => window.open(`/day-roll/${selectedDateKey}`, '_blank')} className="text-xs font-black bg-white border border-amber-300 text-amber-700 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition" title="فتح الرول كامل في نافذة مستقلة">
+                    استعراض الشاشة كاملة
+                  </button>
+                  <button onClick={() => setSelectedDateKey(null)} className="text-slate-400 hover:text-slate-700 p-1"><CalendarX2 className="w-5 h-5"/></button>
+                </div>
               </div>
               
               <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex gap-2">
@@ -263,16 +343,11 @@ export default function Agenda() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-            <p className="text-xs font-black text-navy-900 flex items-center gap-2">
-              <CalendarDays className="w-4 h-4 text-navy-900" /> بحث بتاريخ محدد
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3 mb-3 mt-3">
+            <p className="text-xs font-black text-navy-900 flex items-center gap-2 mb-2">
+              <CalendarDays className="w-4 h-4 text-navy-900" /> بحث بتاريخ محدد وتصنيف الجلسة
             </p>
-            <div className="flex gap-2">
-              <input type="date" value={singleDateSearch} onChange={e => setSingleDateSearch(e.target.value)} className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900" />
-              <button onClick={() => setFilterMode('singleDate')} className="bg-navy-900 hover:bg-navy-800 text-amber-300 font-bold px-5 py-2.5 rounded-xl text-xs transition shadow-sm">
-                بحث
-              </button>
-            </div>
+            <SearchControls />
           </div>
 
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">

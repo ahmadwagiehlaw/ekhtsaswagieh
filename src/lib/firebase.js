@@ -20,3 +20,5 @@ export const LEGACY_MAIN_DOC_REF = doc(db, "appData", "main");
 export const SETTINGS_DOC_REF = doc(db, "appData", "settings");
 export const SCHEMA_DOC_REF = doc(db, "appData", "schema");
 export const CASES_COLLECTION_REF = collection(db, "cases");
+export const ROLLS_COLLECTION_REF = collection(db, "rolls");
+export const TASKS_COLLECTION_REF = collection(db, "tasks");

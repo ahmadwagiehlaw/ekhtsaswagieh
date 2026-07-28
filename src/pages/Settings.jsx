@@ -1,10 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { useAppContext } from '../context/AppState';
-import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon } from 'lucide-react';
+import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { useUI } from '../context/UIContext';
 
 export default function Settings() {
   const { isAdmin, loginAdmin, logoutAdmin, cases, schema, settings, saveSettingsToFirebase, deleteAllCases, saveBatchCasesToFirebase, saveSchemaToFirebase } = useAppContext();
+  const { toast, showConfirm, showPrompt } = useUI();
+  
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const fileInputRef = useRef(null);
@@ -20,12 +23,16 @@ export default function Settings() {
   // Advanced state
   const [localEmployees, setLocalEmployees] = useState(settings?.employees || []);
   const [localDecisions, setLocalDecisions] = useState(settings?.decisions || []);
+  const [localReviewTasks, setLocalReviewTasks] = useState(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
+  const [localRollTypes, setLocalRollTypes] = useState(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
   const [deletePassword, setDeletePassword] = useState('');
   
   // Sync settings when loaded
   React.useEffect(() => {
     setLocalEmployees(settings?.employees || []);
     setLocalDecisions(settings?.decisions || []);
+    setLocalReviewTasks(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
+    setLocalRollTypes(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
   }, [settings]);
 
   const handleSaveSettings = async () => {
@@ -33,26 +40,31 @@ export default function Settings() {
     await saveSettingsToFirebase({
       ...settings,
       employees: localEmployees,
-      decisions: localDecisions
+      decisions: localDecisions,
+      reviewTasks: localReviewTasks,
+      rollTypes: localRollTypes
     });
     setIsProcessing(false);
-    alert('تم حفظ الإعدادات المتقدمة بنجاح');
+    toast('تم حفظ الإعدادات المتقدمة بنجاح', 'success');
   };
 
   const handleDeleteAll = async () => {
     if (deletePassword !== 'a4450422') {
-      alert('كلمة المرور غير صحيحة!');
+      toast('كلمة المرور غير صحيحة!', 'error');
       return;
     }
-    if (window.confirm('تحذير نهائي: هل أنت متأكد من مسح جميع البيانات بشكل لا رجعة فيه؟')) {
+    
+    const confirmed = await showConfirm('تحذير نهائي', 'هل أنت متأكد من مسح جميع البيانات بشكل لا رجعة فيه؟');
+    
+    if (confirmed) {
       setIsProcessing(true);
       const success = await deleteAllCases();
       setIsProcessing(false);
       if (success) {
-        alert('تم مسح جميع البيانات بنجاح.');
+        toast('تم مسح جميع البيانات بنجاح.', 'success');
         setDeletePassword('');
       } else {
-        alert('حدث خطأ أثناء المسح.');
+        toast('حدث خطأ أثناء المسح.', 'error');
       }
     }
   };
@@ -160,7 +172,7 @@ export default function Settings() {
       });
 
     } catch (err) {
-      alert("حدث خطأ أثناء قراءة الملف");
+      toast("حدث خطأ أثناء قراءة الملف", "error");
       console.error(err);
     } finally {
       setIsProcessing(false);
@@ -174,10 +186,10 @@ export default function Settings() {
     const success = await saveBatchCasesToFirebase(syncData.total);
     setIsProcessing(false);
     if (success) {
-      alert('تم تحديث ومزامنة البيانات بنجاح!');
+      toast('تم تحديث ومزامنة البيانات بنجاح!', 'success');
       setSyncData(null);
     } else {
-      alert('حدث خطأ أثناء الحفظ.');
+      toast('حدث خطأ أثناء الحفظ.', 'error');
     }
   };
 
@@ -201,7 +213,7 @@ export default function Settings() {
     setIsProcessing(true);
     await saveSchemaToFirebase(localSchema);
     setIsProcessing(false);
-    alert('تم حفظ بنية البيانات بنجاح!');
+    toast('تم حفظ بنية البيانات بنجاح!', 'success');
   };
 
   if (!isAdmin) {
@@ -386,13 +398,67 @@ export default function Settings() {
                 </div>
               ))}
               <button 
-                onClick={() => {
-                  const newDec = window.prompt('أدخل القرار الجديد:');
+                onClick={async () => {
+                  const newDec = await showPrompt('إضافة قرار', 'أدخل القرار الجديد:');
                   if (newDec?.trim()) setLocalDecisions([...localDecisions, newDec.trim()]);
                 }} 
                 className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
               >
                 <Plus className="w-3 h-3" /> إضافة قرار
+              </button>
+            </div>
+          </div>
+
+          {/* Roll Types Management */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <BookOpen className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-black text-sm text-navy-900">إدارة أنواع رولات الجلسات</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {localRollTypes.map((type, i) => (
+                <div key={i} className="flex items-center gap-1 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+                  <span>{type}</span>
+                  <button onClick={() => setLocalRollTypes(localRollTypes.filter((_, idx) => idx !== i))} className="text-indigo-400 hover:text-rose-500 mr-2">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <button 
+                onClick={async () => {
+                  const newType = await showPrompt('إضافة نوع رول', 'أدخل اسم نوع الرول الجديد:');
+                  if (newType?.trim()) setLocalRollTypes([...localRollTypes, newType.trim()]);
+                }} 
+                className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
+              >
+                <Plus className="w-3 h-3" /> إضافة نوع
+              </button>
+            </div>
+          </div>
+
+          {/* Review Tasks Management */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <ClipboardList className="w-5 h-5 text-emerald-600" />
+              <h3 className="font-black text-sm text-navy-900">إدارة مهام الإطلاع السريعة</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {localReviewTasks.map((task, i) => (
+                <div key={i} className="flex items-center gap-1 bg-emerald-50 border border-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+                  <span>{task}</span>
+                  <button onClick={() => setLocalReviewTasks(localReviewTasks.filter((_, idx) => idx !== i))} className="text-emerald-400 hover:text-rose-500 mr-2">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <button 
+                onClick={async () => {
+                  const newTask = await showPrompt('إضافة مهمة إطلاع', 'أدخل اسم المهمة الجديدة:');
+                  if (newTask?.trim()) setLocalReviewTasks([...localReviewTasks, newTask.trim()]);
+                }} 
+                className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
+              >
+                <Plus className="w-3 h-3" /> إضافة مهمة
               </button>
             </div>
           </div>
@@ -406,25 +472,42 @@ export default function Settings() {
             
             <div className="space-y-3">
               {localEmployees.map((emp, index) => (
-                <div key={index} className="flex gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 items-center">
+                <div key={index} className="flex flex-col sm:flex-row gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 items-start sm:items-center">
                   <input type="text" placeholder="الاسم" value={emp.name} onChange={e => {
                     const newEmp = [...localEmployees];
                     newEmp[index].name = e.target.value;
                     setLocalEmployees(newEmp);
-                  }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300" />
+                  }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
+                  
+                  <select 
+                    value={emp.jobTitle || 'السكرتارية'} 
+                    onChange={e => {
+                      const newEmp = [...localEmployees];
+                      newEmp[index].jobTitle = e.target.value;
+                      setLocalEmployees(newEmp);
+                    }} 
+                    className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto bg-white"
+                  >
+                    <option value="السكرتارية">السكرتارية</option>
+                    <option value="إطلاع">إطلاع</option>
+                    <option value="صادر">صادر</option>
+                    <option value="محامي">محامي</option>
+                  </select>
+
                   <input type="text" placeholder="كلمة المرور" value={emp.password} onChange={e => {
                     const newEmp = [...localEmployees];
                     newEmp[index].password = e.target.value;
                     setLocalEmployees(newEmp);
-                  }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300" />
-                  <button onClick={() => setLocalEmployees(localEmployees.filter((_, idx) => idx !== index))} className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg">
+                  }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
+                  
+                  <button onClick={() => setLocalEmployees(localEmployees.filter((_, idx) => idx !== index))} className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg shrink-0 self-end sm:self-auto mt-2 sm:mt-0">
                     <Trash2 className="w-4 h-4"/>
                   </button>
                 </div>
               ))}
             </div>
 
-            <button onClick={() => setLocalEmployees([...localEmployees, { name: '', password: '' }])} className="w-full border-2 border-dashed border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-2">
+            <button onClick={() => setLocalEmployees([...localEmployees, { name: '', jobTitle: 'السكرتارية', password: '' }])} className="w-full border-2 border-dashed border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-2">
               <Plus className="w-4 h-4"/> إضافة موظف جديد
             </button>
           </div>

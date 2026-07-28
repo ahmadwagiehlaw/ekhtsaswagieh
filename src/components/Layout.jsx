@@ -1,13 +1,34 @@
-import React, { useState } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { FolderOpen, CalendarDays, Settings, Plus, LayoutDashboard, Scale, Bell } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { FolderOpen, CalendarDays, Settings, Plus, LayoutDashboard, Scale, Bell, Search, BookOpen, Download } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import AddCaseModal from './AddCaseModal';
 
 export default function Layout() {
   const { settings, isAdmin } = useAppContext();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    }
+  };
 
   // Hide bottom nav on case details page for full screen view, just like the original app
   const isDetailsPage = location.pathname.startsWith('/case/');
@@ -17,19 +38,64 @@ export default function Layout() {
       
       {/* Top Header */}
       <header className="fixed top-0 inset-x-0 h-[64px] bg-navy-900 shadow-md z-40 flex items-center justify-between px-4 sm:px-6 no-print">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center border border-amber-500/30">
-            <Scale className="w-5 h-5 text-amber-400" />
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+            <Scale className="w-4 h-4 sm:w-5 sm:h-5 text-navy-900" />
           </div>
-          <div>
-            <h1 className="text-base font-black text-white">اختصاص</h1>
-            <p className="text-[10px] font-bold text-amber-400/80">مستشار / أحمد وجيه</p>
+          <div className="flex items-baseline gap-1.5 sm:gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">اختصاص</h1>
+            <span className="text-[13px] sm:text-[15px] font-black text-amber-400">
+              م. أحمد وجيه
+            </span>
           </div>
         </div>
-        <button className="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-slate-300 hover:text-white">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-navy-900"></span>
-        </button>
+        <div className="flex items-center gap-2">
+          {deferredPrompt && (
+            <button 
+              onClick={handleInstallClick}
+              className="hidden sm:flex items-center gap-1.5 bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-600 transition"
+              title="تثبيت التطبيق"
+            >
+              <Download className="w-4 h-4" /> تثبيت
+            </button>
+          )}
+          <button 
+            onClick={() => navigate('/rolls')}
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-slate-300 hover:text-white"
+            title="مكتبة الرولات"
+          >
+            <BookOpen className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={() => {
+              navigate('/files');
+              setTimeout(() => document.getElementById('search-cases-input')?.focus(), 300);
+            }}
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-slate-300 hover:text-white"
+            title="بحث"
+          >
+            <Search className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={() => {
+              if ('Notification' in window) {
+                Notification.requestPermission().then(permission => {
+                  if (permission === 'granted') {
+                    new Notification('اختصاصي', {
+                      body: 'تم تفعيل الإشعارات بنجاح!',
+                      icon: '/icon-192.png'
+                    });
+                  }
+                });
+              }
+            }}
+            className="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-slate-300 hover:text-white"
+            title="الإشعارات"
+          >
+            <Bell className="w-5 h-5" />
+            <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-navy-900"></span>
+          </button>
+        </div>
       </header>
 
       <main className="flex-grow max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 pb-4 space-y-4">

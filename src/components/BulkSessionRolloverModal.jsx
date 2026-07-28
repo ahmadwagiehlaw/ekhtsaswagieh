@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { X, CalendarDays, CheckCircle2, ChevronRight, Save } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
+import { useUI } from '../context/UIContext';
 import { getSafeDateObj, formatDateString } from '../utils/dateUtils';
 
 export default function BulkSessionRolloverModal({ isOpen, onClose, initialDateKey }) {
   const { cases, saveBatchCasesToFirebase } = useAppContext();
+  const { toast } = useUI();
   
   const [sourceDate, setSourceDate] = useState(initialDateKey || '');
   const [targetDate, setTargetDate] = useState('');
@@ -48,11 +50,11 @@ export default function BulkSessionRolloverModal({ isOpen, onClose, initialDateK
   const handleSave = async (e) => {
     e.preventDefault();
     if (selectedCaseIds.length === 0) {
-      alert("يرجى اختيار قضية واحدة على الأقل لترحيلها.");
+      toast("يرجى اختيار قضية واحدة على الأقل لترحيلها.", "error");
       return;
     }
     if (!targetDate) {
-      alert("يرجى إدخال تاريخ الجلسة الجديدة.");
+      toast("يرجى إدخال تاريخ الجلسة الجديدة.", "error");
       return;
     }
 
@@ -96,9 +98,10 @@ export default function BulkSessionRolloverModal({ isOpen, onClose, initialDateK
       setSelectedCaseIds([]);
       setTargetDate('');
       setTargetDecision('');
+      toast("تم الترحيل المجمع بنجاح!", "success");
       onClose();
     } else {
-      alert("حدث خطأ أثناء الترحيل المجمع.");
+      toast("حدث خطأ أثناء الترحيل المجمع.", "error");
     }
   };
 
