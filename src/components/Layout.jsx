@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { FolderOpen, CalendarDays, Settings, Plus, LayoutDashboard, Scale, Bell, Search, BookOpen, Download } from 'lucide-react';
+import { FolderOpen, CalendarDays, Settings, Plus, LayoutDashboard, Scale, Bell, Search, BookOpen, Download, ClipboardList } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import AddCaseModal from './AddCaseModal';
+import GlobalTasksModal from './GlobalTasksModal';
 
 export default function Layout() {
   const { settings, isAdmin } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isTasksModalOpen, setIsTasksModalOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   useEffect(() => {
@@ -65,6 +67,14 @@ export default function Layout() {
             title="مكتبة الرولات"
           >
             <BookOpen className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={() => setIsTasksModalOpen(true)}
+            className="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-slate-300 hover:text-white"
+            title="المهام والتكليفات"
+          >
+            <ClipboardList className="w-5 h-5" />
+            <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-navy-900"></span>
           </button>
           <button 
             onClick={() => {
@@ -181,7 +191,15 @@ export default function Layout() {
 
         </nav>
 
-      <AddCaseModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+      <AddCaseModal 
+        isOpen={isAddModalOpen} 
+        onClose={() => setIsAddModalOpen(false)} 
+      />
+
+      <GlobalTasksModal 
+        isOpen={isTasksModalOpen}
+        onClose={() => setIsTasksModalOpen(false)}
+      />
     </div>
   );
 }

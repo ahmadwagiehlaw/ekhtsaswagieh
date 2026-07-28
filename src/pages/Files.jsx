@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Filter, FolderClosed, Plus, Clock, FileText, Upload, Download, Loader2, Info, Building2, Gavel, FileBox, X, CalendarDays, Printer, CheckSquare, Square, ClipboardList, AlertTriangle, Sparkles, MapPin, User } from 'lucide-react';
+import { Search, Filter, FolderClosed, Plus, Clock, FileText, Upload, Download, Loader2, Info, Building2, Gavel, FileBox, X, CalendarDays, Printer, CheckSquare, Square, ClipboardList, AlertTriangle, Sparkles, MapPin, User, Files as FilesIcon } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import ExportPDFModal from '../components/ExportPDFModal';
 import BulkAssignTaskModal from '../components/BulkAssignTaskModal';
@@ -303,6 +303,11 @@ export default function Files() {
           const role = String(c['الصفة'] || c['صفة'] || '').trim();
           const isAppellant = role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
           const isAppellee = role.includes('مطعون ضده') || role.includes('مستأنف ضده') || role.includes('مدعى عليه');
+          const isNoInterest = role === 'لا شأن';
+          const isOutOfJurisdiction = role === 'خارج الاختصاص';
+
+          const joinedCasesStr = getPrimaryValue(c, ['دعاوى منضمة']);
+          const hasJoinedCases = joinedCasesStr && joinedCasesStr.trim() !== '';
 
           const coverImageDoc = (c.documents || []).find(doc => doc.type === 'غلاف الملف' && doc.fileType === 'image');
           const coverImageUrl = coverImageDoc ? coverImageDoc.url : null;
@@ -310,11 +315,41 @@ export default function Files() {
           const isJudgment = String(decision).includes('حكم') || String(decision).includes('للحكم');
           
           // Card Color Logic based on role
-          const roleColor = isAppellant ? 'rose' : isAppellee ? 'emerald' : 'amber';
-          const bgClass = `bg-white hover:bg-${roleColor}-50/30`;
-          const borderClass = `border-${roleColor}-100 hover:border-${roleColor}-300`;
-          const textClass = `text-${roleColor}-700`;
-          const badgeBgClass = `bg-${roleColor}-50 text-${roleColor}-700 border-${roleColor}-200`;
+          let roleColor = 'amber';
+          let bgClass = `bg-white hover:bg-amber-50/30`;
+          let borderClass = `border-amber-100 hover:border-amber-300`;
+          let textClass = `text-amber-700`;
+          let badgeBgClass = `bg-amber-50 text-amber-700 border-amber-200`;
+          let cardOpacity = '';
+          let grayscale = '';
+
+          if (isAppellant) {
+            roleColor = 'rose';
+            bgClass = `bg-white hover:bg-rose-50/30`;
+            borderClass = `border-rose-100 hover:border-rose-300`;
+            textClass = `text-rose-700`;
+            badgeBgClass = `bg-rose-50 text-rose-700 border-rose-200`;
+          } else if (isAppellee) {
+            roleColor = 'emerald';
+            bgClass = `bg-white hover:bg-emerald-50/30`;
+            borderClass = `border-emerald-100 hover:border-emerald-300`;
+            textClass = `text-emerald-700`;
+            badgeBgClass = `bg-emerald-50 text-emerald-700 border-emerald-200`;
+          } else if (isOutOfJurisdiction) {
+            roleColor = 'indigo';
+            bgClass = `bg-indigo-50/10 hover:bg-indigo-50/30`;
+            borderClass = `border-indigo-100 hover:border-indigo-300`;
+            textClass = `text-indigo-700`;
+            badgeBgClass = `bg-indigo-50 text-indigo-700 border-indigo-200`;
+          } else if (isNoInterest) {
+            roleColor = 'slate';
+            bgClass = `bg-slate-50/50 hover:bg-slate-50`;
+            borderClass = `border-slate-200 hover:border-slate-300`;
+            textClass = `text-slate-500`;
+            badgeBgClass = `bg-slate-100 text-slate-500 border-slate-300`;
+            cardOpacity = 'opacity-60 hover:opacity-100';
+            grayscale = 'grayscale';
+          }
 
           const activeAlerts = (c.alerts || []).filter(a => !a.isDone);
           const hasUrgentAlert = activeAlerts.some(a => {
@@ -348,10 +383,10 @@ export default function Files() {
               )}
 
               {/* Card Body */}
-              <div className={`relative bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all duration-300 z-20 h-full flex flex-col group-hover:-translate-y-1 overflow-hidden`}>
+              <div className={`relative ${bgClass} border ${borderClass} rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all duration-300 z-20 h-full flex flex-col group-hover:-translate-y-1 overflow-hidden ${cardOpacity} ${grayscale}`}>
                 
                 {/* Top Accent Line */}
-                <div className={`absolute top-0 left-0 w-full h-1 z-10 bg-gradient-to-r ${isAppellant ? 'from-rose-400 to-rose-500' : isAppellee ? 'from-emerald-400 to-emerald-500' : 'from-amber-400 to-amber-500'}`}></div>
+                <div className={`absolute top-0 left-0 w-full h-1 z-10 bg-gradient-to-r from-${roleColor}-400 to-${roleColor}-500`}></div>
 
                 {coverImageUrl && (
                   <div className="mb-4 -mx-4 sm:-mx-5 -mt-4 sm:-mt-5 aspect-[3/4] relative border-b border-slate-100 bg-slate-100 shrink-0 overflow-hidden">
@@ -376,15 +411,20 @@ export default function Files() {
                 <div className={`flex flex-col gap-3 mb-4 ${!coverImageUrl ? 'pt-1' : ''}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-2.5">
-                      {!coverImageUrl && (
+                       {!coverImageUrl && (
                          <div className={`w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0`}>
-                           <FolderClosed className={`w-5 h-5 ${isAppellant ? 'text-rose-500' : isAppellee ? 'text-emerald-500' : 'text-amber-500'}`} />
+                           <FolderClosed className={`w-5 h-5 text-${roleColor}-500`} />
                          </div>
                       )}
                       <div>
-                        <h3 className="font-black text-lg sm:text-xl text-navy-900 leading-tight">
+                        <h3 className="font-black text-lg sm:text-xl text-navy-900 leading-tight flex items-center gap-1.5 flex-wrap">
                            {caseNum || 'بدون رقم'} 
                            {year && <span className="text-xs sm:text-sm font-bold text-slate-400 mr-1.5">لسنة {year}</span>}
+                           {hasJoinedCases && (
+                             <span className="bg-indigo-100 text-indigo-700 text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1 border border-indigo-200" title={`دعاوى منضمة: ${joinedCasesStr}`}>
+                               <FilesIcon className="w-3 h-3" /> مجمعة
+                             </span>
+                           )}
                         </h3>
                         {!coverImageUrl && (
                           <div className="flex flex-wrap items-center gap-2 mt-1.5">

@@ -28,7 +28,11 @@ export default function AddCaseModal({ isOpen, onClose }) {
       }
     } catch (error) {
       setIsSaving(false);
-      toast("حدث خطأ غير متوقع", "error");
+      if (error.message === 'DUPLICATE_CASE') {
+        toast("هذه الدعوى مسجلة بالفعل (رقم الدعوى والسنة مكرران)", "error");
+      } else {
+        toast("حدث خطأ غير متوقع", "error");
+      }
     }
   };
 

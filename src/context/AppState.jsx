@@ -45,7 +45,8 @@ export const AppProvider = ({ children }) => {
           { id: 'المدعى_عليه', label: 'المدعى عليه', type: 'text', visible: true },
           { id: 'آخر جلسة', label: 'تاريخ آخر جلسة', type: 'date', visible: true, isDate: true },
           { id: 'القرار', label: 'القرار', type: 'text', visible: true },
-          { id: 'الصفة', label: 'الصفة', type: 'text', visible: true }
+          { id: 'الصفة', label: 'الصفة', type: 'text', visible: true },
+          { id: 'دعاوى منضمة', label: 'دعاوى منضمة', type: 'text', visible: true }
         ]);
       }
     });
@@ -148,15 +149,34 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const checkDuplicateCase = (caseNo, year, excludeId = null) => {
+    return cases.some(c => {
+      const cNo = c['رقم الدعوى'] || c['رقم القضية'] || c['رقم_الدعوى'];
+      const cYear = c['السنة'] || c['سنة'] || c['year'];
+      
+      if (String(cNo).trim() === String(caseNo).trim() && String(cYear).trim() === String(year).trim()) {
+        if (excludeId && c.id === excludeId) return false;
+        return true;
+      }
+      return false;
+    });
+  };
+
   const createNewCase = async (caseData) => {
     try {
       const caseNo = caseData['رقم الدعوى'] || caseData['رقم القضية'] || 'جديد';
       const year = caseData['السنة'] || caseData['سنة'] || new Date().getFullYear();
+      
+      if (checkDuplicateCase(caseNo, year)) {
+         throw new Error('DUPLICATE_CASE');
+      }
+
       const rawId = `${caseNo}-${year}-${Date.now()}`;
       const safeId = sanitizeId(rawId);
       return await saveCaseToFirebase(safeId, caseData);
     } catch (error) {
       console.error("Error creating new case: ", error);
+      if (error.message === 'DUPLICATE_CASE') throw error;
       return false;
     }
   };
@@ -287,6 +307,7 @@ export const AppProvider = ({ children }) => {
       logoutAdmin,
       saveCaseToFirebase,
       createNewCase,
+      checkDuplicateCase,
       saveBatchCasesToFirebase,
       saveSchemaToFirebase,
       saveSettingsToFirebase,

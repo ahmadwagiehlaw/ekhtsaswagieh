@@ -96,7 +96,7 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
             <div>
               <label className="text-[11px] font-black text-slate-500 block mb-1.5">القرار</label>
               <input 
-                type="text"
+                list="decisions-list"
                 value={decision}
                 onChange={(e) => setDecision(e.target.value)}
                 placeholder="مثال: التأجيل للاطلاع، للحكم، إلخ"

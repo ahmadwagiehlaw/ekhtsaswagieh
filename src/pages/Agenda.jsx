@@ -263,14 +263,32 @@ export default function Agenda() {
                   <SessionTable dayCases={sessionsMap[selectedDateKey]} date={selectedDateKey} />
                 ) : (
                   <div className="divide-y divide-slate-100">
-                    {sessionsMap[selectedDateKey].map((cObj, idx) => (
-                      <div key={cObj.id} className="p-3 flex items-start justify-between gap-3 hover:bg-slate-50 transition">
+                    {sessionsMap[selectedDateKey].map((cObj, idx) => {
+                      const role = String(getFieldValue(cObj, ['الصفة']) || '').trim();
+                      const isAppellant = role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
+                      const isAppellee = role.includes('مطعون ضده') || role.includes('مستأنف ضده') || role.includes('مدعى عليه');
+                      const isNoInterest = role === 'لا شأن';
+                      const isOutOfJurisdiction = role === 'خارج الاختصاص';
+
+                      let badgeClass = 'bg-amber-100 text-amber-800';
+                      let containerClass = 'p-3 flex items-start justify-between gap-3 hover:bg-slate-50 transition';
+                      
+                      if (isAppellant) badgeClass = 'bg-rose-100 text-rose-800';
+                      else if (isAppellee) badgeClass = 'bg-emerald-100 text-emerald-800';
+                      else if (isOutOfJurisdiction) badgeClass = 'bg-indigo-100 text-indigo-800';
+                      else if (isNoInterest) {
+                        badgeClass = 'bg-slate-200 text-slate-700';
+                        containerClass += ' opacity-60 grayscale hover:opacity-100 hover:grayscale-0';
+                      }
+
+                      return (
+                      <div key={cObj.id} className={containerClass}>
                         <div className="flex items-start gap-2.5 flex-1 min-w-0">
                             <span className="w-6 h-6 rounded-lg bg-navy-900 text-amber-300 text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">{idx+1}</span>
                             <div className="min-w-0">
                                 <p className="text-xs font-black text-navy-900 leading-snug">
                                     دعوى {getFieldValue(cObj, ['رقم الدعوى'])} لسنة {getFieldValue(cObj, ['السنة'])}
-                                    {getFieldValue(cObj, ['الصفة']) && <span className="mr-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">{getFieldValue(cObj, ['الصفة'])}</span>}
+                                    {role && <span className={`mr-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{role}</span>}
                                 </p>
                                 <p className="text-[11px] text-slate-600 font-bold mt-0.5 truncate"><span className="text-slate-400">المدعي:</span> {getFieldValue(cObj, ['المدعي'])}</p>
                                 <p className="text-[11px] text-slate-600 font-bold truncate"><span className="text-slate-400">ضد:</span> {getFieldValue(cObj, ['المدعى_عليه'])}</p>
@@ -279,7 +297,7 @@ export default function Agenda() {
                         </div>
                         <button onClick={() => navigate(`/case/${cObj.id}`)} className="shrink-0 bg-navy-900 hover:bg-navy-700 text-amber-300 text-[10px] font-black px-2.5 py-1.5 rounded-lg transition">عرض</button>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 )}
               </div>

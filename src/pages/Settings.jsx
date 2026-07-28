@@ -25,6 +25,7 @@ export default function Settings() {
   const [localDecisions, setLocalDecisions] = useState(settings?.decisions || []);
   const [localReviewTasks, setLocalReviewTasks] = useState(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
   const [localRollTypes, setLocalRollTypes] = useState(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
+  const [localNumberFormat, setLocalNumberFormat] = useState(settings?.numberFormat || 'en');
   const [deletePassword, setDeletePassword] = useState('');
   
   // Sync settings when loaded
@@ -33,6 +34,7 @@ export default function Settings() {
     setLocalDecisions(settings?.decisions || []);
     setLocalReviewTasks(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
     setLocalRollTypes(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
+    setLocalNumberFormat(settings?.numberFormat || 'en');
   }, [settings]);
 
   const handleSaveSettings = async () => {
@@ -42,7 +44,8 @@ export default function Settings() {
       employees: localEmployees,
       decisions: localDecisions,
       reviewTasks: localReviewTasks,
-      rollTypes: localRollTypes
+      rollTypes: localRollTypes,
+      numberFormat: localNumberFormat
     });
     setIsProcessing(false);
     toast('تم حفظ الإعدادات المتقدمة بنجاح', 'success');
@@ -382,6 +385,31 @@ export default function Settings() {
       {activeTab === 'advanced' && (
         <div className="space-y-6 animate-in fade-in zoom-in duration-300">
           
+          {/* Global Preferences */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <SettingsIcon className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-black text-sm text-navy-900">تفضيلات العرض (الأرقام)</h3>
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="text-xs font-bold text-slate-700">تنسيق الأرقام والتواريخ:</label>
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                 <button 
+                   onClick={() => setLocalNumberFormat('en')}
+                   className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'en' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                 >
+                   إنجليزي (123)
+                 </button>
+                 <button 
+                   onClick={() => setLocalNumberFormat('ar')}
+                   className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'ar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                 >
+                   عربي (١٢٣)
+                 </button>
+              </div>
+            </div>
+          </div>
+
           {/* Decisions Management */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100">

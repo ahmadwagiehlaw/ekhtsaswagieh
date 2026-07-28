@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, X, Upload, Edit3, Gavel, Settings2, Copy, Maximize2, CheckSquare, Square, Save, CopyPlus, RefreshCcw } from 'lucide-react';
+import { Check, X, Upload, Edit3, Gavel, Settings2, Copy, Maximize2, CheckSquare, Square, Save, CopyPlus, RefreshCcw, Search, Settings, Plus, Trash2 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { uploadToR2 } from '../lib/r2';
 import QuickEditCaseModal from './QuickEditCaseModal';
@@ -16,19 +16,23 @@ const ALL_COLUMNS = [
   { id: 'الحكم', label: 'الحكم', defaultVisible: false },
   { id: 'تصنيف الحكم', label: 'تصنيف الحكم', defaultVisible: false },
   { id: 'منطوق الحكم', label: 'منطوق الحكم', defaultVisible: false },
+  { id: 'الملاحظات', label: 'الملاحظات', defaultVisible: true },
 ];
 
 const PREDEFINED_DECISIONS = ['للحكم', 'تصريح', 'للإعلان', 'للاطلاع', 'للإخطار', 'لورود التقرير', 'لتنفيذ قرار الإعادة', 'للاستعلام', 'استبعاد', 'إحالة للموضوع', 'رفض'];
 
 export default function SessionTable({ dayCases, date }) {
   const navigate = useNavigate();
-  const { saveCaseToFirebase, settings } = useAppContext();
+  const { saveCaseToFirebase, settings, saveSettingsToFirebase, cases } = useAppContext();
   
   const defaultDecisions = settings?.decisions || PREDEFINED_DECISIONS;
+  const [isManageDecisionsOpen, setIsManageDecisionsOpen] = useState(false);
+  const [newDecisionOption, setNewDecisionOption] = useState('');
 
   // View state
   const [filterDecision, setFilterDecision] = useState(null); // 'للحكم' or null
   const [filterType, setFilterType] = useState(null); // 'فحص', 'موضوع', or null
+  const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('الرول');
   const [sortOrder, setSortOrder] = useState('asc');
   
@@ -63,6 +67,18 @@ export default function SessionTable({ dayCases, date }) {
     return '';
   };
 
+  const uniqueShortJudgments = useMemo(() => {
+    const set = new Set();
+    cases?.forEach(c => c.sessions?.forEach(s => { if (s.shortJudgment) set.add(s.shortJudgment) }));
+    return [...set];
+  }, [cases]);
+
+  const uniqueClassifications = useMemo(() => {
+    const set = new Set();
+    cases?.forEach(c => c.sessions?.forEach(s => { if (s.judgmentClassification) set.add(s.judgmentClassification) }));
+    return [...set];
+  }, [cases]);
+
   const filteredCases = useMemo(() => {
     let result = [...dayCases];
     if (filterDecision === 'للحكم') {
@@ -70,6 +86,17 @@ export default function SessionTable({ dayCases, date }) {
     }
     if (filterType) {
       result = result.filter(c => getFieldValueLocal(c, ['نوع الجلسة']) === filterType || getFieldValueLocal(c, ['نوع الدعوى']) === filterType);
+    }
+    
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(c => {
+        return ALL_COLUMNS.some(col => {
+          if (!visibleColumns[col.id]) return false;
+          const val = getFieldValueLocal(c, [col.id, ...(col.id === 'ضد' ? ['المدعى_عليه', 'المطعون ضده'] : []), ...(col.id === 'تاريخ الجلسة' ? ['آخر جلسة'] : [])]);
+          return String(val).toLowerCase().includes(q);
+        });
+      });
     }
     
     result.sort((a, b) => {
@@ -86,7 +113,7 @@ export default function SessionTable({ dayCases, date }) {
     });
     
     return result;
-  }, [dayCases, filterDecision, filterType, sortField, sortOrder]);
+  }, [dayCases, filterDecision, filterType, sortField, sortOrder, searchQuery, visibleColumns]);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -147,7 +174,8 @@ export default function SessionTable({ dayCases, date }) {
              date: oldDate,
              decision: payload['القرار'] || getFieldValueLocal(cObj, ['القرار']) || 'بدون قرار',
              type: getFieldValueLocal(cObj, ['نوع الجلسة']) || 'فحص',
-             roll: getFieldValueLocal(cObj, ['الرول']) || ''
+             roll: getFieldValueLocal(cObj, ['الرول']) || '',
+             notes: getFieldValueLocal(cObj, ['الملاحظات']) || ''
           };
           payload.sessions = [...(cObj.sessions || []), snapshot];
           payload['الرول'] = '';
@@ -172,14 +200,16 @@ export default function SessionTable({ dayCases, date }) {
   const startEditing = (e, cObj) => {
     e.stopPropagation();
     setEditingCaseId(cObj.id);
+    const session = cObj.sessions?.find(s => s.date === date);
     setEditData({
       'الرول': getFieldValueLocal(cObj, ['الرول']) || '',
       'نوع الجلسة': getFieldValueLocal(cObj, ['نوع الجلسة']) || 'فحص',
       'آخر جلسة': getFieldValueLocal(cObj, ['آخر جلسة', 'تاريخ الجلسة']) || '',
       'القرار': getFieldValueLocal(cObj, ['القرار']) || '',
-      'الحكم': getFieldValueLocal(cObj, ['الحكم']) || '',
-      'تصنيف الحكم': getFieldValueLocal(cObj, ['تصنيف الحكم']) || '',
-      'منطوق الحكم': getFieldValueLocal(cObj, ['منطوق الحكم']) || '',
+      'الملاحظات': getFieldValueLocal(cObj, ['الملاحظات']) || '',
+      'الحكم': session?.shortJudgment || '',
+      'تصنيف الحكم': session?.judgmentClassification || '',
+      'منطوق الحكم': session?.verdict || ''
     });
   };
 
@@ -203,11 +233,43 @@ export default function SessionTable({ dayCases, date }) {
         date: oldDate,
         decision: newData['القرار'] || getFieldValueLocal(cObj, ['القرار']) || 'بدون قرار',
         type: getFieldValueLocal(cObj, ['نوع الجلسة']) || 'فحص',
-        roll: getFieldValueLocal(cObj, ['الرول']) || ''
+        roll: getFieldValueLocal(cObj, ['الرول']) || '',
+        notes: newData['الملاحظات'] || getFieldValueLocal(cObj, ['الملاحظات']) || ''
       };
       newData.sessions = [...(cObj.sessions || []), snapshot];
       newData['الرول'] = ''; 
     }
+
+    // Judgment saving logic for current session
+    const hasJudgmentData = !!(newData['الحكم'] || newData['تصنيف الحكم'] || newData['منطوق الحكم']);
+    if (hasJudgmentData) {
+      const sessionIndex = (newData.sessions || cObj.sessions || []).findIndex(s => s.date === date);
+      let updatedSessions = [...(newData.sessions || cObj.sessions || [])];
+      
+      if (sessionIndex >= 0) {
+         updatedSessions[sessionIndex] = {
+           ...updatedSessions[sessionIndex],
+           shortJudgment: newData['الحكم'],
+           judgmentClassification: newData['تصنيف الحكم'],
+           verdict: newData['منطوق الحكم'],
+           hasJudgment: true
+         };
+      } else {
+         updatedSessions.push({
+           id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+           date: date,
+           shortJudgment: newData['الحكم'],
+           judgmentClassification: newData['تصنيف الحكم'],
+           verdict: newData['منطوق الحكم'],
+           hasJudgment: true
+         });
+      }
+      newData.sessions = updatedSessions;
+    }
+    
+    delete newData['الحكم'];
+    delete newData['تصنيف الحكم'];
+    delete newData['منطوق الحكم'];
     
     await saveCaseToFirebase(cObj.id, newData);
     setEditingCaseId(null);
@@ -228,35 +290,6 @@ export default function SessionTable({ dayCases, date }) {
     }
   };
 
-  const handleFileUpload = async (e, cObj) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    setIsUploading(true);
-    try {
-      const url = await uploadToR2(file);
-      const newDoc = {
-        id: Date.now().toString(),
-        name: file.name,
-        type: 'حكم',
-        fileType: file.type.startsWith('image/') ? 'image' : 'pdf',
-        url: url,
-        date: new Date().toISOString(),
-        size: (file.size / 1024 / 1024).toFixed(2) + ' MB'
-      };
-      const existingDocs = cObj.documents || [];
-      await saveCaseToFirebase(cObj.id, {
-        documents: [...existingDocs, newDoc]
-      });
-      alert('تم رفع ملف الحكم وإضافته بنجاح لمرفقات القضية!');
-    } catch (err) {
-      console.error(err);
-      alert('حدث خطأ أثناء الرفع.');
-    }
-    setIsUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
   return (
     <div className="flex flex-col space-y-3">
       {/* Filters and Settings */}
@@ -268,6 +301,8 @@ export default function SessionTable({ dayCases, date }) {
               setFilterDecision(newFilter);
               if (newFilter === 'للحكم') {
                 setVisibleColumns(prev => ({ ...prev, 'الحكم': true, 'تصنيف الحكم': true, 'منطوق الحكم': true }));
+              } else {
+                setVisibleColumns(prev => ({ ...prev, 'الحكم': false, 'تصنيف الحكم': false, 'منطوق الحكم': false }));
               }
             }}
             className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition border flex items-center gap-1 ${filterDecision === 'للحكم' ? 'bg-rose-100 text-rose-700 border-rose-200 shadow-inner' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}
@@ -290,7 +325,29 @@ export default function SessionTable({ dayCases, date }) {
           </button>
         </div>
 
-        <div className="relative">
+        <div className="flex items-center gap-2">
+          <div className="relative group">
+            <div className="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none">
+              <Search className="w-3 h-3 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+            </div>
+            <input
+              type="text"
+              placeholder="بحث في الجدول..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-40 sm:w-56 text-[10px] font-bold py-1.5 pr-8 pl-6 rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition shadow-sm"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 left-0 flex items-center pl-2 text-slate-400 hover:text-rose-500 transition"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          
+          <div className="relative">
           <button 
             onClick={() => setShowColSettings(!showColSettings)}
             className="text-[10px] font-black px-3 py-1.5 rounded-lg transition border bg-white text-slate-600 border-slate-200 hover:bg-slate-100 flex items-center gap-1"
@@ -315,6 +372,7 @@ export default function SessionTable({ dayCases, date }) {
               </div>
             </div>
           )}
+        </div>
         </div>
       </div>
 
@@ -341,13 +399,22 @@ export default function SessionTable({ dayCases, date }) {
                 onChange={e => setBulkData({...bulkData, 'تاريخ الجلسة': e.target.value})}
                 className="text-xs font-bold p-1.5 rounded-lg border border-indigo-200 bg-white focus:outline-none focus:border-indigo-400"
               />
-              <input 
-                type="text" 
-                placeholder="القرار" 
-                value={bulkData['القرار']} 
-                onChange={e => setBulkData({...bulkData, 'القرار': e.target.value})}
-                className="text-xs font-bold p-1.5 rounded-lg border border-indigo-200 bg-white focus:outline-none focus:border-indigo-400 w-48"
-              />
+              <div className="relative flex items-center gap-1">
+                <input 
+                  list="decisions-list"
+                  placeholder="القرار" 
+                  value={bulkData['القرار']} 
+                  onChange={e => setBulkData({...bulkData, 'القرار': e.target.value})}
+                  className="text-xs font-bold p-1.5 rounded-lg border border-indigo-200 bg-white focus:outline-none focus:border-indigo-400 w-48"
+                />
+                <button 
+                  onClick={() => setIsManageDecisionsOpen(true)}
+                  className="p-1.5 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition"
+                  title="إعدادات القرارات السريعة"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+              </div>
               <button 
                 onClick={handleBulkSave}
                 disabled={isBulkSaving}
@@ -385,47 +452,58 @@ export default function SessionTable({ dayCases, date }) {
               </th>
               {visibleColumns['الرول'] && (
                 <th onClick={() => handleSort('الرول')} className="px-3 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200 cursor-pointer hover:bg-slate-200 transition text-center w-12">
-                  الرول {sortField === 'الرول' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  <div className="resize-x overflow-hidden max-w-full inline-block pb-1">الرول {sortField === 'الرول' && (sortOrder === 'asc' ? '↑' : '↓')}</div>
                 </th>
               )}
               {visibleColumns['رقم الدعوى'] && (
                 <th onClick={() => handleSort('رقم الدعوى')} className="px-3 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200 cursor-pointer hover:bg-slate-200 transition">
-                  الدعوى {sortField === 'رقم الدعوى' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  <div className="resize-x overflow-hidden max-w-full min-w-[80px] inline-block pb-1">الدعوى {sortField === 'رقم الدعوى' && (sortOrder === 'asc' ? '↑' : '↓')}</div>
                 </th>
               )}
               {visibleColumns['المدعي'] && (
                 <th onClick={() => handleSort('المدعي')} className="px-3 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200 cursor-pointer hover:bg-slate-200 transition">
-                  المدعي {sortField === 'المدعي' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  <div className="resize-x overflow-hidden max-w-full min-w-[120px] inline-block pb-1">المدعي {sortField === 'المدعي' && (sortOrder === 'asc' ? '↑' : '↓')}</div>
                 </th>
               )}
               {visibleColumns['ضد'] && (
                 <th onClick={() => handleSort('المدعى_عليه')} className="px-3 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200 cursor-pointer hover:bg-slate-200 transition">
-                  ضد {sortField === 'المدعى_عليه' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  <div className="resize-x overflow-hidden max-w-full min-w-[120px] inline-block pb-1">ضد {sortField === 'المدعى_عليه' && (sortOrder === 'asc' ? '↑' : '↓')}</div>
                 </th>
               )}
               {visibleColumns['نوع الجلسة'] && (
                 <th onClick={() => handleSort('نوع الجلسة')} className="px-3 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200 cursor-pointer hover:bg-slate-200 transition">
-                  نوع الجلسة {sortField === 'نوع الجلسة' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  <div className="resize-x overflow-hidden max-w-full inline-block pb-1">نوع الجلسة {sortField === 'نوع الجلسة' && (sortOrder === 'asc' ? '↑' : '↓')}</div>
                 </th>
               )}
               {visibleColumns['تاريخ الجلسة'] && (
                 <th onClick={() => handleSort('آخر جلسة')} className="px-3 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200 cursor-pointer hover:bg-slate-200 transition">
-                  الجلسة القادمة {sortField === 'آخر جلسة' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  <div className="resize-x overflow-hidden max-w-full min-w-[90px] inline-block pb-1">الجلسة القادمة {sortField === 'آخر جلسة' && (sortOrder === 'asc' ? '↑' : '↓')}</div>
                 </th>
               )}
               {visibleColumns['القرار'] && (
                 <th onClick={() => handleSort('القرار')} className="px-3 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200 cursor-pointer hover:bg-slate-200 transition">
-                  القرار {sortField === 'القرار' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  <div className="resize-x overflow-hidden max-w-full min-w-[150px] inline-block pb-1">القرار {sortField === 'القرار' && (sortOrder === 'asc' ? '↑' : '↓')}</div>
                 </th>
               )}
               {visibleColumns['الحكم'] && (
-                <th className="px-3 py-2 text-[10px] font-black text-rose-700 bg-rose-50 border-b border-slate-200">الحكم</th>
+                <th className="px-3 py-2 text-[10px] font-black text-rose-700 bg-rose-50 border-b border-slate-200">
+                  <div className="resize-x overflow-hidden max-w-full min-w-[120px] inline-block pb-1">الحكم</div>
+                </th>
               )}
               {visibleColumns['تصنيف الحكم'] && (
-                <th className="px-3 py-2 text-[10px] font-black text-rose-700 bg-rose-50 border-b border-slate-200">تصنيف الحكم</th>
+                <th className="px-3 py-2 text-[10px] font-black text-rose-700 bg-rose-50 border-b border-slate-200">
+                  <div className="resize-x overflow-hidden max-w-full min-w-[90px] inline-block pb-1">تصنيف الحكم</div>
+                </th>
               )}
               {visibleColumns['منطوق الحكم'] && (
-                <th className="px-3 py-2 text-[10px] font-black text-rose-700 bg-rose-50 border-b border-slate-200">منطوق الحكم</th>
+                <th className="px-3 py-2 text-[10px] font-black text-rose-700 bg-rose-50 border-b border-slate-200">
+                  <div className="resize-x overflow-hidden max-w-full min-w-[200px] inline-block pb-1">منطوق الحكم</div>
+                </th>
+              )}
+              {visibleColumns['الملاحظات'] && (
+                <th onClick={() => handleSort('الملاحظات')} className="px-3 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200 cursor-pointer hover:bg-slate-200 transition text-center min-w-[150px]">
+                  <div className="resize-x overflow-hidden max-w-full min-w-[150px] inline-block pb-1">ملاحظات الجلسة {sortField === 'الملاحظات' && (sortOrder === 'asc' ? '↑' : '↓')}</div>
+                </th>
               )}
               <th className="px-2 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200 w-28 text-center no-print">إجراء</th>
             </tr>
@@ -504,43 +582,42 @@ export default function SessionTable({ dayCases, date }) {
                   {visibleColumns['القرار'] && (
                     <td className="px-3 py-2.5 text-[10px] font-bold text-amber-800 line-clamp-2 min-w-[200px]">
                       {isEditing ? (
-                        <div className="flex flex-col gap-1.5">
-                           <textarea 
+                        <div className="flex items-center gap-1">
+                           <input 
+                            list="decisions-list"
                             value={editData['القرار'] || ''} 
                             onChange={e => setEditData({...editData, 'القرار': e.target.value})}
-                            className="w-full text-[10px] font-bold p-1 rounded border border-amber-300 bg-white focus:border-amber-600 outline-none resize-none"
-                            rows={2}
+                            className="w-full text-[10px] font-bold p-1 rounded border border-amber-300 bg-white focus:border-amber-600 outline-none"
+                            placeholder="القرار..."
                           />
-                          <div className="flex flex-wrap gap-1">
-                            {defaultDecisions.slice(0, 6).map((opt, i) => (
-                              <button 
-                                key={i}
-                                type="button" 
-                                onClick={() => setEditData({...editData, 'القرار': opt})} 
-                                className={`px-1.5 py-0.5 rounded text-[8px] font-bold transition-all ${editData['القرار'] === opt ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                              >
-                                {opt}
-                              </button>
-                            ))}
-                          </div>
+                          <button 
+                            onClick={() => setIsManageDecisionsOpen(true)}
+                            className="p-1 rounded bg-amber-100 text-amber-700 hover:bg-amber-200 transition"
+                            title="إعدادات القرارات السريعة"
+                          >
+                            <Settings className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       ) : (
                         getFieldValueLocal(cObj, ['القرار'])
                       )}
                     </td>
                   )}
-                  
+
                   {visibleColumns['الحكم'] && (
                     <td className="px-3 py-2.5 bg-rose-50/30">
                       {isEditing ? (
                         <input 
                           type="text" 
+                          list="short-judgments-list"
                           value={editData['الحكم'] || ''} 
                           onChange={e => setEditData({...editData, 'الحكم': e.target.value})}
                           className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
                         />
                       ) : (
-                        <span className="text-[10px] font-bold text-rose-800">{getFieldValueLocal(cObj, ['الحكم'])}</span>
+                        <span className="text-[10px] font-bold text-rose-800">
+                           {cObj.sessions?.find(s => s.date === date)?.shortJudgment || ''}
+                        </span>
                       )}
                     </td>
                   )}
@@ -550,18 +627,21 @@ export default function SessionTable({ dayCases, date }) {
                       {isEditing ? (
                         <input 
                           type="text" 
+                          list="judgment-classifications-list"
                           value={editData['تصنيف الحكم'] || ''} 
                           onChange={e => setEditData({...editData, 'تصنيف الحكم': e.target.value})}
                           className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
                         />
                       ) : (
-                        <span className="text-[10px] font-bold text-rose-800">{getFieldValueLocal(cObj, ['تصنيف الحكم'])}</span>
+                        <span className="text-[10px] font-bold text-rose-800">
+                           {cObj.sessions?.find(s => s.date === date)?.judgmentClassification || ''}
+                        </span>
                       )}
                     </td>
                   )}
                   
                   {visibleColumns['منطوق الحكم'] && (
-                    <td className="px-3 py-2.5 bg-rose-50/30 relative">
+                    <td className="px-3 py-2.5 bg-rose-50/30 relative min-w-[200px]">
                       {isEditing ? (
                         <div className="flex flex-col gap-1">
                           <textarea 
@@ -570,16 +650,27 @@ export default function SessionTable({ dayCases, date }) {
                             className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white resize-none focus:border-rose-500 outline-none"
                             rows={2}
                           />
-                          <div className="flex items-center gap-1">
-                            <label className="cursor-pointer flex-1 flex items-center justify-center gap-1 text-[9px] font-black bg-white border border-rose-200 text-rose-600 px-2 py-1 rounded hover:bg-rose-50 transition">
-                              <Upload className="w-3 h-3" />
-                              {isUploading ? 'جاري الرفع...' : 'مرفق'}
-                              <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(e, cObj)} disabled={isUploading} />
-                            </label>
-                          </div>
                         </div>
                       ) : (
-                        <span className="text-[10px] font-bold text-rose-800 line-clamp-3">{getFieldValueLocal(cObj, ['منطوق الحكم'])}</span>
+                        <span className="text-[10px] font-bold text-rose-800 line-clamp-3" title={cObj.sessions?.find(s => s.date === date)?.verdict || ''}>
+                           {cObj.sessions?.find(s => s.date === date)?.verdict || ''}
+                        </span>
+                      )}
+                    </td>
+                  )}
+
+                  {visibleColumns['الملاحظات'] && (
+                    <td className="px-3 py-2.5 text-[10px] font-bold text-slate-700">
+                      {isEditing ? (
+                        <textarea 
+                          value={editData['الملاحظات'] || ''} 
+                          onChange={e => setEditData({...editData, 'الملاحظات': e.target.value})}
+                          className="w-full text-[10px] font-bold p-1 rounded border border-slate-300 bg-white focus:border-navy-900 outline-none resize-none"
+                          rows={2}
+                          placeholder="ملاحظات..."
+                        />
+                      ) : (
+                        <span className="line-clamp-2">{getFieldValueLocal(cObj, ['الملاحظات'])}</span>
                       )}
                     </td>
                   )}
@@ -628,6 +719,83 @@ export default function SessionTable({ dayCases, date }) {
           onClose={() => setQuickEditCaseId(null)} 
           caseData={dayCases.find(c => c.id === quickEditCaseId)} 
         />
+      )}
+
+      <datalist id="decisions-list">
+        {defaultDecisions.map((opt, i) => (
+          <option key={i} value={opt} />
+        ))}
+      </datalist>
+      <datalist id="short-judgments-list">
+        {uniqueShortJudgments.map((opt, i) => <option key={`sh-${i}`} value={opt} />)}
+      </datalist>
+      <datalist id="judgment-classifications-list">
+        {uniqueClassifications.map((opt, i) => <option key={`jc-${i}`} value={opt} />)}
+      </datalist>
+
+      {isManageDecisionsOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h3 className="font-black text-navy-900 flex items-center gap-2">
+                <Settings className="w-4 h-4 text-amber-500" />
+                إعدادات قائمة القرارات
+              </h3>
+              <button onClick={() => setIsManageDecisionsOpen(false)} className="text-slate-400 hover:text-rose-500 transition">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              <div className="flex gap-2">
+                <input 
+                  type="text"
+                  value={newDecisionOption}
+                  onChange={(e) => setNewDecisionOption(e.target.value)}
+                  placeholder="إضافة قرار جديد..."
+                  className="flex-1 text-xs font-bold p-2 rounded-xl border border-slate-200 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newDecisionOption.trim() !== '') {
+                      const updated = [...defaultDecisions, newDecisionOption.trim()];
+                      if(saveSettingsToFirebase) saveSettingsToFirebase({ decisions: updated });
+                      setNewDecisionOption('');
+                    }
+                  }}
+                />
+                <button 
+                  onClick={() => {
+                    if (newDecisionOption.trim() !== '') {
+                      const updated = [...defaultDecisions, newDecisionOption.trim()];
+                      if(saveSettingsToFirebase) saveSettingsToFirebase({ decisions: updated });
+                      setNewDecisionOption('');
+                    }
+                  }}
+                  className="bg-amber-500 hover:bg-amber-600 text-white p-2 rounded-xl transition"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                {defaultDecisions.map((opt, i) => (
+                  <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100 group hover:border-amber-200 transition">
+                    <span className="text-xs font-bold text-slate-700">{opt}</span>
+                    <button 
+                      onClick={() => {
+                        const updated = defaultDecisions.filter((_, idx) => idx !== i);
+                        if(saveSettingsToFirebase) saveSettingsToFirebase({ decisions: updated });
+                      }}
+                      className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition"
+                      title="حذف"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
