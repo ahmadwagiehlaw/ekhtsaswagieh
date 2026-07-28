@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2, Bell, AlertTriangle, FileText, ExternalLink, BookOpen, Files, Hash, Paperclip, Scale, Loader2 } from 'lucide-react';
+import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2, Bell, AlertTriangle, FileText, ExternalLink, BookOpen, Files, Hash, Paperclip, Scale, Loader2, Plus, Star } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import AddSessionModal from '../components/AddSessionModal';
@@ -310,6 +310,34 @@ export default function CaseDetails() {
               )}
             </h1>
             
+            {/* Star Button */}
+            <button
+               onClick={async () => {
+                 if (caseData.isImportant) {
+                    const confirmed = await showConfirm('تأكيد الإزالة', 'هل أنت متأكد من إزالة النجمة عن هذه الدعوى الهامة؟');
+                    if (!confirmed) return;
+                 } else {
+                    toast('تم تمييز الدعوى كدعوى هامة', 'success');
+                 }
+                 await saveCaseToFirebase(caseData.id, { isImportant: !caseData.isImportant });
+               }}
+               className={`relative p-2 rounded-xl transition ${caseData.isImportant ? 'bg-amber-100 text-amber-500 hover:bg-amber-200' : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'}`}
+               title={caseData.isImportant ? "إزالة الأهمية" : "تمييز كدعوى هامة"}
+            >
+               <Star className={`w-5 h-5 ${caseData.isImportant ? 'fill-amber-500' : ''}`} />
+            </button>
+            
+            {/* Case Task Button */}
+            <button 
+              onClick={() => {
+                navigate(`/tasks?caseId=${caseData.id}`);
+              }}
+              className="relative p-2 rounded-xl transition bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-indigo-600"
+              title="إضافة مهمة متعلقة بهذه الدعوى"
+            >
+              <ClipboardList className="w-5 h-5" />
+            </button>
+
             {/* Alerts Button in Header */}
             <button 
               onClick={() => setIsAlertsOpen(true)}
@@ -404,79 +432,14 @@ export default function CaseDetails() {
 
       {/* Tab Content: Details */}
       {activeTab === 'details' && (
-      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mx-4 sm:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-300">
-        <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shrink-0">
-             <Gavel className="w-6 h-6" />
-          </div>
-          <div>
-            <h2 className="font-black text-lg text-navy-900">البيانات التفصيلية</h2>
-            <p className="text-[11px] text-slate-500 font-bold">كل الحقول المسجلة في هيكل قاعدة البيانات</p>
-          </div>
-        </div>
-
-        {/* Joined Cases Section */}
-        {caseData.role === 'خارج الاختصاص' && (
-        <div className="bg-indigo-50/40 rounded-xl p-4 border border-indigo-100 mb-6 mt-4">
-           <h3 className="text-[11px] font-black text-indigo-800 mb-3 flex items-center gap-1.5"><Files className="w-4 h-4"/> الدعاوى المنضمة للملف</h3>
-           <div className="flex flex-wrap gap-2">
-              {(editData.joinedCasesList || []).map((jc, idx) => (
-                 <div key={idx} className="bg-white border border-indigo-200 shadow-sm text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2">
-                    {localizeNumber(jc.no, settings?.numberFormat)} <span className="text-[10px] text-slate-400">لسنة</span> {localizeNumber(jc.year, settings?.numberFormat)}
-                    {isEditing && (
-                       <button onClick={() => {
-                          const list = [...(editData.joinedCasesList || [])];
-                          list.splice(idx, 1);
-                          setEditData({...editData, joinedCasesList: list});
-                       }} className="text-rose-400 hover:text-rose-600 transition">
-                         <X className="w-3 h-3" />
-                       </button>
-                    )}
-                 </div>
-              ))}
-              
-              {legacyJoinedStr && !isEditing && (
-                 <div className="bg-white border border-indigo-200 shadow-sm text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2">
-                    {legacyJoinedStr}
-                 </div>
-              )}
-              
-              {(!editData.joinedCasesList || editData.joinedCasesList.length === 0) && !legacyJoinedStr && !isEditing && (
-                <span className="text-[10px] font-bold text-slate-400">لا توجد دعاوى منضمة.</span>
-              )}
-           </div>
-           
-           {isEditing && (
-              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-indigo-100/50 max-w-sm">
-                 <input type="number" placeholder="رقم الدعوى" value={newJoinedNo} onChange={e => setNewJoinedNo(e.target.value)} className="w-24 bg-white border border-indigo-200 shadow-sm rounded-lg px-2 py-1.5 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400" />
-                 <input type="number" placeholder="السنة" value={newJoinedYear} onChange={e => setNewJoinedYear(e.target.value)} className="w-20 bg-white border border-indigo-200 shadow-sm rounded-lg px-2 py-1.5 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400" />
-                 <button onClick={() => {
-                    if(!newJoinedNo || !newJoinedYear) return;
-                    
-                    const list = [...(editData.joinedCasesList || []), { no: newJoinedNo, year: newJoinedYear }];
-                    
-                    setEditData({
-                       ...editData,
-                       joinedCasesList: list
-                    });
-                    
-                    setNewJoinedNo('');
-                    setNewJoinedYear('');
-                 }} className="bg-indigo-600 hover:bg-indigo-700 shadow-sm text-white px-3 py-1.5 rounded-lg text-[10px] font-black transition">
-                    إضافة الدعوى
-                 </button>
-              </div>
-           )}
-        </div>
-        )}
-
+      <div className="bg-transparent space-y-4 mx-4 sm:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-300">
         {/* Dynamic Fields from Schema (Grouped & Redesigned) */}
         <div className="space-y-6 pt-2">
           {[
             {
               title: '📌 بيانات أساسية',
               colorClass: 'text-blue-700 bg-blue-50/50 border-blue-100',
-              keys: ['الرول', 'رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'المحكمة', 'الدائرة', 'مرحلة التقاضي', 'الإجراءات الهامة والعاجلة']
+              keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'المحكمة', 'الدائرة', 'مرحلة التقاضي', 'الإجراءات الهامة والعاجلة']
             },
             {
               title: '👥 الأطراف والصفة',
@@ -613,6 +576,59 @@ export default function CaseDetails() {
                               <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 whitespace-pre-wrap break-words min-h-[42px]" dir={isDateField ? "ltr" : "auto"}>
                                 {displayVal}
                               </div>
+                            )}
+
+                            {/* Inject Joined Cases directly below Case Number if applicable */}
+                            {['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى'].includes(field.id) && (
+                               ((editData.joinedCasesList && editData.joinedCasesList.length > 0) || legacyJoinedStr || isEditing) && (
+                                 <div className="mt-3 bg-indigo-50/40 rounded-xl p-3 border border-indigo-100">
+                                    <h3 className="text-[10px] font-black text-indigo-800 mb-2 flex items-center gap-1.5"><Files className="w-3 h-3"/> الدعاوى المنضمة</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                       {(editData.joinedCasesList || []).map((jc, idx) => (
+                                          <div key={idx} className="bg-white border border-indigo-200 shadow-sm text-indigo-700 px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1">
+                                             {localizeNumber(jc.no, settings?.numberFormat)} <span className="text-[9px] text-slate-400">لسنة</span> {localizeNumber(jc.year, settings?.numberFormat)}
+                                             {isEditing && (
+                                                <button onClick={() => {
+                                                   const list = [...(editData.joinedCasesList || [])];
+                                                   list.splice(idx, 1);
+                                                   setEditData({...editData, joinedCasesList: list});
+                                                }} className="text-rose-400 hover:text-rose-600 transition mr-1">
+                                                  <X className="w-3 h-3" />
+                                                </button>
+                                             )}
+                                          </div>
+                                       ))}
+                                       
+                                       {legacyJoinedStr && !isEditing && (
+                                          <div className="bg-white border border-indigo-200 shadow-sm text-indigo-700 px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1">
+                                             {legacyJoinedStr}
+                                          </div>
+                                       )}
+                                       
+                                       {(!editData.joinedCasesList || editData.joinedCasesList.length === 0) && !legacyJoinedStr && !isEditing && (
+                                         <span className="text-[10px] font-bold text-slate-400">لا توجد دعاوى منضمة.</span>
+                                       )}
+                                    </div>
+                                    
+                                    {isEditing && (
+                                       <div className="flex items-center gap-2 mt-2 pt-2 border-t border-indigo-100/50">
+                                          <input type="number" placeholder="رقم الدعوى" value={newJoinedNo} onChange={e => setNewJoinedNo(e.target.value)} className="w-20 bg-white border border-indigo-200 shadow-sm rounded-md px-1.5 py-1 text-[10px] font-bold text-navy-900 focus:outline-none focus:border-indigo-400" />
+                                          <input type="number" placeholder="السنة" value={newJoinedYear} onChange={e => setNewJoinedYear(e.target.value)} className="w-16 bg-white border border-indigo-200 shadow-sm rounded-md px-1.5 py-1 text-[10px] font-bold text-navy-900 focus:outline-none focus:border-indigo-400" />
+                                          <button onClick={() => {
+                                             if(!newJoinedNo || !newJoinedYear) return;
+                                             
+                                             const list = [...(editData.joinedCasesList || []), { no: newJoinedNo, year: newJoinedYear }];
+                                             setEditData({...editData, joinedCasesList: list});
+                                             
+                                             setNewJoinedNo('');
+                                             setNewJoinedYear('');
+                                          }} className="bg-indigo-600 hover:bg-indigo-700 shadow-sm text-white px-2 py-1 rounded-md text-[10px] font-black transition">
+                                             إضافة
+                                          </button>
+                                       </div>
+                                    )}
+                                 </div>
+                               )
                             )}
                           </div>
                         );
@@ -917,14 +933,21 @@ export default function CaseDetails() {
         </div>
 
         <div className="pt-2 space-y-4">
-          {(!caseData.procedures || caseData.procedures.length === 0) ? (
-            <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
-               <p className="text-xs font-bold text-slate-500">لا توجد إجراءات مسجلة في هذا الملف.</p>
-            </div>
-          ) : (
-            <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
-              {caseData.procedures.sort((a, b) => new Date(b.date) - new Date(a.date)).map((proc, idx) => (
-                <div key={proc.id || idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+          {(() => {
+            const proceduresList = Array.isArray(caseData.procedures) ? caseData.procedures : Object.values(caseData.procedures || {});
+            
+            if (proceduresList.length === 0) {
+              return (
+                <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
+                   <p className="text-xs font-bold text-slate-500">لا توجد إجراءات مسجلة في هذا الملف.</p>
+                </div>
+              );
+            }
+            
+            return (
+              <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
+                {proceduresList.sort((a, b) => new Date(b.date) - new Date(a.date)).map((proc, idx) => (
+                  <div key={proc.id || idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                   {/* Icon */}
                   <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-slate-100 text-slate-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
                     <CheckCircle2 className="w-5 h-5 text-indigo-500" />
@@ -940,7 +963,7 @@ export default function CaseDetails() {
                           onClick={async () => {
                             const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذا الإجراء؟');
                             if (confirmed) {
-                              const newProcs = caseData.procedures.filter(p => p.id !== proc.id);
+                              const newProcs = proceduresList.filter(p => p.id !== proc.id);
                               await saveCaseToFirebase(caseData.id, { procedures: newProcs });
                             }
                           }}
@@ -963,7 +986,8 @@ export default function CaseDetails() {
                 </div>
               ))}
             </div>
-          )}
+            );
+          })()}
 
           {isAdmin && (
             <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 mt-6">
@@ -1056,7 +1080,8 @@ export default function CaseDetails() {
                         createdAt: new Date().toISOString()
                       };
                       
-                      const updatedProcedures = [...(caseData.procedures || []), newProcObj];
+                      const currentProceduresList = Array.isArray(caseData.procedures) ? caseData.procedures : Object.values(caseData.procedures || {});
+                      const updatedProcedures = [...currentProceduresList, newProcObj];
                       
                       // Also add to documents if there is an attachment
                       let updatedDocuments = caseData.documents || [];

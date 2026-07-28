@@ -11,6 +11,8 @@ export default function AlertsModal({ isOpen, onClose, caseData }) {
 
   if (!isOpen || !caseData) return null;
 
+  const alertsList = Array.isArray(caseData.alerts) ? caseData.alerts : Object.values(caseData.alerts || {});
+
   const handleAddAlert = async () => {
     if (!newAlert.date || !newAlert.title) {
       toast('يرجى اختيار التاريخ وكتابة نص التنبيه.', 'error');
@@ -26,7 +28,7 @@ export default function AlertsModal({ isOpen, onClose, caseData }) {
         createdAt: new Date().toISOString()
       };
       
-      const updatedAlerts = [...(caseData.alerts || []), alertObj];
+      const updatedAlerts = [...alertsList, alertObj];
       await saveCaseToFirebase(caseData.id, { alerts: updatedAlerts });
       
       setNewAlert({ date: '', title: '' });
@@ -66,14 +68,14 @@ export default function AlertsModal({ isOpen, onClose, caseData }) {
         </div>
         
         <div className="p-4 sm:p-5 max-h-[60vh] overflow-y-auto">
-          {(!caseData.alerts || caseData.alerts.length === 0) ? (
+          {alertsList.length === 0 ? (
             <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
                <Bell className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                <p className="text-sm font-bold text-slate-500">لا توجد مواعيد أو تنبيهات مسجلة.</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {caseData.alerts.map((alert, idx) => {
+              {alertsList.map((alert, idx) => {
                  const isCompleted = alert.isDone;
                  const alertDate = new Date(alert.date);
                  const today = new Date();
@@ -114,7 +116,7 @@ export default function AlertsModal({ isOpen, onClose, caseData }) {
                     {!isCompleted && isAdmin && (
                       <button
                         onClick={async () => {
-                          const updatedAlerts = [...caseData.alerts];
+                          const updatedAlerts = [...alertsList];
                           updatedAlerts[idx].isDone = true;
                           await saveCaseToFirebase(caseData.id, { alerts: updatedAlerts });
                           toast('تم إغلاق التنبيه', 'success');

@@ -24,6 +24,9 @@ export default function Dashboard() {
     let reservedCount = 0; // محجوز للحكم
     let ongoingCount = 0; // متداول
 
+    let noInterestCount = 0; // لا شأن
+    let outOfJurisdictionCount = 0; // خارج الاختصاص
+
     let activeThisMonth = 0;
     let alerts = [];
 
@@ -38,6 +41,13 @@ export default function Dashboard() {
 
     cases.forEach(c => {
       const role = String(c['الصفة'] || c['صفة'] || '').trim();
+      
+      if (role === 'لا شأن') noInterestCount++;
+      if (role === 'خارج الاختصاص') outOfJurisdictionCount++;
+      
+      // Ignore these two types from all dashboard statistics
+      if (role === 'لا شأن' || role === 'خارج الاختصاص') return;
+
       const isAppellant = role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
       const isAppellee = role.includes('مطعون ضده') || role.includes('مستأنف ضده') || role.includes('مدعى عليه');
 
@@ -132,6 +142,9 @@ export default function Dashboard() {
 
     return {
       all: cases.length,
+      netTotal: cases.length - noInterestCount - outOfJurisdictionCount,
+      noInterest: noInterestCount,
+      outOfJurisdiction: outOfJurisdictionCount,
       appellant: appellantCount,
       appellee: appelleeCount,
       judged: judgedCount,
@@ -408,8 +421,8 @@ export default function Dashboard() {
             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
               <Scale className="w-5 h-5" />
             </div>
-            <p className="text-xs font-bold text-slate-500">إجمالي القضايا</p>
-            <p className="text-2xl font-black text-navy-900">{stats.all}</p>
+            <p className="text-xs font-bold text-slate-500">صافي القضايا النشطة</p>
+            <p className="text-2xl font-black text-navy-900">{stats.netTotal}</p>
           </div>
 
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center space-y-2">
@@ -435,6 +448,18 @@ export default function Dashboard() {
             <p className="text-xs font-bold text-slate-500">قضايا الطاعنين</p>
             <p className="text-2xl font-black text-navy-900">{stats.appellant}</p>
           </div>
+        </div>
+
+        {/* Ignored Cases Stats */}
+        <div className="grid grid-cols-2 gap-3">
+           <div className="bg-slate-50/50 rounded-xl p-3 border border-slate-200 border-dashed flex justify-between items-center opacity-70">
+              <span className="text-xs font-bold text-slate-500">لا شأن</span>
+              <span className="text-sm font-black text-slate-700">{stats.noInterest}</span>
+           </div>
+           <div className="bg-slate-50/50 rounded-xl p-3 border border-slate-200 border-dashed flex justify-between items-center opacity-70">
+              <span className="text-xs font-bold text-slate-500">خارج الاختصاص</span>
+              <span className="text-sm font-black text-slate-700">{stats.outOfJurisdiction}</span>
+           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

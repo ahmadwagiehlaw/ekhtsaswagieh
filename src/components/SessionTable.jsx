@@ -41,6 +41,7 @@ export default function SessionTable({ dayCases, date }) {
     ALL_COLUMNS.reduce((acc, col) => ({ ...acc, [col.id]: col.defaultVisible }), {})
   );
   const [showColSettings, setShowColSettings] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   // Edit state
   const [editingCaseId, setEditingCaseId] = useState(null);
@@ -373,6 +374,11 @@ export default function SessionTable({ dayCases, date }) {
             </div>
           )}
         </div>
+        <div className="flex bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+           <button onClick={() => setZoomLevel(prev => Math.min(prev + 0.1, 1.5))} className="px-2 py-1 hover:bg-slate-100 text-slate-600 font-black text-[10px] border-l border-slate-200" title="تكبير">+</button>
+           <span className="px-2 py-1 text-[10px] font-bold text-slate-500 bg-slate-50">{Math.round(zoomLevel * 100)}%</span>
+           <button onClick={() => setZoomLevel(prev => Math.max(prev - 0.1, 0.7))} className="px-2 py-1 hover:bg-slate-100 text-slate-600 font-black text-[10px] border-r border-slate-200" title="تصغير">-</button>
+        </div>
         </div>
       </div>
 
@@ -442,7 +448,7 @@ export default function SessionTable({ dayCases, date }) {
       )}
 
       <div className="overflow-x-auto border rounded-xl border-slate-200 bg-white shadow-sm min-h-[300px]">
-        <table className="w-full text-right border-collapse min-w-[800px]">
+        <table className="w-full text-right border-collapse min-w-[800px]" style={{ zoom: zoomLevel }}>
           <thead className="bg-slate-100 sticky top-0 z-10 shadow-sm">
             <tr>
               <th className="px-3 py-2 text-[10px] font-black text-slate-600 border-b border-slate-200 w-10 text-center no-print">
@@ -510,12 +516,14 @@ export default function SessionTable({ dayCases, date }) {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredCases.map((cObj, idx) => {
-              const isEditing = editingCaseId === cObj.id;
               const isSelected = selectedCaseIds.has(cObj.id);
+              const isEditing = editingCaseId === cObj.id;
               
               return (
-                <tr key={cObj.id} className={`hover:bg-slate-50 transition group ${isSelected ? 'bg-indigo-50/50' : ''}`}>
-                  <td className="px-3 py-2.5 text-center align-middle no-print">
+                <tr 
+                  key={cObj.id} 
+                  className={`group transition-colors border-b border-slate-100 even:bg-slate-50/50 odd:bg-white hover:bg-indigo-50/30 ${isSelected ? 'bg-indigo-50/50' : ''}`}
+                >  <td className="px-3 py-2.5 text-center align-middle no-print">
                     <button onClick={() => toggleSelection(cObj.id)} className="text-slate-300 hover:text-indigo-600 transition">
                       {isSelected ? <CheckSquare className="w-4 h-4 text-indigo-600" /> : <Square className="w-4 h-4" />}
                     </button>

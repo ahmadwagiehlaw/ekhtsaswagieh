@@ -26,6 +26,8 @@ export default function Files() {
   // Quick Filters
   const [showOngoingOnly, setShowOngoingOnly] = useState(false);
   const [showWithAttachmentsOnly, setShowWithAttachmentsOnly] = useState(false);
+  const [showImportantOnly, setShowImportantOnly] = useState(false);
+  const [ignoreNoInterest, setIgnoreNoInterest] = useState(false);
 
   const itemsPerPage = 20;
 
@@ -63,6 +65,14 @@ export default function Files() {
         }
         return true;
       });
+    }
+
+    if (ignoreNoInterest) {
+      result = result.filter(c => String(c['الصفة'] || c['صفة'] || '').trim() !== 'لا شأن');
+    }
+
+    if (showImportantOnly) {
+      result = result.filter(c => c.isImportant);
     }
 
     if (showOngoingOnly) {
@@ -145,11 +155,11 @@ export default function Files() {
     }
 
     return result;
-  }, [cases, searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly]);
+  }, [cases, searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, ignoreNoInterest]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly]);
+  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, ignoreNoInterest]);
 
   const totalPages = Math.ceil(filteredCases.length / itemsPerPage);
   const currentCases = filteredCases.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -268,6 +278,24 @@ export default function Files() {
           >
             <FileBox className="w-4 h-4" />
             <span className={showWithAttachmentsOnly ? 'inline' : 'hidden sm:inline'}>مرفقات</span>
+          </button>
+
+          <button 
+             onClick={() => setShowImportantOnly(!showImportantOnly)}
+             className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showImportantOnly ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
+             title="الدعاوى الهامة فقط"
+          >
+            <Sparkles className={`w-4 h-4 ${showImportantOnly ? 'fill-amber-700' : ''}`} />
+            <span className={showImportantOnly ? 'inline' : 'hidden sm:inline'}>هامة</span>
+          </button>
+
+          <button 
+             onClick={() => setIgnoreNoInterest(!ignoreNoInterest)}
+             className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${ignoreNoInterest ? 'bg-slate-700 text-white border-slate-800' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
+             title="إخفاء دعاوى لا شأن"
+          >
+            <X className="w-4 h-4" />
+            <span className={ignoreNoInterest ? 'inline' : 'hidden sm:inline'}>بدون (لا شأن)</span>
           </button>
 
           <button 
@@ -418,6 +446,7 @@ export default function Files() {
                       )}
                       <div>
                         <h3 className="font-black text-lg sm:text-xl text-navy-900 leading-tight flex items-center gap-1.5 flex-wrap">
+                           {c.isImportant && <Sparkles className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" title="دعوى هامة" />}
                            {caseNum || 'بدون رقم'} 
                            {year && <span className="text-xs sm:text-sm font-bold text-slate-400 mr-1.5">لسنة {year}</span>}
                            {hasJoinedCases && (
