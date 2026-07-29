@@ -152,6 +152,38 @@ export default function RollsLibrary() {
     return typeMatch && monthMatch;
   });
 
+  const getFriendlyMonthName = (monthKey) => {
+    const [year, month] = monthKey.split('-');
+    const months = {
+      '01': 'يناير',
+      '02': 'فبراير',
+      '03': 'مارس',
+      '04': 'أبريل',
+      '05': 'مايو',
+      '06': 'يونيو',
+      '07': 'يوليو',
+      '08': 'أغسطس',
+      '09': 'سبتمبر',
+      '10': 'أكتوبر',
+      '11': 'نوفمبر',
+      '12': 'ديسمبر'
+    };
+    const monthName = months[month] || month;
+    return `${monthName} ${year}`;
+  };
+
+  // Group filtered rolls by month key (YYYY-MM)
+  const rollsByMonth = {};
+  filteredRolls.forEach(roll => {
+    const monthKey = roll.date.substring(0, 7);
+    if (!rollsByMonth[monthKey]) {
+      rollsByMonth[monthKey] = [];
+    }
+    rollsByMonth[monthKey].push(roll);
+  });
+
+  const sortedMonthKeys = Object.keys(rollsByMonth).sort((a, b) => b.localeCompare(a));
+
   const getRollStyle = (type) => {
     const isJudgment = type.includes('حصر') || type.includes('أحكام');
     const isFahs = type.includes('فحص');
@@ -191,21 +223,21 @@ export default function RollsLibrary() {
 
     if (isJudgment) {
         if (isFahs) {
-             theme.base = `bg-amber-50/70 border-2 border-amber-200`;
+             theme.base = `bg-amber-50/70 border-2 border-amber-200 hover:bg-amber-50/90 hover:border-amber-400`;
              theme.iconBg = 'bg-amber-100/80';
              theme.textColor = 'text-amber-900';
              theme.btnBg = 'bg-white border border-amber-200 hover:bg-amber-100 text-amber-700';
              theme.accent = 'bg-amber-500';
              theme.iconColor = 'text-amber-600';
         } else if (isMawdoo) {
-             theme.base = `bg-emerald-50/70 border-2 border-emerald-200`;
+             theme.base = `bg-emerald-50/70 border-2 border-emerald-200 hover:bg-emerald-50/90 hover:border-emerald-400`;
              theme.iconBg = 'bg-emerald-100/80';
              theme.textColor = 'text-emerald-900';
              theme.btnBg = 'bg-white border border-emerald-200 hover:bg-emerald-100 text-emerald-700';
              theme.accent = 'bg-emerald-500';
              theme.iconColor = 'text-emerald-600';
         } else {
-             theme.base = `bg-rose-50/70 border-2 border-rose-200`;
+             theme.base = `bg-rose-50/70 border-2 border-rose-200 hover:bg-rose-50/90 hover:border-rose-400`;
              theme.iconBg = 'bg-rose-100/80';
              theme.textColor = 'text-rose-900';
              theme.btnBg = 'bg-white border border-rose-200 hover:bg-rose-100 text-rose-700';
@@ -213,7 +245,13 @@ export default function RollsLibrary() {
              theme.iconColor = 'text-rose-600';
         }
     } else {
-        theme.base = `bg-white border-2 ${theme.border}`;
+        if (isFahs) {
+             theme.base = `bg-amber-50/20 border-2 border-amber-200 hover:bg-amber-50/45 hover:border-amber-400`;
+        } else if (isMawdoo) {
+             theme.base = `bg-emerald-50/20 border-2 border-emerald-200 hover:bg-emerald-50/45 hover:border-emerald-400`;
+        } else {
+             theme.base = `bg-white border-2 ${theme.border} hover:bg-slate-50 hover:border-indigo-400`;
+        }
     }
 
     return theme;
@@ -385,62 +423,79 @@ export default function RollsLibrary() {
         </div>
       )}
 
-      {/* Rolls List */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-        {filteredRolls.map(roll => {
-          const style = getRollStyle(roll.type);
-          return (
-          <div key={roll.id} className={`rounded-2xl p-4 shadow-sm hover:shadow-md transition relative group flex flex-col items-center text-center overflow-hidden ${style.base}`}>
-            {/* Top color accent */}
-            <div className={`absolute top-0 inset-x-0 h-1.5 ${style.accent}`}></div>
-            
-            {isAdmin && (
-              <div className="absolute top-3 right-3 flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition z-10">
-                <button
-                  onClick={() => {
-                    const parts = roll.type.split(' - ');
-                    setBaseType(parts[0] || 'رول جلسة');
-                    setCircuitType(parts[1] || 'فحص');
-                    setRollDate(roll.date);
-                    setEditingRoll(roll);
-                  }}
-                  className="bg-indigo-50 text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition shadow-sm"
-                >
-                  <Edit3 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDelete(roll)}
-                  className="bg-rose-50 text-rose-500 p-1.5 rounded-lg hover:bg-rose-500 hover:text-white transition shadow-sm"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-            
-            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-3 transition mt-2 ${style.iconBg} ${style.iconColor}`}>
-              {style.icon}
+      {/* Rolls List Grouped by Month */}
+      <div className="space-y-8 animate-fade-in">
+        {sortedMonthKeys.map(monthKey => (
+          <div key={monthKey} className="space-y-4">
+            {/* Month Header / Divider */}
+            <div className="flex items-center gap-3 no-print">
+              <h3 className="font-black text-xs sm:text-sm text-indigo-700 bg-indigo-50 border border-indigo-100 px-3.5 py-1.5 rounded-xl shrink-0 shadow-sm">
+                {getFriendlyMonthName(monthKey)}
+              </h3>
+              <div className="h-[1px] bg-slate-200 w-full rounded"></div>
             </div>
-            
-            <h4 className={`font-black text-xs sm:text-sm mb-1 ${style.textColor}`}>{roll.type}</h4>
-            <p className={`text-sm sm:text-xl font-black flex items-center justify-center gap-1.5 tracking-tight ${style.textColor}`}>
-               {roll.date}
-            </p>
-            
-            <button
-              onClick={() => {
-                setViewingRoll(roll);
-                setRotation(0);
-              }}
-              className={`mt-4 w-full font-bold py-2.5 rounded-xl text-xs transition ${style.btnBg}`}
-            >
-              استعراض الرول
-            </button>
+
+            {/* Grid for this month's rolls */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+              {rollsByMonth[monthKey].map(roll => {
+                const style = getRollStyle(roll.type);
+                return (
+                  <div key={roll.id} className={`rounded-2xl p-4 shadow-sm hover:shadow-md transition relative group flex flex-col items-center text-center overflow-hidden ${style.base}`}>
+                    {/* Top color accent */}
+                    <div className={`absolute top-0 inset-x-0 h-1.5 ${style.accent}`}></div>
+                    
+                    {isAdmin && (
+                      <div className="absolute top-3 right-3 flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition z-10">
+                        <button
+                          onClick={() => {
+                            const parts = roll.type.split(' - ');
+                            setBaseType(parts[0] || 'رول جلسة');
+                            setCircuitType(parts[1] || 'فحص');
+                            setRollDate(roll.date);
+                            setEditingRoll(roll);
+                          }}
+                          className="bg-indigo-50 text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition shadow-sm"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(roll)}
+                          className="bg-rose-50 text-rose-500 p-1.5 rounded-lg hover:bg-rose-500 hover:text-white transition shadow-sm"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                    
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-3 transition mt-2 ${style.iconBg} ${style.iconColor}`}>
+                      {style.icon}
+                    </div>
+                    
+                    <h4 className={`font-black text-xs sm:text-sm mb-1 ${style.textColor}`}>{roll.type}</h4>
+                    <p className={`text-sm sm:text-xl font-black flex items-center justify-center gap-1.5 tracking-tight ${style.textColor}`}>
+                       {roll.date}
+                    </p>
+                    
+                    <button
+                      onClick={() => {
+                        setViewingRoll(roll);
+                        setRotation(0);
+                      }}
+                      className={`mt-4 w-full font-bold py-2.5 rounded-xl text-xs transition ${style.btnBg}`}
+                    >
+                      استعراض الرول
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        )})}
+        ))}
         
         {filteredRolls.length === 0 && (
-          <div className="col-span-full text-center py-12 bg-white rounded-2xl border-2 border-dashed border-slate-200">
-            <p className="text-slate-500 font-bold">لا توجد رولات مطابقة للبحث.</p>
+          <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 shadow-sm">
+            <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-sm font-bold text-slate-500">لا توجد رولات مطابقة للبحث</p>
           </div>
         )}
       </div>

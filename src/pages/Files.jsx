@@ -27,8 +27,9 @@ export default function Files() {
   const [showOngoingOnly, setShowOngoingOnly] = useState(false);
   const [showWithAttachmentsOnly, setShowWithAttachmentsOnly] = useState(false);
   const [showImportantOnly, setShowImportantOnly] = useState(false);
-  const [showPastAndSessionlessOnly, setShowPastAndSessionlessOnly] = useState(false);
+  const [showSessionlessOnly, setShowSessionlessOnly] = useState(false);
   const [showPastSessionsOnly, setShowPastSessionsOnly] = useState(false);
+  const [isSelectionReportModalOpen, setIsSelectionReportModalOpen] = useState(false);
 
   const itemsPerPage = 20;
 
@@ -68,15 +69,12 @@ export default function Files() {
       });
     }
 
-    if (showPastAndSessionlessOnly) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    if (showSessionlessOnly) {
       result = result.filter(c => {
         const dateStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'];
         if (!dateStr) return true;
         const d = getSafeDateObj(dateStr);
-        if (!d) return true;
-        return d < today;
+        return !d;
       });
     }
 
@@ -176,11 +174,11 @@ export default function Files() {
     }
 
     return result;
-  }, [cases, searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showPastAndSessionlessOnly]);
+  }, [cases, searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showPastAndSessionlessOnly]);
+  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly]);
 
   const totalPages = Math.ceil(filteredCases.length / itemsPerPage);
   const currentCases = filteredCases.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -219,21 +217,7 @@ export default function Files() {
 
   return (
     <div className="space-y-4 pb-20 animate-fade-in">
-      <ExportPDFModal 
-        isOpen={isExportModalOpen} 
-        onClose={() => setIsExportModalOpen(false)} 
-        casesToExport={filteredCases}
-        schema={schema}
-        title="تقرير القضايا"
-      />
 
-      <BulkAssignTaskModal 
-        isOpen={isAssignModalOpen}
-        onClose={() => setIsAssignModalOpen(false)}
-        selectedCaseIds={selectedCaseIds}
-        onSuccess={() => setSelectedCaseIds([])}
-      />
-      
       <AdvancedSearchModal 
         isOpen={isAdvancedSearchOpen}
         onClose={() => setIsAdvancedSearchOpen(false)}
@@ -320,12 +304,12 @@ export default function Files() {
           </button>
 
           <button 
-             onClick={() => setShowPastAndSessionlessOnly(!showPastAndSessionlessOnly)}
-             className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showPastAndSessionlessOnly ? 'bg-slate-700 text-white border-slate-800' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
-             title="استعلام: بدون جلسة أو جلسة سابقة"
+             onClick={() => setShowSessionlessOnly(!showSessionlessOnly)}
+             className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showSessionlessOnly ? 'bg-slate-700 text-white border-slate-800' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
+             title="تصفية: دعاوى بدون جلسة"
           >
             <X className="w-4 h-4" />
-            <span className={showPastAndSessionlessOnly ? 'inline' : 'hidden'}>استعلام</span>
+            <span className={showSessionlessOnly ? 'inline' : 'hidden'}>بدون جلسة</span>
           </button>
 
           <button 
@@ -580,6 +564,14 @@ export default function Files() {
             <span className="sm:hidden">إسناد</span>
           </button>
           <button 
+            onClick={() => setIsSelectionReportModalOpen(true)}
+            className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 transition"
+          >
+            <Printer className="w-4 h-4" />
+            <span className="hidden sm:inline">إنشاء تقرير</span>
+            <span className="sm:hidden">تقرير</span>
+          </button>
+          <button 
             onClick={() => setSelectedCaseIds([])}
             className="text-slate-300 hover:text-white p-2 rounded-xl transition bg-slate-800 hover:bg-slate-700 shrink-0"
           >
@@ -591,7 +583,15 @@ export default function Files() {
       <ExportPDFModal 
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
-        cases={currentCases}
+        data={filteredCases}
+        defaultTitle="تقرير القضايا"
+      />
+
+      <ExportPDFModal 
+        isOpen={isSelectionReportModalOpen}
+        onClose={() => setIsSelectionReportModalOpen(false)}
+        data={cases.filter(c => selectedCaseIds.includes(c.id))}
+        defaultTitle="تقرير القضايا المحددة"
       />
 
       <BulkAssignTaskModal 
