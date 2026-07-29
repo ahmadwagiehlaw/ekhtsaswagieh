@@ -27,7 +27,7 @@ export default function Files() {
   const [showOngoingOnly, setShowOngoingOnly] = useState(false);
   const [showWithAttachmentsOnly, setShowWithAttachmentsOnly] = useState(false);
   const [showImportantOnly, setShowImportantOnly] = useState(false);
-  const [ignoreNoInterest, setIgnoreNoInterest] = useState(false);
+  const [showPastAndSessionlessOnly, setShowPastAndSessionlessOnly] = useState(false);
   const [showPastSessionsOnly, setShowPastSessionsOnly] = useState(false);
 
   const itemsPerPage = 20;
@@ -68,8 +68,16 @@ export default function Files() {
       });
     }
 
-    if (ignoreNoInterest) {
-      result = result.filter(c => String(c['الصفة'] || c['صفة'] || '').trim() !== 'لا شأن');
+    if (showPastAndSessionlessOnly) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      result = result.filter(c => {
+        const dateStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'];
+        if (!dateStr) return true;
+        const d = getSafeDateObj(dateStr);
+        if (!d) return true;
+        return d < today;
+      });
     }
 
     if (showImportantOnly) {
@@ -168,11 +176,11 @@ export default function Files() {
     }
 
     return result;
-  }, [cases, searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, ignoreNoInterest]);
+  }, [cases, searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showPastAndSessionlessOnly]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, ignoreNoInterest]);
+  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showPastAndSessionlessOnly]);
 
   const totalPages = Math.ceil(filteredCases.length / itemsPerPage);
   const currentCases = filteredCases.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -312,12 +320,12 @@ export default function Files() {
           </button>
 
           <button 
-             onClick={() => setIgnoreNoInterest(!ignoreNoInterest)}
-             className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${ignoreNoInterest ? 'bg-slate-700 text-white border-slate-800' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
-             title="إخفاء دعاوى لا شأن"
+             onClick={() => setShowPastAndSessionlessOnly(!showPastAndSessionlessOnly)}
+             className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showPastAndSessionlessOnly ? 'bg-slate-700 text-white border-slate-800' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
+             title="استعلام: بدون جلسة أو جلسة سابقة"
           >
             <X className="w-4 h-4" />
-            <span className={ignoreNoInterest ? 'inline' : 'hidden'}>بدون لا شأن</span>
+            <span className={showPastAndSessionlessOnly ? 'inline' : 'hidden'}>استعلام</span>
           </button>
 
           <button 
