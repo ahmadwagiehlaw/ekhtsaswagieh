@@ -26,6 +26,10 @@ export default function Settings() {
   const [localReviewTasks, setLocalReviewTasks] = useState(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
   const [localRollTypes, setLocalRollTypes] = useState(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
   const [localNumberFormat, setLocalNumberFormat] = useState(settings?.numberFormat || 'en');
+  const [localRoles, setLocalRoles] = useState(settings?.roles || ['طاعن', 'مطعون ضده', 'خصم مدخل']);
+  const [localSessionTypes, setLocalSessionTypes] = useState(settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة']);
+  const [localFileLocations, setLocalFileLocations] = useState(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
+  const [localCommonProcedures, setLocalCommonProcedures] = useState(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
   const [deletePassword, setDeletePassword] = useState('');
   
   // Sync settings when loaded
@@ -35,6 +39,10 @@ export default function Settings() {
     setLocalReviewTasks(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
     setLocalRollTypes(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
     setLocalNumberFormat(settings?.numberFormat || 'en');
+    setLocalRoles(settings?.roles || ['طاعن', 'مطعون ضده', 'خصم مدخل']);
+    setLocalSessionTypes(settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة']);
+    setLocalFileLocations(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
+    setLocalCommonProcedures(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
   }, [settings]);
 
   const handleSaveSettings = async () => {
@@ -45,10 +53,19 @@ export default function Settings() {
       decisions: localDecisions,
       reviewTasks: localReviewTasks,
       rollTypes: localRollTypes,
-      numberFormat: localNumberFormat
+      numberFormat: localNumberFormat,
+      roles: localRoles,
+      sessionTypes: localSessionTypes,
+      fileLocations: localFileLocations,
+      commonProcedures: localCommonProcedures
     });
     setIsProcessing(false);
     toast('تم حفظ الإعدادات المتقدمة بنجاح', 'success');
+  };
+
+  const handleResetConfirms = () => {
+    localStorage.removeItem('disabledConfirms');
+    toast('تم إعادة تفعيل جميع الرسائل التأكيدية بنجاح!', 'success');
   };
 
   const handleDeleteAll = async () => {
@@ -389,24 +406,146 @@ export default function Settings() {
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
               <SettingsIcon className="w-5 h-5 text-indigo-600" />
-              <h3 className="font-black text-sm text-navy-900">تفضيلات العرض (الأرقام)</h3>
+              <h3 className="font-black text-sm text-navy-900">تفضيلات العرض والرسائل</h3>
             </div>
-            <div className="flex items-center gap-4">
-              <label className="text-xs font-bold text-slate-700">تنسيق الأرقام والتواريخ:</label>
-              <div className="flex bg-slate-100 p-1 rounded-xl">
-                 <button 
-                   onClick={() => setLocalNumberFormat('en')}
-                   className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'en' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                 >
-                   إنجليزي (123)
-                 </button>
-                 <button 
-                   onClick={() => setLocalNumberFormat('ar')}
-                   className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'ar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                 >
-                   عربي (١٢٣)
-                 </button>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-4">
+                <label className="text-xs font-bold text-slate-700">تنسيق الأرقام والتواريخ:</label>
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                   <button 
+                     onClick={() => setLocalNumberFormat('en')}
+                     className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'en' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                   >
+                     إنجليزي (123)
+                   </button>
+                   <button 
+                     onClick={() => setLocalNumberFormat('ar')}
+                     className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'ar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                   >
+                     عربي (١٢٣)
+                   </button>
+                </div>
               </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                <div>
+                  <h4 className="text-xs font-black text-navy-900">الرسائل التأكيدية</h4>
+                  <p className="text-[10px] text-slate-500 font-bold">إعادة تفعيل الرسائل التأكيدية التي قمت بتعطيلها مسبقاً عبر خيار (عدم الإظهار مجدداً).</p>
+                </div>
+                <button 
+                  onClick={handleResetConfirms}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-750 text-xs font-black px-4 py-2 rounded-xl border border-slate-200 transition shadow-sm self-start sm:self-auto"
+                >
+                  إعادة تفعيل النوافذ التأكيدية
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Core Field Options Management */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <SettingsIcon className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-black text-sm text-navy-900">إدارة خيارات الحقول الجوهرية</h3>
+            </div>
+            
+            {/* Roles choice */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-black text-slate-500">خيارات حقل الصفة (طاعن / مطعون ضده / إلخ):</h4>
+              <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-200/60">
+                {localRoles.map((role, i) => (
+                  <div key={i} className="flex items-center gap-1 bg-rose-50 border border-rose-100 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+                    <span>{role}</span>
+                    <button onClick={() => setLocalRoles(localRoles.filter((_, idx) => idx !== i))} className="text-rose-450 hover:text-rose-600 mr-2">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                <button 
+                  onClick={async () => {
+                    const newRole = await showPrompt('إضافة صفة', 'أدخل مسمى الصفة الجديد:');
+                    if (newRole?.trim()) setLocalRoles([...localRoles, newRole.trim()]);
+                  }} 
+                  className="flex items-center gap-1 bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-100 transition shadow-sm"
+                >
+                  <Plus className="w-3 h-3" /> إضافة صفة
+                </button>
+              </div>
+            </div>
+
+            {/* Session Types choice */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-black text-slate-500">خيارات حقل نوع الجلسة (فحص / موضوع / إلخ):</h4>
+              <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-200/60">
+                {localSessionTypes.map((type, i) => (
+                  <div key={i} className="flex items-center gap-1 bg-emerald-50 border border-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+                    <span>{type}</span>
+                    <button onClick={() => setLocalSessionTypes(localSessionTypes.filter((_, idx) => idx !== i))} className="text-emerald-450 hover:text-emerald-600 mr-2">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                <button 
+                  onClick={async () => {
+                    const newType = await showPrompt('إضافة نوع جلسة', 'أدخل اسم نوع الجلسة الجديد:');
+                    if (newType?.trim()) setLocalSessionTypes([...localSessionTypes, newType.trim()]);
+                  }} 
+                  className="flex items-center gap-1 bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-100 transition shadow-sm"
+                >
+                  <Plus className="w-3 h-3" /> إضافة نوع
+                </button>
+              </div>
+            </div>
+
+            {/* File Locations choice */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-black text-slate-500">خيارات حقل مكان الملف (شعبة الحفظ / أصلي / إلخ):</h4>
+              <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-200/60">
+                {localFileLocations.map((loc, i) => (
+                  <div key={i} className="flex items-center gap-1 bg-amber-50 border border-amber-100 text-amber-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+                    <span>{loc}</span>
+                    <button onClick={() => setLocalFileLocations(localFileLocations.filter((_, idx) => idx !== i))} className="text-amber-450 hover:text-amber-600 mr-2">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                <button 
+                  onClick={async () => {
+                    const newLoc = await showPrompt('إضافة مكان الملف', 'أدخل مسمى مكان الملف الجديد:');
+                    if (newLoc?.trim()) setLocalFileLocations([...localFileLocations, newLoc.trim()]);
+                  }} 
+                  className="flex items-center gap-1 bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-100 transition shadow-sm"
+                >
+                  <Plus className="w-3 h-3" /> إضافة مكان
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Common Procedures Management */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <ClipboardList className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-black text-sm text-navy-900">إدارة خيارات الإجراءات الشائعة (سجل الإجراءات)</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {localCommonProcedures.map((proc, i) => (
+                <div key={i} className="flex items-center gap-1 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+                  <span>{proc}</span>
+                  <button onClick={() => setLocalCommonProcedures(localCommonProcedures.filter((_, idx) => idx !== i))} className="text-indigo-400 hover:text-rose-500 mr-2">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <button 
+                onClick={async () => {
+                  const newProc = await showPrompt('إضافة إجراء شائع', 'أدخل اسم الإجراء الجديد:');
+                  if (newProc?.trim()) setLocalCommonProcedures([...localCommonProcedures, newProc.trim()]);
+                }} 
+                className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
+              >
+                <Plus className="w-3 h-3" /> إضافة إجراء
+              </button>
             </div>
           </div>
 

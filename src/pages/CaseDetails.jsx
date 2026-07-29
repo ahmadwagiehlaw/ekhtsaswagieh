@@ -15,8 +15,8 @@ import { useRef } from 'react';
 export default function CaseDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { cases, schema, isAdmin, saveCaseToFirebase, settings, rolls, checkDuplicateCase, deleteCaseFromFirebase } = useAppContext();
-  const { toast, showConfirm, openRollViewer } = useUI();
+  const { cases, schema, isAdmin, saveCaseToFirebase, settings, rolls, checkDuplicateCase, deleteCaseFromFirebase, saveSettingsToFirebase, saveGlobalTask, currentUser } = useAppContext();
+  const { toast, showConfirm, openRollViewer, showPrompt } = useUI();
 
   // In the new architecture, id is the document id, not the array index.
   const caseData = cases.find(c => c.id === id);
@@ -38,10 +38,48 @@ export default function CaseDetails() {
   
   // Procedure state
   const procedureFileInputRef = useRef(null);
-  const [newProcedure, setNewProcedure] = useState({ date: new Date().toISOString().split('T')[0], title: '', notes: '' });
+  const [newProcedure, setNewProcedure] = useState({ date: new Date().toISOString().split('T')[0], title: '', notes: '', sessionDate: '' });
   const [isAddingProcedure, setIsAddingProcedure] = useState(false);
   const [isUploadingProcedureFile, setIsUploadingProcedureFile] = useState(false);
   const [procedureAttachment, setProcedureAttachment] = useState(null); // { url, name }
+
+  const isEmptyValue = (val) => {
+    if (val === null || val === undefined) return true;
+    const s = String(val).trim();
+    return s === '' || s === '-' || s === '---' || s === 'لا يوجد' || s === 'لايوجد';
+  };
+
+  const getAutocompleteOptions = (fieldId) => {
+    const values = cases
+      .map(c => c[fieldId])
+      .filter(val => val && typeof val === 'string' && val.trim() !== '')
+      .map(val => val.trim());
+    return [...new Set(values)];
+  };
+
+  const handleAddUrgentReminder = async (urgentText) => {
+    const reminderDate = await showPrompt('تحديد موعد التذكير', 'أدخل تاريخ التذكير (السنة-الشهر-اليوم):', new Date().toISOString().split('T')[0]);
+    if (!reminderDate) return;
+    
+    // 1. Save reminderDate on case
+    const updated = { ...editData, urgentReminderDate: reminderDate };
+    setEditData(updated);
+    await saveCaseToFirebase(caseData.id, { urgentReminderDate: reminderDate });
+
+    // 2. Add to globalTasks
+    const taskObj = {
+      id: `urgent-${Date.now()}`,
+      title: `إجراء عاجل: ${urgentText}`,
+      dueDate: reminderDate,
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+      assignee: currentUser || 'المدير',
+      linkedCases: [caseData.id]
+    };
+    await saveGlobalTask(taskObj.id, taskObj);
+    
+    toast('تمت جدولة التذكير بنجاح وإضافته إلى المهام!', 'success');
+  };
 
   // Joined cases state
   const [newJoinedNo, setNewJoinedNo] = useState('');
@@ -49,9 +87,6 @@ export default function CaseDetails() {
 
   // Extract unique values for autocomplete
   const defaultDecisions = settings?.decisions || [];
-  const uniqueCourts = [...new Set(cases.map(c => c['المحكمة']).filter(Boolean))];
-  const uniqueStages = [...new Set(cases.map(c => c['مرحلة التقاضي']).filter(Boolean))];
-  const uniqueDepartments = [...new Set(cases.map(c => c['الدائرة']).filter(Boolean))];
 
   const handleSessionFileUpload = async (e) => {
     const file = e.target.files[0];
@@ -459,25 +494,20 @@ export default function CaseDetails() {
             {
               title: '📍 بيانات أخرى',
               colorClass: 'text-slate-700 bg-slate-50/50 border-slate-200',
-              keys: ['المقر المختار', 'عنوان المدعى عليه'] // and any unmapped fields
+              keys: ['المقر المختار', 'عنوان المدعى عليه']
             }
           ].map((group, idx, arr) => {
              const excludedFields = ['الصفة', 'صفة', 'مكان الملف', 'آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'نوع الجلسة', 'القرار', 'قرار الجلسة'];
-             
-             // Find matching visible fields
              let groupFields = schema.filter(f => f.visible && group.keys.includes(f.id) && !excludedFields.includes(f.id));
-             
-             // If it's the last group ("بيانات أخرى"), include any unmapped visible fields
              if (idx === arr.length - 1) {
                 const allConfiguredKeys = arr.flatMap(g => g.keys);
                 const unmappedFields = schema.filter(f => f.visible && !allConfiguredKeys.includes(f.id) && !excludedFields.includes(f.id));
                 groupFields = [...groupFields, ...unmappedFields];
              }
              
-             // Only render this block if there are visible fields that have data (when not editing) or if editing
              const hasContent = groupFields.some(f => {
                const val = editData[f.id] || '';
-               return isEditing || (val !== null && val !== '');
+               return isEditing || !isEmptyValue(val);
              });
              
              if (!hasContent) return null;
@@ -490,17 +520,51 @@ export default function CaseDetails() {
                   <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 gap-y-5">
                      {groupFields.map(field => {
                         const val = editData[field.id] || '';
-                        if (!isEditing && (val === null || val === '')) return null;
+                        if (!isEditing && isEmptyValue(val)) return null;
 
                         const isDateField = field.type === 'date' || field.id.includes('تاريخ') || field.id.includes('جلسة');
                         const displayVal = localizeNumber(isDateField ? formatDateString(val) : val, settings?.numberFormat);
                         
-                        let colSpan = 'col-span-2 md:col-span-2'; // Default medium
+                        let colSpan = 'col-span-2 md:col-span-2';
                         const shortFields = ['رقم الدعوى', 'السنة', 'سنة', 'year', 'رقم القضية', 'رقم_الدعوى', 'الرول', 'الدائرة', 'تصنيف الحكم'];
                         const longFields = ['ملاحظات', 'المنطوق', 'منطوق الحكم', 'موضوع الدعوى', 'الإجراءات الهامة والعاجلة'];
 
                         if (shortFields.includes(field.id)) colSpan = 'col-span-1 md:col-span-1';
                         if (longFields.includes(field.id) || field.type === 'textarea') colSpan = 'col-span-2 md:col-span-4';
+
+                        if (field.id === 'الإجراءات الهامة والعاجلة' && !isEditing) {
+                            return (
+                              <div key={field.id} className="col-span-2 md:col-span-4 bg-gradient-to-r from-rose-50 to-amber-50 border border-rose-200/80 rounded-2xl p-4.5 space-y-3 shadow-sm relative overflow-hidden group">
+                                <div className="absolute top-0 bottom-0 right-0 w-1.5 bg-gradient-to-b from-rose-500 to-amber-500"></div>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                    <label className="text-xs font-black text-rose-800">{field.label}</label>
+                                  </div>
+                                  <button 
+                                    onClick={() => handleAddUrgentReminder(val)}
+                                    className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black text-amber-700 bg-amber-100 hover:bg-amber-250 hover:text-amber-800 px-3 py-1.5 rounded-xl border border-amber-200 transition shadow-sm cursor-pointer"
+                                  >
+                                    <Bell className="w-3.5 h-3.5" />
+                                    <span>تذكير بموعد الإجراء</span>
+                                  </button>
+                                </div>
+                                <div className="text-xs font-bold text-slate-800 pr-3 leading-relaxed whitespace-pre-wrap">
+                                  {val}
+                                </div>
+                                {editData.urgentReminderDate && (
+                                  <div className="flex items-center gap-1.5 text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-lg w-max mt-2">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    <span>موعد التذكير: {localizeNumber(editData.urgentReminderDate, settings?.numberFormat)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                         }
+
+                         const roleOptions = settings?.roles || ['طاعن', 'مطعون ضده', 'خصم مدخل'];
+                         const sessionTypeOptions = settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة'];
+                         const fileLocationOptions = settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي'];
 
                         return (
                           <div key={field.id} className={`space-y-1.5 ${colSpan}`}>
@@ -508,19 +572,19 @@ export default function CaseDetails() {
                             {isEditing ? (
                               field.id === 'الصفة' || field.id === 'صفة' ? (
                                  <div className="flex bg-slate-100 p-1 rounded-xl w-full">
-                                    {['طاعن', 'مطعون ضده', 'خصم مدخل'].map(opt => (
+                                    {roleOptions.map((opt, i) => (
                                       <button 
                                         key={opt} type="button" onClick={() => setEditData({...editData, [field.id]: opt})} 
-                                        className={`flex-1 py-2 px-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${val === opt ? (opt === 'طاعن' ? 'bg-rose-500 text-white' : opt === 'مطعون ضده' ? 'bg-emerald-500 text-white' : 'bg-navy-900 text-white') : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
+                                        className={`flex-1 py-2 px-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${val === opt ? (i === 0 ? 'bg-rose-500 text-white' : i === 1 ? 'bg-emerald-500 text-white' : 'bg-navy-900 text-white') : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
                                       >{opt}</button>
                                     ))}
                                  </div>
                               ) : field.id === 'نوع الجلسة' ? (
                                  <div className="flex bg-slate-100 p-1 rounded-xl w-full">
-                                    {['فحص', 'موضوع', 'حكم', 'خبير'].map(opt => (
+                                    {sessionTypeOptions.map((opt, i) => (
                                       <button 
                                         key={opt} type="button" onClick={() => setEditData({...editData, [field.id]: opt})} 
-                                        className={`flex-1 py-2 px-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${val === opt ? 'bg-amber-500 text-white' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
+                                        className={`flex-1 py-2 px-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${val === opt ? (i === 0 ? 'bg-amber-500 text-white' : i === 1 ? 'bg-emerald-500 text-white' : 'bg-navy-900 text-white') : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
                                       >{opt}</button>
                                     ))}
                                  </div>
@@ -539,45 +603,32 @@ export default function CaseDetails() {
                               ) : field.id === 'مكان الملف' ? (
                                  <div className="space-y-2">
                                    <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-100 rounded-xl">
-                                      {['غير موجود', 'أصلي', 'مؤقت', 'شعبة الحفظ', 'شعبة الشغل', 'الأحكام', 'في البيت'].map(opt => (
+                                      {fileLocationOptions.map(opt => (
                                         <button 
                                           key={opt} type="button" onClick={() => setEditData({...editData, [field.id]: opt})} 
                                           className={`px-3 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${val === opt ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'}`}
                                         >{opt}</button>
                                       ))}
                                    </div>
-                                   <input type="text" placeholder="أو اكتب مكان آخر..." value={!['غير موجود', 'أصلي', 'مؤقت', 'شعبة الحفظ', 'شعبة الشغل', 'الأحكام', 'في البيت'].includes(val) ? val : ''} onChange={(e) => setEditData({...editData, [field.id]: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
+                                   <input type="text" placeholder="أو اكتب مكان آخر..." value={!fileLocationOptions.includes(val) && val ? val : ''} onChange={(e) => setEditData({...editData, [field.id]: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
                                  </div>
                               ) : field.type === 'textarea' ? (
                                  <textarea value={val} onChange={(e) => setEditData({...editData, [field.id]: e.target.value})} rows={3} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 resize-none transition" />
                               ) : field.type === 'date' || field.id.includes('تاريخ') || field.id.includes('جلسة') ? (
                                  <input type="date" value={val && getSafeDateObj(val) ? getSafeDateObj(val).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({...editData, [field.id]: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
                               ) : (
-                                 <>
-                                   <input type="text" value={val} list={`list-${field.id}`} onChange={(e) => setEditData({...editData, [field.id]: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
-                                   {(field.id === 'المحكمة') && (
-                                      <datalist id={`list-${field.id}`}>
-                                        {uniqueCourts.map((opt, i) => <option key={i} value={opt} />)}
-                                      </datalist>
-                                   )}
-                                   {(field.id === 'الدائرة') && (
-                                      <datalist id={`list-${field.id}`}>
-                                        {uniqueDepartments.map((opt, i) => <option key={i} value={opt} />)}
-                                      </datalist>
-                                   )}
-                                   {(field.id === 'مرحلة التقاضي') && (
-                                      <datalist id={`list-${field.id}`}>
-                                        {uniqueStages.map((opt, i) => <option key={i} value={opt} />)}
-                                      </datalist>
-                                   )}
-                                 </>
+                                  <>
+                                    <input type="text" value={val} list={`list-${field.id}`} onChange={(e) => setEditData({...editData, [field.id]: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
+                                    <datalist id={`list-${field.id}`}>
+                                      {getAutocompleteOptions(field.id).map((opt, i) => <option key={i} value={opt} />)}
+                                    </datalist>
+                                  </>
                               )
                             ) : (
                               <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 whitespace-pre-wrap break-words min-h-[42px]" dir={isDateField ? "ltr" : "auto"}>
                                 {displayVal}
                               </div>
                             )}
-
                             {/* Inject Joined Cases directly below Case Number if applicable */}
                             {['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى'].includes(field.id) && (
                                ((editData.joinedCasesList && editData.joinedCasesList.length > 0) || legacyJoinedStr || isEditing) && (
@@ -833,7 +884,7 @@ export default function CaseDetails() {
                            {isAdmin && (
                               <button
                                  onClick={async () => {
-                                 const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذه الجلسة؟');
+                                 const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذه الجلسة؟', 'delete_session');
                                  if (confirmed) {
                                     const newSessions = [...caseData.sessions];
                                     newSessions.splice(idx, 1);
@@ -955,13 +1006,20 @@ export default function CaseDetails() {
                   {/* Card */}
                   <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
                     <div className="flex justify-between items-start mb-2">
-                      <div className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md mb-2 inline-block">
-                        {formatDateString(proc.date)}
+                      <div className="flex flex-wrap gap-1.5 items-center mb-2">
+                        <div className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">
+                          {formatDateString(proc.date)}
+                        </div>
+                        {proc.sessionDate && (
+                          <div className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-1 rounded-md border border-amber-250">
+                            مرتبط بجلسة: {formatDateString(proc.sessionDate)}
+                          </div>
+                        )}
                       </div>
                       {isAdmin && (
                         <button 
                           onClick={async () => {
-                            const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذا الإجراء؟');
+                            const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذا الإجراء؟', 'delete_procedure');
                             if (confirmed) {
                               const newProcs = proceduresList.filter(p => p.id !== proc.id);
                               await saveCaseToFirebase(caseData.id, { procedures: newProcs });
@@ -996,19 +1054,64 @@ export default function CaseDetails() {
               </h4>
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <input 
-                    type="date" 
-                    value={newProcedure.date}
-                    onChange={e => setNewProcedure({...newProcedure, date: e.target.value})}
-                    className="bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400 flex-[1]"
-                  />
+                  <div className="flex-1 flex gap-2">
+                    <input 
+                      type="date" 
+                      value={newProcedure.date}
+                      onChange={e => setNewProcedure({...newProcedure, date: e.target.value})}
+                      className="bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400 flex-[1]"
+                    />
+                    <select
+                      value={newProcedure.sessionDate || ''}
+                      onChange={e => setNewProcedure({...newProcedure, sessionDate: e.target.value})}
+                      className="bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400 flex-[1]"
+                    >
+                      <option value="">تاريخ الجلسة المرتبطة (اختياري)</option>
+                      {caseData.sessions?.map(s => (
+                        <option key={s.date} value={s.date}>{formatDateString(s.date)}</option>
+                      ))}
+                    </select>
+                  </div>
                   <input 
                     type="text" 
                     placeholder="اسم الإجراء (مثال: إيداع مذكرة دفاع، تقديم حافظة...)" 
                     value={newProcedure.title}
                     onChange={e => setNewProcedure({...newProcedure, title: e.target.value})}
-                    className="bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400 flex-[3]"
+                    className="bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400 flex-[2]"
                   />
+                </div>
+                {/* Quick selection procedures list */}
+                <div className="flex flex-wrap gap-1 mt-2 items-center">
+                  <span className="text-[10px] font-bold text-slate-400">إدخال سريع:</span>
+                  {(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']).map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setNewProcedure({...newProcedure, title: p})}
+                      className={`px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-bold transition-all ${newProcedure.title === p ? 'bg-indigo-600 text-white' : ''}`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const newProcName = await showPrompt('إضافة إجراء جديد', 'أدخل اسم الإجراء الشائع الجديد:');
+                      if (newProcName?.trim()) {
+                        const currentProcs = settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة'];
+                        if (!currentProcs.includes(newProcName.trim())) {
+                          await saveSettingsToFirebase({
+                            ...settings,
+                            commonProcedures: [...currentProcs, newProcName.trim()]
+                          });
+                          toast('تمت إضافة الإجراء الشائع بنجاح!', 'success');
+                        }
+                      }
+                    }}
+                    className="text-indigo-600 hover:text-indigo-800 text-[10px] font-black underline cursor-pointer select-none ml-2"
+                  >
+                    + إضافة خيار
+                  </button>
                 </div>
                 <textarea 
                   placeholder="ملاحظات تفصيلية (اختياري)..."
@@ -1075,6 +1178,7 @@ export default function CaseDetails() {
                         title: newProcedure.title,
                         date: newProcedure.date,
                         notes: newProcedure.notes,
+                        sessionDate: newProcedure.sessionDate || null,
                         attachmentUrl: procedureAttachment?.url || null,
                         attachmentName: procedureAttachment?.name || null,
                         createdAt: new Date().toISOString()
@@ -1096,7 +1200,7 @@ export default function CaseDetails() {
                       }
                       
                       await saveCaseToFirebase(caseData.id, { procedures: updatedProcedures, documents: updatedDocuments });
-                      setNewProcedure({ date: new Date().toISOString().split('T')[0], title: '', notes: '' });
+                       setNewProcedure({ date: new Date().toISOString().split('T')[0], title: '', notes: '', sessionDate: '' });
                       setProcedureAttachment(null);
                       setIsAddingProcedure(false);
                       toast('تم حفظ الإجراء بنجاح', 'success');
@@ -1163,7 +1267,7 @@ export default function CaseDetails() {
                     if(newRole === role) {
                       setIsChangeRoleModalOpen(false); return;
                     }
-                    const confirmed = await showConfirm('تأكيد التعديل', `هل أنت متأكد من تغيير تصنيف الدعوى إلى "${newRole}"؟`);
+                    const confirmed = await showConfirm('تأكيد التعديل', `هل أنت متأكد من تغيير تصنيف الدعوى إلى "${newRole}"؟`, 'change_role');
                     if(confirmed) {
                       const roleFieldKey = Object.keys(caseData).find(k => k === 'الصفة' || k === 'صفة') || 'الصفة';
                       await saveCaseToFirebase(caseData.id, { [roleFieldKey]: newRole });
@@ -1228,7 +1332,7 @@ export default function CaseDetails() {
                      const shouldConfirm = localStorage.getItem('skipLocationConfirm') !== 'true';
                      
                      if (shouldConfirm) {
-                       const confirmed = await showConfirm('تغيير مكان الملف', `هل أنت متأكد من تغيير مكان الملف إلى: ${newLocation}؟`);
+                       const confirmed = await showConfirm('تغيير مكان الملف', `هل أنت متأكد من تغيير مكان الملف إلى: ${newLocation}؟`, 'change_location');
                        if (!confirmed) return;
                      }
                      

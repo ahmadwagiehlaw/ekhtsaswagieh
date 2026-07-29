@@ -5,11 +5,20 @@ import { useUI } from '../context/UIContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function QuickEditCaseModal({ isOpen, onClose, caseData }) {
-  const { schema, saveCaseToFirebase, settings } = useAppContext();
+  const { schema, saveCaseToFirebase, settings, cases } = useAppContext();
   const { toast } = useUI();
   const [formData, setFormData] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
+
+  const getAutocompleteOptions = (fieldId) => {
+    if (!cases) return [];
+    const values = cases
+      .map(c => c[fieldId])
+      .filter(val => val && typeof val === 'string' && val.trim() !== '')
+      .map(val => val.trim());
+    return [...new Set(values)];
+  };
 
   useEffect(() => {
     if (caseData && isOpen) {
@@ -77,9 +86,13 @@ export default function QuickEditCaseModal({ isOpen, onClose, caseData }) {
                     <input 
                       type="text"
                       value={formData[field.id] || ''}
+                      list={`list-edit-${field.id}`}
                       onChange={(e) => setFormData({...formData, [field.id]: e.target.value})}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition"
                     />
+                    <datalist id={`list-edit-${field.id}`}>
+                      {getAutocompleteOptions(field.id).map((opt, i) => <option key={i} value={opt} />)}
+                    </datalist>
                     {field.id === 'القرار' && settings?.decisions && (
                        <div className="flex flex-wrap gap-1 mt-2">
                          {settings.decisions.slice(0, 5).map(dec => (
@@ -89,21 +102,21 @@ export default function QuickEditCaseModal({ isOpen, onClose, caseData }) {
                     )}
                     {(field.id === 'الصفة' || field.id === 'صفة') && (
                        <div className="flex flex-wrap gap-1 mt-2">
-                         {['طاعن', 'مطعون ضده', 'خصم مدخل'].map(s => (
+                         {(settings?.roles || ['طاعن', 'مطعون ضده', 'خصم مدخل']).map(s => (
                            <button key={s} type="button" onClick={() => setFormData({...formData, [field.id]: s})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{s}</button>
                          ))}
                        </div>
                     )}
                     {field.id === 'نوع الجلسة' && (
                        <div className="flex flex-wrap gap-1 mt-2">
-                         {['موضوع', 'فحص', 'للحكم', 'أول جلسة'].map(s => (
+                         {(settings?.sessionTypes || ['موضوع', 'فحص', 'للحكم', 'أول جلسة']).map(s => (
                            <button key={s} type="button" onClick={() => setFormData({...formData, [field.id]: s})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{s}</button>
                          ))}
                        </div>
                     )}
                     {field.id === 'مكان الملف' && (
                        <div className="flex flex-wrap gap-1 mt-2">
-                         {['شعبة الحفظ', 'الأحكام', 'أصلي'].map(s => (
+                         {(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']).map(s => (
                            <button key={s} type="button" onClick={() => setFormData({...formData, [field.id]: s})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{s}</button>
                          ))}
                        </div>

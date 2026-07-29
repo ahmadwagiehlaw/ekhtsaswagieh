@@ -127,7 +127,7 @@ export default function CaseDocuments({ caseId }) {
   };
 
   const handleDelete = async (doc) => {
-    const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذا الملف نهائياً؟');
+    const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذا الملف نهائياً؟', 'delete_document');
     if (!confirmed) return;
 
     try {

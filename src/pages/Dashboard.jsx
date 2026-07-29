@@ -48,8 +48,10 @@ export default function Dashboard() {
       // Ignore these two types from all dashboard statistics
       if (role === 'لا شأن' || role === 'خارج الاختصاص') return;
 
-      const isAppellant = role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
-      const isAppellee = role.includes('مطعون ضده') || role.includes('مستأنف ضده') || role.includes('مدعى عليه');
+      const appRole = settings?.roles?.[0] || 'طاعن';
+      const isAppellant = role.includes(appRole) || role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
+      const apeRole = settings?.roles?.[1] || 'مطعون ضده';
+      const isAppellee = role.includes(apeRole) || role.includes('مطعون ضده') || role.includes('مستأنف ضده') || role.includes('مدعى عليه');
 
       const lastSessionStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'] || '';
       const lastSessionDate = getSafeDateObj(lastSessionStr);
@@ -445,7 +447,7 @@ export default function Dashboard() {
             <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
               <Building2 className="w-5 h-5" />
             </div>
-            <p className="text-xs font-bold text-slate-500">قضايا الطاعنين</p>
+            <p className="text-xs font-bold text-slate-500">قضايا {settings?.roles?.[0] || 'الطاعنين'}</p>
             <p className="text-2xl font-black text-navy-900">{stats.appellant}</p>
           </div>
         </div>
@@ -510,8 +512,8 @@ export default function Dashboard() {
               </div>
               
               <div className="w-full flex justify-between text-xs font-black">
-                 <span className="text-emerald-700">طاعن ({stats.appellant})</span>
-                 <span className="text-rose-700">مطعون ضده ({stats.appellee})</span>
+                 <span className="text-emerald-700">{settings?.roles?.[0] || 'طاعن'} ({stats.appellant})</span>
+                 <span className="text-rose-700">{settings?.roles?.[1] || 'مطعون ضده'} ({stats.appellee})</span>
               </div>
             </div>
           </div>
@@ -523,7 +525,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4 text-slate-400" />
-              <h3 className="font-black text-xs text-slate-600">الجهات رافعة الدعوى (قضايا الطاعنين)</h3>
+              <h3 className="font-black text-xs text-slate-600">الجهات رافعة الدعوى (قضايا {settings?.roles?.[0] || 'الطاعنين'})</h3>
             </div>
             <div className="space-y-3">
               {stats.topOpponents.length > 0 ? stats.topOpponents.map(([name, count], i) => (

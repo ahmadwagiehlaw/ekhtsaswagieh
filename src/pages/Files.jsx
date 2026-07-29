@@ -8,7 +8,7 @@ import AdvancedSearchModal from '../components/AdvancedSearchModal';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 
 export default function Files() {
-  const { cases, schema } = useAppContext();
+  const { cases, schema, settings } = useAppContext();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -60,10 +60,12 @@ export default function Files() {
     if (roleFilter !== 'all') {
       result = result.filter(c => {
         const role = String(c['الصفة'] || c['صفة'] || '').trim();
+        const appRole = settings?.roles?.[0] || 'طاعن';
+        const apeRole = settings?.roles?.[1] || 'مطعون ضده';
         if (roleFilter === 'appellant') {
-          return role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
+          return role.includes(appRole) || role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
         } else if (roleFilter === 'appellee') {
-          return role.includes('مطعون') || role.includes('مستأنف ضده') || role.includes('مدعى عليه');
+          return role.includes(apeRole) || role.includes('مطعون') || role.includes('مستأنف ضده') || role.includes('مدعى عليه');
         }
         return true;
       });
@@ -264,7 +266,7 @@ export default function Files() {
              title="تصفية حسب الصفة"
           >
             <User className="w-4 h-4" />
-            <span className={roleFilter === 'all' ? 'hidden' : 'inline'}>{roleFilter === 'appellant' ? 'الطاعنين' : 'المطعون ضدهم'}</span>
+            <span className={roleFilter === 'all' ? 'hidden' : 'inline'}>{roleFilter === 'appellant' ? (settings?.roles?.[0] || 'الطاعنين') : (settings?.roles?.[1] || 'المطعون ضدهم')}</span>
           </button>
           
           <button 

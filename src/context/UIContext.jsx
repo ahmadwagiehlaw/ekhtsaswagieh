@@ -22,6 +22,8 @@ export function UIProvider({ children }) {
   const [promptValue, setPromptValue] = useState('');
   const promptValueRef = useRef('');
 
+  const [dontShowAgain, setDontShowAgain] = useState(false);
+
   // Global Roll Viewer State
   const [rollViewer, setRollViewer] = useState({ isOpen: false, date: '' });
 
@@ -59,13 +61,22 @@ export function UIProvider({ children }) {
   }, []);
 
   // Confirm Function
-  const showConfirm = useCallback((title, message) => {
+  const showConfirm = useCallback((title, message, confirmKey = '') => {
     return new Promise((resolve) => {
+      if (confirmKey) {
+        const disabled = JSON.parse(localStorage.getItem('disabledConfirms') || '[]');
+        if (disabled.includes(confirmKey)) {
+          resolve(true);
+          return;
+        }
+      }
+      setDontShowAgain(false);
       setModal({
         isOpen: true,
         type: 'confirm',
         title,
         message,
+        confirmKey,
         onConfirm: () => {
           setModal(prev => ({ ...prev, isOpen: false }));
           resolve(true);
@@ -142,6 +153,18 @@ export function UIProvider({ children }) {
                 />
               )}
 
+              {modal.type === 'confirm' && modal.confirmKey && (
+                <label className="flex items-center gap-2 mt-2 mb-6 select-none cursor-pointer">
+                  <input 
+                    type="checkbox"
+                    checked={dontShowAgain}
+                    onChange={e => setDontShowAgain(e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                  />
+                  <span className="text-xs font-bold text-slate-500">عدم إظهار هذه الرسالة مرة أخرى</span>
+                </label>
+              )}
+
               <div className="flex gap-3 mt-2">
                 {modal.type !== 'alert' && (
                   <button 
@@ -152,7 +175,16 @@ export function UIProvider({ children }) {
                   </button>
                 )}
                 <button 
-                  onClick={modal.onConfirm}
+                  onClick={() => {
+                    if (dontShowAgain && modal.confirmKey) {
+                      const disabled = JSON.parse(localStorage.getItem('disabledConfirms') || '[]');
+                      if (!disabled.includes(modal.confirmKey)) {
+                        disabled.push(modal.confirmKey);
+                        localStorage.setItem('disabledConfirms', JSON.stringify(disabled));
+                      }
+                    }
+                    modal.onConfirm();
+                  }}
                   className={`flex-1 font-bold py-3 rounded-xl transition text-sm text-white shadow-sm ${
                     modal.type === 'confirm' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-navy-900 hover:bg-navy-800'
                   }`}

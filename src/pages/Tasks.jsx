@@ -68,7 +68,7 @@ export default function Tasks() {
   };
 
   const handleDelete = async (id) => {
-    const confirmed = await showConfirm('حذف المهمة', 'هل أنت متأكد من حذف هذه المهمة؟');
+    const confirmed = await showConfirm('حذف المهمة', 'هل أنت متأكد من حذف هذه المهمة؟', 'delete_task');
     if (confirmed) {
       const success = await deleteGlobalTask(id);
       if (success) toast('تم الحذف بنجاح', 'success');
