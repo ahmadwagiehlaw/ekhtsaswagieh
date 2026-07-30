@@ -43,8 +43,9 @@ export default function Layout() {
             <Scale className="w-4 h-4 sm:w-5 sm:h-5 text-navy-900" />
           </div>
           <div className="flex flex-col justify-center">
-            <h1 className="text-base sm:text-xl font-black text-white tracking-tight leading-none">اختصاص</h1>
-            <span className="text-[11px] sm:text-[13px] font-bold text-amber-400 leading-none mt-0.5">
+            <h1 className="text-base sm:text-xl font-black text-white tracking-tight leading-none pb-1">اختصاص</h1>
+            <div className="h-[1px] w-full bg-gradient-to-l from-amber-400/70 to-transparent rounded-full"></div>
+            <span className="text-[11px] sm:text-[13px] font-bold text-amber-400 leading-none mt-1">
               م. أحمد وجيه
             </span>
           </div>

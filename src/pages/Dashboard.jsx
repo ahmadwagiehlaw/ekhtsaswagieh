@@ -50,8 +50,8 @@ export default function Dashboard() {
 
       const appRole = settings?.roles?.[0] || 'طاعن';
       const isAppellant = role.includes(appRole) || role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
-      const apeRole = settings?.roles?.[1] || 'مطعون ضده';
-      const isAppellee = role.includes(apeRole) || role.includes('مطعون ضده') || role.includes('مستأنف ضده') || role.includes('مدعى عليه');
+      const apeRole = settings?.roles?.[1] || 'مطعون ضدنا';
+      const isAppellee = role.includes(apeRole) || role.includes('مطعون ضده') || role.includes('مطعون ضدنا') || role.includes('مستأنف ضده') || role.includes('مدعى عليه') || role.includes('مدعى علينا');
 
       const lastSessionStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'] || '';
       const lastSessionDate = getSafeDateObj(lastSessionStr);
@@ -513,7 +513,7 @@ export default function Dashboard() {
               
               <div className="w-full flex justify-between text-xs font-black">
                  <span className="text-emerald-700">{settings?.roles?.[0] || 'طاعن'} ({stats.appellant})</span>
-                 <span className="text-rose-700">{settings?.roles?.[1] || 'مطعون ضده'} ({stats.appellee})</span>
+                 <span className="text-rose-700">{settings?.roles?.[1] || 'مطعون ضدنا'} ({stats.appellee})</span>
               </div>
             </div>
           </div>

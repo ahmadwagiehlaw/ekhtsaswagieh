@@ -266,7 +266,7 @@ export default function Agenda() {
                     {sessionsMap[selectedDateKey].map((cObj, idx) => {
                       const role = String(getFieldValue(cObj, ['الصفة']) || '').trim();
                       const isAppellant = role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
-                      const isAppellee = role.includes('مطعون ضده') || role.includes('مستأنف ضده') || role.includes('مدعى عليه');
+                      const isAppellee = role.includes('مطعون ضده') || role.includes('مطعون ضدنا') || role.includes('مستأنف ضده') || role.includes('مدعى عليه') || role.includes('مدعى علينا');
                       const isNoInterest = role === 'لا شأن';
                       const isOutOfJurisdiction = role === 'خارج الاختصاص';
 

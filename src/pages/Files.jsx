@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Filter, FolderClosed, Plus, Clock, FileText, Upload, Download, Loader2, Info, Building2, Gavel, FileBox, X, CalendarDays, Printer, CheckSquare, Square, ClipboardList, AlertTriangle, Sparkles, MapPin, User, Files as FilesIcon, ArrowUpDown, SlidersHorizontal } from 'lucide-react';
+import { Search, Filter, FolderClosed, Plus, Clock, FileText, Upload, Download, Loader2, Info, Building2, Gavel, FileBox, X, CalendarDays, Printer, CheckSquare, Square, ClipboardList, AlertTriangle, Sparkles, MapPin, User, Files as FilesIcon, ArrowUpDown, SlidersHorizontal, Edit3 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import ExportPDFModal from '../components/ExportPDFModal';
 import BulkAssignTaskModal from '../components/BulkAssignTaskModal';
+import BulkEditCasesModal from '../components/BulkEditCasesModal';
 import AdvancedSearchModal from '../components/AdvancedSearchModal';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 
@@ -17,6 +18,7 @@ export default function Files() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const [selectedCaseIds, setSelectedCaseIds] = useState([]);
   
@@ -66,11 +68,11 @@ export default function Files() {
       result = result.filter(c => {
         const role = String(c['الصفة'] || c['صفة'] || '').trim();
         const appRole = settings?.roles?.[0] || 'طاعن';
-        const apeRole = settings?.roles?.[1] || 'مطعون ضده';
+        const apeRole = settings?.roles?.[1] || 'مطعون ضدنا';
         if (roleFilter === 'appellant') {
           return role.includes(appRole) || role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
         } else if (roleFilter === 'appellee') {
-          return role.includes(apeRole) || role.includes('مطعون') || role.includes('مستأنف ضده') || role.includes('مدعى عليه');
+          return role.includes(apeRole) || role.includes('مطعون') || role.includes('مستأنف ضده') || role.includes('مدعى عليه') || role.includes('مدعى علينا');
         }
         return true;
       });
@@ -424,7 +426,7 @@ export default function Files() {
                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${roleFilter === 'all' ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' : roleFilter === 'appellant' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}`}
               >
                 <User className="w-3.5 h-3.5" />
-                <span>الصفة: {roleFilter === 'all' ? 'الكل' : roleFilter === 'appellant' ? (settings?.roles?.[0] || 'الطاعن') : (settings?.roles?.[1] || 'المطعون ضده')}</span>
+                <span>الصفة: {roleFilter === 'all' ? 'الكل' : roleFilter === 'appellant' ? (settings?.roles?.[0] || 'الطاعن') : (settings?.roles?.[1] || 'المطعون ضدنا')}</span>
               </button>
               
               <button 
@@ -543,7 +545,7 @@ export default function Files() {
           
           const role = String(c['الصفة'] || c['صفة'] || '').trim();
           const isAppellant = role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
-          const isAppellee = role.includes('مطعون ضده') || role.includes('مستأنف ضده') || role.includes('مدعى عليه');
+          const isAppellee = role.includes('مطعون ضده') || role.includes('مطعون ضدنا') || role.includes('مستأنف ضده') || role.includes('مدعى عليه') || role.includes('مدعى علينا');
           const isNoInterest = role === 'لا شأن';
           const isOutOfJurisdiction = role === 'خارج الاختصاص';
 
@@ -750,10 +752,18 @@ export default function Files() {
 
       {/* Floating Action Bar for Bulk Selection */}
       {selectedCaseIds.length > 0 && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-navy-900 rounded-2xl shadow-2xl p-4 flex items-center gap-4 z-40 border border-slate-700 animate-in slide-in-from-bottom-10 fade-in w-11/12 max-w-sm sm:max-w-md">
-          <div className="text-white text-xs sm:text-sm font-bold flex-1">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-navy-900 rounded-2xl shadow-2xl p-4 flex items-center gap-3 z-40 border border-slate-700 animate-in slide-in-from-bottom-10 fade-in w-11/12 max-w-md sm:max-w-xl">
+          <div className="text-white text-xs sm:text-sm font-bold flex-1 min-w-[70px]">
             تم تحديد <span className="text-amber-300 font-black px-1">{selectedCaseIds.length}</span> ملف
           </div>
+          <button 
+            onClick={() => setIsEditModalOpen(true)}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 transition"
+          >
+            <Edit3 className="w-4 h-4" />
+            <span className="hidden sm:inline">تعديل البيانات</span>
+            <span className="sm:hidden">تعديل</span>
+          </button>
           <button 
             onClick={() => setIsAssignModalOpen(true)}
             className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 transition"
@@ -796,6 +806,13 @@ export default function Files() {
       <BulkAssignTaskModal 
         isOpen={isAssignModalOpen}
         onClose={() => setIsAssignModalOpen(false)}
+        selectedCases={selectedCaseIds}
+        onClearSelection={() => setSelectedCaseIds([])}
+      />
+
+      <BulkEditCasesModal 
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
         selectedCases={selectedCaseIds}
         onClearSelection={() => setSelectedCaseIds([])}
       />

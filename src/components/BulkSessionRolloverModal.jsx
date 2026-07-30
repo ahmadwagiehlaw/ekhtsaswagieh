@@ -88,7 +88,7 @@ export default function BulkSessionRolloverModal({ isOpen, onClose, initialDateK
         updateData[decisionKey] = targetDecision;
       }
 
-      updates.push({ id: caseData.id, data: updateData });
+      updates.push({ id: caseData.id, ...updateData });
     });
 
     const success = await saveBatchCasesToFirebase(updates);

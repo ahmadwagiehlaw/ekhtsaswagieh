@@ -26,7 +26,7 @@ export default function Settings() {
   const [localReviewTasks, setLocalReviewTasks] = useState(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
   const [localRollTypes, setLocalRollTypes] = useState(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
   const [localNumberFormat, setLocalNumberFormat] = useState(settings?.numberFormat || 'en');
-  const [localRoles, setLocalRoles] = useState(settings?.roles || ['طاعن', 'مطعون ضده', 'خصم مدخل']);
+  const [localRoles, setLocalRoles] = useState(settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل']);
   const [localSessionTypes, setLocalSessionTypes] = useState(settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة']);
   const [localFileLocations, setLocalFileLocations] = useState(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
   const [localCommonProcedures, setLocalCommonProcedures] = useState(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
@@ -39,7 +39,7 @@ export default function Settings() {
     setLocalReviewTasks(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
     setLocalRollTypes(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
     setLocalNumberFormat(settings?.numberFormat || 'en');
-    setLocalRoles(settings?.roles || ['طاعن', 'مطعون ضده', 'خصم مدخل']);
+    setLocalRoles(settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل']);
     setLocalSessionTypes(settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة']);
     setLocalFileLocations(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
     setLocalCommonProcedures(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
@@ -451,7 +451,7 @@ export default function Settings() {
             
             {/* Roles choice */}
             <div className="space-y-2">
-              <h4 className="text-xs font-black text-slate-500">خيارات حقل الصفة (طاعن / مطعون ضده / إلخ):</h4>
+              <h4 className="text-xs font-black text-slate-500">خيارات حقل الصفة (طاعن / مطعون ضدنا / إلخ):</h4>
               <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-200/60">
                 {localRoles.map((role, i) => (
                   <div key={i} className="flex items-center gap-1 bg-rose-50 border border-rose-100 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-bold">

@@ -149,7 +149,7 @@ export default function AdvancedSearchModal({ isOpen, onClose, onSearch }) {
                     onClick={() => handleToggleRole('appellee')}
                     className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all ${formData.opponentRole === 'appellee' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-navy-700'}`}
                   >
-                    مطعون ضده
+                    مطعون ضدنا
                   </button>
                 </div>
               </div>

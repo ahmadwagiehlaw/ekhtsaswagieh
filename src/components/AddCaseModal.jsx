@@ -101,7 +101,7 @@ export default function AddCaseModal({ isOpen, onClose }) {
                     )}
                     {(field.id === 'الصفة' || field.id === 'صفة') && (
                        <div className="flex flex-wrap gap-1 mt-2">
-                         {(settings?.roles || ['طاعن', 'مطعون ضده', 'خصم مدخل']).map(s => (
+                         {(settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل']).map(s => (
                            <button key={s} type="button" onClick={() => setFormData({...formData, [field.id]: s})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{s}</button>
                          ))}
                        </div>

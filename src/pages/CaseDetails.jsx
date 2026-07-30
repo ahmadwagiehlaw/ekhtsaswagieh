@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2, Bell, AlertTriangle, FileText, ExternalLink, BookOpen, Files, Hash, Paperclip, Scale, Loader2, Plus, Star } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
@@ -161,7 +161,7 @@ export default function CaseDetails() {
   const role = getFieldValue(caseData, ['الصفة', 'صفة']) || '';
   const fileLocation = getFieldValue(caseData, ['مكان الملف']) || '';
   const isAppellant = role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
-  const isAppellee = role.includes('مطعون ضده') || role.includes('مستأنف ضده') || role.includes('مدعى عليه');
+  const isAppellee = role.includes('مطعون ضده') || role.includes('مطعون ضدنا') || role.includes('مستأنف ضده') || role.includes('مدعى عليه') || role.includes('مدعى علينا');
   const isNoInterest = role === 'لا شأن';
   const isOutOfJurisdiction = role === 'خارج الاختصاص';
 
@@ -583,7 +583,7 @@ export default function CaseDetails() {
                             );
                          }
 
-                         const roleOptions = settings?.roles || ['طاعن', 'مطعون ضده', 'خصم مدخل'];
+                         const roleOptions = settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل'];
                          const sessionTypeOptions = settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة'];
                          const fileLocationOptions = settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي'];
 
@@ -923,50 +923,79 @@ export default function CaseDetails() {
                      </div>
 
                      {/* Judgment Fields Block */}
-                     {session.hasJudgment && (
-                        <div className="flex flex-col gap-2 bg-rose-50/50 p-2.5 rounded-lg border border-rose-100 mt-1 animate-in fade-in slide-in-from-top-2 shadow-sm">
-                           <div className="flex gap-2">
-                              <input 
-                                 type="text" 
-                                 placeholder="تصنيف الحكم (صالح، ضد...)" 
-                                 defaultValue={session.judgmentClassification || ''}
-                                 className="w-1/3 text-[10px] font-bold text-rose-800 bg-white p-2 rounded-md border border-rose-200 focus:outline-none focus:border-rose-400" 
-                                 onBlur={async (e) => {
-                                    if (e.target.value !== (session.judgmentClassification || '')) {
-                                       const newSessions = [...caseData.sessions];
-                                       newSessions[idx] = { ...newSessions[idx], judgmentClassification: e.target.value };
-                                       await saveCaseToFirebase(caseData.id, { sessions: newSessions });
-                                    }
-                                 }}
-                              />
-                              <input 
-                                 type="text" 
-                                 placeholder="الحكم (وقف جزائي، رفض، إلغاء...)" 
-                                 defaultValue={session.shortJudgment || ''}
-                                 className="flex-1 text-[10px] font-bold text-rose-800 bg-white p-2 rounded-md border border-rose-200 focus:outline-none focus:border-rose-400" 
-                                 onBlur={async (e) => {
-                                    if (e.target.value !== (session.shortJudgment || '')) {
-                                       const newSessions = [...caseData.sessions];
-                                       newSessions[idx] = { ...newSessions[idx], shortJudgment: e.target.value };
-                                       await saveCaseToFirebase(caseData.id, { sessions: newSessions });
-                                    }
-                                 }}
-                              />
-                           </div>
-                           <textarea 
-                              placeholder="منطوق الحكم كامل..." 
-                              defaultValue={session.verdict || ''}
-                              className="w-full text-[10px] font-bold text-rose-800 bg-white p-2 rounded-md border border-rose-200 whitespace-pre-wrap focus:outline-none focus:border-rose-400 resize-none min-h-[40px]" 
-                              onBlur={async (e) => {
-                                 if (e.target.value !== (session.verdict || '')) {
-                                    const newSessions = [...caseData.sessions];
-                                    newSessions[idx] = { ...newSessions[idx], verdict: e.target.value };
-                                    await saveCaseToFirebase(caseData.id, { sessions: newSessions });
-                                 }
-                              }}
-                           />
-                        </div>
-                     )}
+                     {session.hasJudgment && (() => {
+                        const JCAT = ['نهائي', 'تمهيدي', 'إجرائي'];
+                        const JTYPES = {
+                          'إجرائي': ['وقف جزائي','وقف تعليقي','شطب','اعتبار كأن لم تكن','إحالة للموضوع','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)'],
+                          'تمهيدي': ['ندب خبير','تكليف خبير','إعادة للمحكمة المختصة','إحالة للنيابة','تعجيل من الوقف'],
+                          'نهائي':  ['رفض الدعوى','عدم القبول شكلاً','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه'],
+                        };
+                        const JRESULTS = ['للصالح','للضد','جزئي','إجرائي'];
+                        const resColorMap = { 'للصالح':'emerald', 'للضد':'rose', 'جزئي':'amber', 'إجرائي':'indigo' };
+                        const j = session.judgment || {};
+                        const JudgmentEditor = () => {
+                          const [cat, setCat]     = React.useState(j.category || '');
+                          const [type, setType]   = React.useState(j.type || session.shortJudgment || '');
+                          const [res, setRes]     = React.useState(j.result || session.judgmentClassification || '');
+                          const [verd, setVerd]   = React.useState(j.fullVerdict || session.verdict || '');
+                          const [final, setFinal] = React.useState(j.isFinal || false);
+                          const [saving, setSaving] = React.useState(false);
+                          const rc = resColorMap[res] || 'slate';
+                          const handleSave = async () => {
+                            setSaving(true);
+                            const newJudgmentObj = { category: cat, type, result: res, fullVerdict: verd, isFinal: final, recordedAt: new Date().toISOString().split('T')[0] };
+                            const newSessions = [...caseData.sessions];
+                            newSessions[idx] = { ...newSessions[idx], judgment: newJudgmentObj, shortJudgment: type, judgmentClassification: res, verdict: verd, hasJudgment: true };
+                            await saveCaseToFirebase(caseData.id, { sessions: newSessions });
+                            setSaving(false);
+                          };
+                          return (
+                            <div className="flex flex-col gap-2 bg-rose-50/60 p-3 rounded-xl border border-rose-100 mt-1 shadow-sm">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-[10px] font-black text-rose-700">⚖️ بيانات الحكم</span>
+                                {res && <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border bg-${rc}-50 text-${rc}-700 border-${rc}-200`}>{res}</span>}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-[9px] font-bold text-slate-500 block mb-0.5">فئة الحكم</label>
+                                  <select value={cat} onChange={e => { setCat(e.target.value); setType(''); }} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
+                                    <option value="">-- اختر --</option>
+                                    {JCAT.map(c => <option key={c} value={c}>{c}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="text-[9px] font-bold text-slate-500 block mb-0.5">النتيجة</label>
+                                  <select value={res} onChange={e => setRes(e.target.value)} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
+                                    <option value="">-- اختر --</option>
+                                    {JRESULTS.map(r => <option key={r} value={r}>{r}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-[9px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
+                                <select value={type} onChange={e => setType(e.target.value)} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
+                                  <option value="">-- اختر --</option>
+                                  {(JTYPES[cat] || []).map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[9px] font-bold text-slate-500 block mb-0.5">منطوق الحكم كاملاً</label>
+                                <textarea value={verd} onChange={e => setVerd(e.target.value)} placeholder="أكتب منطوق الحكم كاملاً..." className="w-full text-[10px] font-bold bg-white p-2 rounded-lg border border-rose-200 whitespace-pre-wrap focus:outline-none focus:border-rose-400 resize-none min-h-[50px]" rows={2} />
+                              </div>
+                              <div className="flex items-center justify-between pt-1 border-t border-rose-100">
+                                <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer">
+                                  <input type="checkbox" checked={final} onChange={e => setFinal(e.target.checked)} className="rounded accent-rose-600" />
+                                  حكم نهائي في الدعوى
+                                </label>
+                                <button onClick={handleSave} disabled={saving} className="text-[10px] font-black px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition disabled:opacity-50">
+                                  {saving ? '...' : '💾 حفظ الحكم'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        };
+                        return <JudgmentEditor />;
+                     })()}
 
                      <textarea 
                         placeholder="ملاحظات الجلسة..."
@@ -1277,7 +1306,7 @@ export default function CaseDetails() {
               <p className="text-xs font-bold text-slate-500 mb-2">اختر التصنيف الجديد لهذه الدعوى:</p>
               <div className="grid grid-cols-1 gap-2">
                 <button onClick={() => setNewRole('طاعن')} className={`p-3 rounded-xl border text-sm font-black transition ${newRole === 'طاعن' ? 'bg-rose-100 text-rose-700 border-rose-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>طاعن / مدعي (مهم جداً)</button>
-                <button onClick={() => setNewRole('مطعون ضده')} className={`p-3 rounded-xl border text-sm font-black transition ${newRole === 'مطعون ضده' ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>مطعون ضده / مدعى عليه</button>
+                <button onClick={() => setNewRole('مطعون ضدنا')} className={`p-3 rounded-xl border text-sm font-black transition ${newRole === 'مطعون ضدنا' ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>مطعون ضدنا / مدعى علينا</button>
                 <button onClick={() => setNewRole('لا شأن')} className={`p-3 rounded-xl border text-sm font-black transition ${newRole === 'لا شأن' ? 'bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>لا شأن (غير نشطة)</button>
                 <button onClick={() => setNewRole('خارج الاختصاص')} className={`p-3 rounded-xl border text-sm font-black transition ${newRole === 'خارج الاختصاص' ? 'bg-indigo-100 text-indigo-700 border-indigo-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>خارج الاختصاص (متابعة فقط)</button>
               </div>

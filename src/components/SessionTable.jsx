@@ -14,10 +14,40 @@ const ALL_COLUMNS = [
   { id: 'تاريخ الجلسة', label: 'الجلسة القادمة', defaultVisible: true },
   { id: 'القرار', label: 'القرار', defaultVisible: true },
   { id: 'الحكم', label: 'الحكم', defaultVisible: false },
-  { id: 'تصنيف الحكم', label: 'تصنيف الحكم', defaultVisible: false },
   { id: 'منطوق الحكم', label: 'منطوق الحكم', defaultVisible: false },
   { id: 'الملاحظات', label: 'الملاحظات', defaultVisible: true },
 ];
+
+// ─── Judgment Data ───────────────────────────────────────────────
+const JUDGMENT_CATEGORIES = ['نهائي', 'تمهيدي', 'إجرائي'];
+
+const JUDGMENT_TYPES = {
+  'إجرائي': [
+    'وقف جزائي', 'وقف تعليقي', 'شطب', 'اعتبار كأن لم تكن',
+    'إحالة للموضوع', 'رفض (دائرة فحص)', 'قبول طعن (إحالة للموضوع)'
+  ],
+  'تمهيدي': [
+    'ندب خبير', 'تكليف خبير', 'إعادة للمحكمة المختصة',
+    'إحالة للنيابة', 'تعجيل من الوقف'
+  ],
+  'نهائي': [
+    'رفض الدعوى', 'عدم القبول شكلاً', 'عدم الاختصاص',
+    'انتفاء قرار', 'إلغاء القرار', 'تعويض', 'رفض الطعن',
+    'قبول الطعن', 'عدم القبول موضوعاً', 'تعديل الحكم المطعون فيه'
+  ]
+};
+
+const JUDGMENT_RESULTS = [
+  { value: 'للصالح',  label: 'للصالح',  color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+  { value: 'للضد',    label: 'للضد',    color: 'text-rose-700 bg-rose-50 border-rose-200' },
+  { value: 'جزئي',   label: 'جزئي',   color: 'text-amber-700 bg-amber-50 border-amber-200' },
+  { value: 'إجرائي', label: 'إجرائي', color: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
+];
+
+const getResultStyle = (result) => {
+  const r = JUDGMENT_RESULTS.find(x => x.value === result);
+  return r ? r.color : 'text-slate-600 bg-slate-50 border-slate-200';
+};
 
 const PREDEFINED_DECISIONS = ['للحكم', 'تصريح', 'للإعلان', 'للاطلاع', 'للإخطار', 'لورود التقرير', 'لتنفيذ قرار الإعادة', 'للاستعلام', 'استبعاد', 'إحالة للموضوع', 'رفض'];
 
@@ -94,7 +124,7 @@ export default function SessionTable({ dayCases, date }) {
       result = result.filter(c => {
         return ALL_COLUMNS.some(col => {
           if (!visibleColumns[col.id]) return false;
-          const val = getFieldValueLocal(c, [col.id, ...(col.id === 'ضد' ? ['المدعى_عليه', 'المطعون ضده'] : []), ...(col.id === 'تاريخ الجلسة' ? ['آخر جلسة'] : [])]);
+          const val = getFieldValueLocal(c, [col.id, ...(col.id === 'ضد' ? ['المدعى_عليه', 'المطعون ضده', 'المطعون ضدنا', 'مدعى علينا'] : []), ...(col.id === 'تاريخ الجلسة' ? ['آخر جلسة'] : [])]);
           return String(val).toLowerCase().includes(q);
         });
       });
@@ -202,15 +232,20 @@ export default function SessionTable({ dayCases, date }) {
     e.stopPropagation();
     setEditingCaseId(cObj.id);
     const session = cObj.sessions?.find(s => s.date === date);
+    // Support both new structured judgment and legacy fields
+    const j = session?.judgment || {};
     setEditData({
       'الرول': getFieldValueLocal(cObj, ['الرول']) || '',
       'نوع الجلسة': getFieldValueLocal(cObj, ['نوع الجلسة']) || 'فحص',
       'آخر جلسة': getFieldValueLocal(cObj, ['آخر جلسة', 'تاريخ الجلسة']) || '',
       'القرار': getFieldValueLocal(cObj, ['القرار']) || '',
       'الملاحظات': getFieldValueLocal(cObj, ['الملاحظات']) || '',
-      'الحكم': session?.shortJudgment || '',
-      'تصنيف الحكم': session?.judgmentClassification || '',
-      'منطوق الحكم': session?.verdict || ''
+      // New structured judgment fields
+      '_judgmentCategory': j.category || '',
+      '_judgmentType': j.type || session?.shortJudgment || '',
+      '_judgmentResult': j.result || session?.judgmentClassification || '',
+      'منطوق الحكم': j.fullVerdict || session?.verdict || '',
+      '_isFinalJudgment': j.isFinal || false,
     });
   };
 
@@ -241,35 +276,49 @@ export default function SessionTable({ dayCases, date }) {
       newData['الرول'] = ''; 
     }
 
-    // Judgment saving logic for current session
-    const hasJudgmentData = !!(newData['الحكم'] || newData['تصنيف الحكم'] || newData['منطوق الحكم']);
+    // Judgment saving logic for current session (new structured format)
+    const hasJudgmentData = !!(newData['_judgmentCategory'] || newData['_judgmentType'] || newData['_judgmentResult'] || newData['منطوق الحكم']);
     if (hasJudgmentData) {
+      const newJudgmentObj = {
+        category: newData['_judgmentCategory'] || '',
+        type: newData['_judgmentType'] || '',
+        result: newData['_judgmentResult'] || '',
+        fullVerdict: newData['منطوق الحكم'] || '',
+        isFinal: newData['_isFinalJudgment'] || false,
+        recordedAt: new Date().toISOString().split('T')[0],
+      };
+      // Also write legacy fields for backward compatibility with Reports
       const sessionIndex = (newData.sessions || cObj.sessions || []).findIndex(s => s.date === date);
       let updatedSessions = [...(newData.sessions || cObj.sessions || [])];
       
       if (sessionIndex >= 0) {
-         updatedSessions[sessionIndex] = {
-           ...updatedSessions[sessionIndex],
-           shortJudgment: newData['الحكم'],
-           judgmentClassification: newData['تصنيف الحكم'],
-           verdict: newData['منطوق الحكم'],
-           hasJudgment: true
-         };
+        updatedSessions[sessionIndex] = {
+          ...updatedSessions[sessionIndex],
+          judgment: newJudgmentObj,
+          shortJudgment: newData['_judgmentType'],
+          judgmentClassification: newData['_judgmentResult'],
+          verdict: newData['منطوق الحكم'] || '',
+          hasJudgment: true,
+        };
       } else {
-         updatedSessions.push({
-           id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-           date: date,
-           shortJudgment: newData['الحكم'],
-           judgmentClassification: newData['تصنيف الحكم'],
-           verdict: newData['منطوق الحكم'],
-           hasJudgment: true
-         });
+        updatedSessions.push({
+          id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+          date: date,
+          judgment: newJudgmentObj,
+          shortJudgment: newData['_judgmentType'],
+          judgmentClassification: newData['_judgmentResult'],
+          verdict: newData['منطوق الحكم'] || '',
+          hasJudgment: true,
+        });
       }
       newData.sessions = updatedSessions;
     }
     
-    delete newData['الحكم'];
-    delete newData['تصنيف الحكم'];
+    // Clean up internal edit state keys before saving
+    delete newData['_judgmentCategory'];
+    delete newData['_judgmentType'];
+    delete newData['_judgmentResult'];
+    delete newData['_isFinalJudgment'];
     delete newData['منطوق الحكم'];
     
     await saveCaseToFirebase(cObj.id, newData);
@@ -496,11 +545,6 @@ export default function SessionTable({ dayCases, date }) {
                   <div className="resize-x overflow-hidden max-w-full min-w-[120px] inline-block pb-1">الحكم</div>
                 </th>
               )}
-              {visibleColumns['تصنيف الحكم'] && (
-                <th className="px-3 py-2 text-[10px] font-black text-rose-700 bg-rose-50 border-b border-slate-200">
-                  <div className="resize-x overflow-hidden max-w-full min-w-[90px] inline-block pb-1">تصنيف الحكم</div>
-                </th>
-              )}
               {visibleColumns['منطوق الحكم'] && (
                 <th className="px-3 py-2 text-[10px] font-black text-rose-700 bg-rose-50 border-b border-slate-200">
                   <div className="resize-x overflow-hidden max-w-full min-w-[200px] inline-block pb-1">منطوق الحكم</div>
@@ -553,7 +597,7 @@ export default function SessionTable({ dayCases, date }) {
                     <td className="px-3 py-2.5 text-[11px] font-bold text-slate-700 truncate max-w-[120px]">{getFieldValueLocal(cObj, ['المدعي'])}</td>
                   )}
                   {visibleColumns['ضد'] && (
-                    <td className="px-3 py-2.5 text-[11px] font-bold text-slate-700 truncate max-w-[120px]">{getFieldValueLocal(cObj, ['المدعى_عليه', 'المطعون ضده'])}</td>
+                    <td className="px-3 py-2.5 text-[11px] font-bold text-slate-700 truncate max-w-[120px]">{getFieldValueLocal(cObj, ['المدعى_عليه', 'المطعون ضده', 'المطعون ضدنا', 'مدعى علينا'])}</td>
                   )}
                   
                   {visibleColumns['نوع الجلسة'] && (
@@ -613,55 +657,81 @@ export default function SessionTable({ dayCases, date }) {
                   )}
 
                   {visibleColumns['الحكم'] && (
-                    <td className="px-3 py-2.5 bg-rose-50/30">
+                    <td className="px-3 py-2.5 bg-rose-50/30 min-w-[260px]">
                       {isEditing ? (
-                        <input 
-                          type="text" 
-                          list="short-judgments-list"
-                          value={editData['الحكم'] || ''} 
-                          onChange={e => setEditData({...editData, 'الحكم': e.target.value})}
-                          className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
-                        />
-                      ) : (
-                        <span className="text-[10px] font-bold text-rose-800">
-                           {cObj.sessions?.find(s => s.date === date)?.shortJudgment || ''}
-                        </span>
-                      )}
-                    </td>
-                  )}
-                  
-                  {visibleColumns['تصنيف الحكم'] && (
-                    <td className="px-3 py-2.5 bg-rose-50/30">
-                      {isEditing ? (
-                        <input 
-                          type="text" 
-                          list="judgment-classifications-list"
-                          value={editData['تصنيف الحكم'] || ''} 
-                          onChange={e => setEditData({...editData, 'تصنيف الحكم': e.target.value})}
-                          className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
-                        />
-                      ) : (
-                        <span className="text-[10px] font-bold text-rose-800">
-                           {cObj.sessions?.find(s => s.date === date)?.judgmentClassification || ''}
-                        </span>
-                      )}
+                        <div className="flex flex-col gap-1.5">
+                          {/* Row 1: Category + Result */}
+                          <div className="flex gap-1">
+                            <select
+                              value={editData['_judgmentCategory'] || ''}
+                              onChange={e => setEditData({...editData, '_judgmentCategory': e.target.value, '_judgmentType': ''})}
+                              className="flex-1 text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
+                            >
+                              <option value="">-- فئة --</option>
+                              {JUDGMENT_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                            </select>
+                            <select
+                              value={editData['_judgmentResult'] || ''}
+                              onChange={e => setEditData({...editData, '_judgmentResult': e.target.value})}
+                              className="flex-1 text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
+                            >
+                              <option value="">-- النتيجة --</option>
+                              {JUDGMENT_RESULTS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                            </select>
+                          </div>
+                          {/* Row 2: Type */}
+                          <select
+                            value={editData['_judgmentType'] || ''}
+                            onChange={e => setEditData({...editData, '_judgmentType': e.target.value})}
+                            className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
+                          >
+                            <option value="">-- نوع الحكم --</option>
+                            {(JUDGMENT_TYPES[editData['_judgmentCategory']] || []).map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                          {/* Row 3: Final checkbox */}
+                          <label className="flex items-center gap-1 text-[9px] font-bold text-rose-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editData['_isFinalJudgment'] || false}
+                              onChange={e => setEditData({...editData, '_isFinalJudgment': e.target.checked})}
+                              className="rounded"
+                            />
+                            حكم نهائي في الدعوى
+                          </label>
+                        </div>
+                      ) : (() => {
+                        const session = cObj.sessions?.find(s => s.date === date);
+                        const j = session?.judgment;
+                        const typeLabel = j?.type || session?.shortJudgment || '';
+                        const result = j?.result || session?.judgmentClassification || '';
+                        if (!typeLabel && !result) return null;
+                        return (
+                          <div className="flex flex-col gap-0.5">
+                            {typeLabel && <span className="text-[10px] font-black text-rose-800">{typeLabel}</span>}
+                            {result && (
+                              <span className={`inline-block text-[9px] font-black px-1.5 py-0.5 rounded border w-fit ${getResultStyle(result)}`}>
+                                {result}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                   )}
                   
                   {visibleColumns['منطوق الحكم'] && (
                     <td className="px-3 py-2.5 bg-rose-50/30 relative min-w-[200px]">
                       {isEditing ? (
-                        <div className="flex flex-col gap-1">
-                          <textarea 
-                            value={editData['منطوق الحكم'] || ''} 
-                            onChange={e => setEditData({...editData, 'منطوق الحكم': e.target.value})}
-                            className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white resize-none focus:border-rose-500 outline-none"
-                            rows={2}
-                          />
-                        </div>
+                        <textarea 
+                          value={editData['منطوق الحكم'] || ''} 
+                          onChange={e => setEditData({...editData, 'منطوق الحكم': e.target.value})}
+                          className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white resize-none focus:border-rose-500 outline-none"
+                          rows={3}
+                          placeholder="منطوق الحكم كاملاً..."
+                        />
                       ) : (
-                        <span className="text-[10px] font-bold text-rose-800 line-clamp-3" title={cObj.sessions?.find(s => s.date === date)?.verdict || ''}>
-                           {cObj.sessions?.find(s => s.date === date)?.verdict || ''}
+                        <span className="text-[10px] font-bold text-slate-700 line-clamp-3" title={cObj.sessions?.find(s => s.date === date)?.judgment?.fullVerdict || cObj.sessions?.find(s => s.date === date)?.verdict || ''}>
+                           {cObj.sessions?.find(s => s.date === date)?.judgment?.fullVerdict || cObj.sessions?.find(s => s.date === date)?.verdict || ''}
                         </span>
                       )}
                     </td>

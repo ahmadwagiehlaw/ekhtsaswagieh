@@ -6,11 +6,12 @@ import { formatDateString } from '../utils/dateUtils';
 export default function Reports() {
   const { cases, settings } = useAppContext();
   
-  const [reportType, setReportType] = useState('memos'); // 'memos', 'judgments', 'prep', 'custom'
+  const [reportType, setReportType] = useState('memos'); // 'memos', 'judgments', 'prep'
   const [targetMonth, setTargetMonth] = useState(new Date().getMonth() + 1);
   const [targetYear, setTargetYear] = useState(new Date().getFullYear());
-  const [targetDate, setTargetDate] = useState(''); // For specific date reports like session prep
+  const [targetDate, setTargetDate] = useState('');
   const [consultantName, setConsultantName] = useState(settings?.consultantName || 'م. أحمد وجيه');
+  const [judgmentResultFilter, setJudgmentResultFilter] = useState(''); // '' = all
   
   const [generatedData, setGeneratedData] = useState([]);
 
@@ -18,6 +19,7 @@ export default function Reports() {
   const generateReport = () => {
     let results = [];
     
+    // Memos report
     if (reportType === 'memos') {
       const monthStr = targetMonth.toString().padStart(2, '0');
       const targetPrefix = `${targetYear}-${monthStr}`;
@@ -26,25 +28,56 @@ export default function Reports() {
         const procedures = Array.isArray(c.procedures) ? c.procedures : Object.values(c.procedures || {});
         procedures.forEach(proc => {
           if (proc.title?.includes('مذكرة') && proc.date?.startsWith(targetPrefix)) {
-            // Find session date
             const sessionDate = c['تاريخ الجلسة'] || c['أخر جلسة'] || c['آخر جلسة'] || '';
-            const decision = c['القرار'] || '';
-            
             results.push({
               id: c.id + proc.id,
               caseNumber: `${c['رقم الدعوى'] || c.id} لسنة ${c['السنة']}`,
               plaintiff: c['المدعي'] || '',
-              defendant: c['المطعون ضده'] || c['المدعى عليه'] || '',
+              defendant: c['المطعون ضده'] || c['المطعون ضدنا'] || c['المدعى عليه'] || c['مدعى علينا'] || '',
               sessionDate: formatDateString(sessionDate),
-              decision: decision,
+              decision: c['القرار'] || '',
               notes: proc.notes || ''
             });
           }
         });
       });
       setGeneratedData(results);
+      
+    // Judgments report
+    } else if (reportType === 'judgments') {
+      const monthStr = targetMonth.toString().padStart(2, '0');
+      const targetPrefix = `${targetYear}-${monthStr}`;
+      const summary = { 'للصالح': 0, 'للضد': 0, 'جزئي': 0, 'إجرائي': 0, 'غير مصنف': 0 };
+      
+      cases.forEach(c => {
+        const sessions = Array.isArray(c.sessions) ? c.sessions : Object.values(c.sessions || {});
+        sessions.forEach(s => {
+          if (!s.hasJudgment) return;
+          if (!s.date?.startsWith(targetPrefix)) return;
+          // Read new structured judgment first, fallback to legacy
+          const result = s.judgment?.result || s.judgmentClassification || 'غير مصنف';
+          const type   = s.judgment?.type   || s.shortJudgment || '';
+          if (judgmentResultFilter && result !== judgmentResultFilter) return;
+          if (summary[result] !== undefined) summary[result]++; else summary['غير مصنف']++;
+          results.push({
+            id: c.id + s.id,
+            caseNumber: `${c['رقم الدعوى'] || c.id} لسنة ${c['السنة']}`,
+            plaintiff: c['المدعي'] || '',
+            defendant: c['المطعون ضده'] || c['المطعون ضدنا'] || c['المدعى عليه'] || c['مدعى علينا'] || '',
+            sessionDate: formatDateString(s.date),
+            decision: type,
+            notes: result,
+            judgmentResult: result,
+            isFinal: s.judgment?.isFinal || false,
+          });
+        });
+      });
+      setGeneratedData(results);
+      // Store summary for display
+      setJudgmentSummary(summary);
+      
+    // Prep report
     } else if (reportType === 'prep') {
-      // Session prep
       if (!targetDate) return;
       cases.forEach(c => {
         const sessionDate = c['تاريخ الجلسة'] || c['أخر جلسة'] || c['آخر جلسة'] || '';
@@ -53,7 +86,7 @@ export default function Reports() {
             id: c.id,
             caseNumber: `${c['رقم الدعوى'] || c.id} لسنة ${c['السنة']}`,
             plaintiff: c['المدعي'] || '',
-            defendant: c['المطعون ضده'] || c['المدعى عليه'] || '',
+            defendant: c['المطعون ضده'] || c['المطعون ضدنا'] || c['المدعى عليه'] || c['مدعى علينا'] || '',
             sessionDate: formatDateString(sessionDate),
             decision: c['القرار'] || '',
             notes: ''
@@ -64,9 +97,11 @@ export default function Reports() {
     }
   };
 
+  const [judgmentSummary, setJudgmentSummary] = useState(null);
+
   useEffect(() => {
     generateReport();
-  }, [reportType, targetMonth, targetYear, targetDate, cases]);
+  }, [reportType, targetMonth, targetYear, targetDate, cases, judgmentResultFilter]);
 
   const handlePrint = () => {
     window.print();
@@ -102,11 +137,11 @@ export default function Reports() {
             >
               <option value="memos">كشف المذكرات المحررة</option>
               <option value="prep">كشف تحضير جلسة</option>
-              <option value="judgments">الإحصائية الشهرية (قريباً)</option>
+              <option value="judgments">كشف أحكام الشهر</option>
             </select>
           </div>
 
-          {reportType === 'memos' && (
+          {(reportType === 'memos' || reportType === 'judgments') && (
             <>
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-500">الشهر</label>
@@ -130,6 +165,23 @@ export default function Reports() {
                 />
               </div>
             </>
+          )}
+
+          {reportType === 'judgments' && (
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500">فلتر النتيجة</label>
+              <select
+                value={judgmentResultFilter}
+                onChange={e => setJudgmentResultFilter(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500"
+              >
+                <option value="">كل الأحكام</option>
+                <option value="للصالح">للصالح</option>
+                <option value="للضد">للضد</option>
+                <option value="جزئي">جزئي</option>
+                <option value="إجرائي">إجرائي</option>
+              </select>
+            </div>
           )}
 
           {reportType === 'prep' && (
@@ -178,6 +230,7 @@ export default function Reports() {
            <h1 className="text-2xl font-black text-slate-900 mt-2 mb-3">
              {reportType === 'memos' && `كشف المذكرات المحررة عن شهر ${getMonthName(targetMonth)} سنة ${targetYear}`}
              {reportType === 'prep' && `كشف تحضير جلسة ${formatDateString(targetDate) || '---'}`}
+             {reportType === 'judgments' && `كشف أحكام شهر ${getMonthName(targetMonth)} سنة ${targetYear}`}
            </h1>
            
            <p className="text-lg font-bold text-slate-700">
@@ -187,12 +240,25 @@ export default function Reports() {
 
         {/* Document Body */}
         <div className="p-8">
-          {reportType === 'judgments' ? (
+          {/* Judgment Summary Cards */}
+          {reportType === 'judgments' && judgmentSummary && generatedData.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 no-print">
+              {[{k:'للصالح',c:'emerald'},{k:'للضد',c:'rose'},{k:'جزئي',c:'amber'},{k:'إجرائي',c:'indigo'}].map(({k,c}) => (
+                <div key={k} className={`bg-${c}-50 border border-${c}-200 rounded-xl p-3 text-center`}>
+                  <p className={`text-2xl font-black text-${c}-700`}>{judgmentSummary[k] || 0}</p>
+                  <p className={`text-xs font-bold text-${c}-600 mt-0.5`}>{k}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {reportType === 'judgments' && generatedData.length === 0 ? (
              <div className="text-center py-12 text-slate-400 no-print">
-               <FileText className="w-12 h-12 mx-auto mb-3 opacity-20" />
-               <p className="font-bold">سيتم تفعيل هذه الإحصائية بعد الانتهاء من حقول الأحكام</p>
+               <Search className="w-12 h-12 mx-auto mb-3 opacity-20" />
+               <p className="font-bold">لا توجد أحكام مسجلة في هذا الشهر</p>
+               <p className="text-xs font-bold mt-1">تأكد من تسجيل بيانات الحكم في جلسات الدعاوى</p>
              </div>
-          ) : generatedData.length === 0 ? (
+          ) : reportType !== 'judgments' && generatedData.length === 0 ? (
              <div className="text-center py-12 text-slate-400 no-print">
                <Search className="w-12 h-12 mx-auto mb-3 opacity-20" />
                <p className="font-bold">لا توجد بيانات مطابقة لمعايير التقرير</p>
@@ -205,9 +271,9 @@ export default function Reports() {
                   <th className="border border-slate-800 p-2 font-black text-sm w-40">رقم الدعوى</th>
                   <th className="border border-slate-800 p-2 font-black text-sm">المدعي</th>
                   <th className="border border-slate-800 p-2 font-black text-sm">المدعى عليه</th>
-                  <th className="border border-slate-800 p-2 font-black text-sm w-28 text-center">أخر جلسة</th>
-                  <th className="border border-slate-800 p-2 font-black text-sm w-32">القرار</th>
-                  <th className="border border-slate-800 p-2 font-black text-sm w-40">ملاحظات</th>
+                  <th className="border border-slate-800 p-2 font-black text-sm w-28 text-center">تاريخ الجلسة</th>
+                  <th className="border border-slate-800 p-2 font-black text-sm w-36">{reportType === 'judgments' ? 'نوع الحكم' : 'القرار'}</th>
+                  <th className="border border-slate-800 p-2 font-black text-sm w-28">{reportType === 'judgments' ? 'النتيجة' : 'ملاحظات'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -219,19 +285,16 @@ export default function Reports() {
                     <td className="border border-slate-800 p-2 text-sm font-bold">{row.defendant}</td>
                     <td className="border border-slate-800 p-2 text-sm font-bold text-center">{row.sessionDate}</td>
                     <td className="border border-slate-800 p-2 text-sm font-bold">{row.decision}</td>
-                    <td className="border border-slate-800 p-2 text-sm font-bold text-slate-600">{row.notes}</td>
+                    <td className={`border border-slate-800 p-2 text-sm font-black text-center ${
+                      row.judgmentResult === 'للصالح' ? 'text-emerald-700 bg-emerald-50' :
+                      row.judgmentResult === 'للضد' ? 'text-rose-700 bg-rose-50' :
+                      row.judgmentResult === 'جزئي' ? 'text-amber-700 bg-amber-50' : ''
+                    }`}>{row.notes}</td>
                   </tr>
                 ))}
-                {/* Empty rows to match the image layout */}
-                {[...Array(Math.max(0, 10 - generatedData.length))].map((_, i) => (
+                {reportType !== 'judgments' && [...Array(Math.max(0, 10 - generatedData.length))].map((_, i) => (
                   <tr key={`empty-${i}`} className="h-10">
-                    <td className="border border-slate-800 p-2"></td>
-                    <td className="border border-slate-800 p-2"></td>
-                    <td className="border border-slate-800 p-2"></td>
-                    <td className="border border-slate-800 p-2"></td>
-                    <td className="border border-slate-800 p-2"></td>
-                    <td className="border border-slate-800 p-2"></td>
-                    <td className="border border-slate-800 p-2"></td>
+                    {[...Array(7)].map((_,j) => <td key={j} className="border border-slate-800 p-2"></td>)}
                   </tr>
                 ))}
               </tbody>
