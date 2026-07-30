@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Filter, FolderClosed, Plus, Clock, FileText, Upload, Download, Loader2, Info, Building2, Gavel, FileBox, X, CalendarDays, Printer, CheckSquare, Square, ClipboardList, AlertTriangle, Sparkles, MapPin, User, Files as FilesIcon } from 'lucide-react';
+import { Search, Filter, FolderClosed, Plus, Clock, FileText, Upload, Download, Loader2, Info, Building2, Gavel, FileBox, X, CalendarDays, Printer, CheckSquare, Square, ClipboardList, AlertTriangle, Sparkles, MapPin, User, Files as FilesIcon, ArrowUpDown, SlidersHorizontal } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import ExportPDFModal from '../components/ExportPDFModal';
 import BulkAssignTaskModal from '../components/BulkAssignTaskModal';
@@ -30,6 +30,11 @@ export default function Files() {
   const [showSessionlessOnly, setShowSessionlessOnly] = useState(false);
   const [showPastSessionsOnly, setShowPastSessionsOnly] = useState(false);
   const [isSelectionReportModalOpen, setIsSelectionReportModalOpen] = useState(false);
+
+  // Sorting and collapsible states
+  const [sortBy, setSortBy] = useState('none');
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [isSortPanelOpen, setIsSortPanelOpen] = useState(false);
 
   const itemsPerPage = 20;
 
@@ -180,10 +185,92 @@ export default function Files() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly]);
+  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, sortBy]);
 
-  const totalPages = Math.ceil(filteredCases.length / itemsPerPage);
-  const currentCases = filteredCases.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const getPrimaryValue = (cObj, possibleKeys) => {
+    for (let k of possibleKeys) {
+      if (cObj[k] !== undefined && cObj[k] !== null) return cObj[k];
+    }
+    return '';
+  };
+
+  const sortedCases = useMemo(() => {
+    let result = [...filteredCases];
+    if (sortBy === 'none') return result;
+
+    const getCaseNumber = (c) => {
+      const numStr = c['رقم الدعوى'] || c['رقم القضية'] || c['رقم_الدعوى'] || c.id || '';
+      const parsed = parseInt(String(numStr).replace(/[^\d]/g, ''), 10);
+      return isNaN(parsed) ? 0 : parsed;
+    };
+
+    const getCaseYear = (c) => {
+      const yrStr = c['السنة'] || c['سنة'] || '';
+      const parsed = parseInt(String(yrStr).replace(/[^\d]/g, ''), 10);
+      return isNaN(parsed) ? 0 : parsed;
+    };
+
+    const getSessionDate = (c) => {
+      const dStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'] || '';
+      if (!dStr) return null;
+      return getSafeDateObj(dStr);
+    };
+
+    result.sort((a, b) => {
+      if (sortBy === 'appellant_asc') {
+        const valA = getPrimaryValue(a, ['الطاعن', 'المدعي', 'المستأنف']);
+        const valB = getPrimaryValue(b, ['الطاعن', 'المدعي', 'المستأنف']);
+        return valA.localeCompare(valB, 'ar');
+      }
+      if (sortBy === 'appellant_desc') {
+        const valA = getPrimaryValue(a, ['الطاعن', 'المدعي', 'المستأنف']);
+        const valB = getPrimaryValue(b, ['الطاعن', 'المدعي', 'المستأنف']);
+        return valB.localeCompare(valA, 'ar');
+      }
+      if (sortBy === 'number_asc') {
+        const numA = getCaseNumber(a);
+        const numB = getCaseNumber(b);
+        return numA - numB;
+      }
+      if (sortBy === 'number_desc') {
+        const numA = getCaseNumber(a);
+        const numB = getCaseNumber(b);
+        return numB - numA;
+      }
+      if (sortBy === 'year_desc') {
+        const yrA = getCaseYear(a);
+        const yrB = getCaseYear(b);
+        return yrB - yrA;
+      }
+      if (sortBy === 'year_asc') {
+        const yrA = getCaseYear(a);
+        const yrB = getCaseYear(b);
+        return yrA - yrB;
+      }
+      if (sortBy === 'date_desc') {
+        const dA = getSessionDate(a);
+        const dB = getSessionDate(b);
+        if (!dA && !dB) return 0;
+        if (!dA) return 1;
+        if (!dB) return -1;
+        return dB.getTime() - dA.getTime();
+      }
+      if (sortBy === 'date_asc') {
+        const dA = getSessionDate(a);
+        const dB = getSessionDate(b);
+        if (!dA && !dB) return 0;
+        if (!dA) return 1;
+        if (!dB) return -1;
+        return dA.getTime() - dB.getTime();
+      }
+      return 0;
+    });
+
+    return result;
+  }, [filteredCases, sortBy]);
+
+  const totalPages = Math.ceil(sortedCases.length / itemsPerPage);
+  const currentCases = sortedCases.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleAdvancedSearch = (params) => {
     const query = new URLSearchParams();
@@ -191,13 +278,6 @@ export default function Files() {
       if (val) query.set(key, val);
     });
     navigate(`/files?${query.toString()}`);
-  };
-
-  const getPrimaryValue = (cObj, possibleKeys) => {
-    for (let k of possibleKeys) {
-      if (cObj[k] !== undefined && cObj[k] !== null) return cObj[k];
-    }
-    return '';
   };
 
   const toggleSelection = (e, id) => {
@@ -227,109 +307,226 @@ export default function Files() {
       />
 
       {/* Filter & Actions Bar */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm sticky top-[76px] z-30 no-print flex flex-col sm:flex-row gap-3 items-center justify-between">
+      <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm sticky top-[76px] z-30 no-print flex flex-col gap-3">
         
-        {/* Search */}
-        <div className="relative w-full sm:max-w-xs">
-          <input 
-            id="search-cases-input"
-            type="text" 
-            placeholder="بحث في القضايا..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2 pl-10 pr-10 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
-          />
-          
-          <button 
-            type="button"
-            onClick={() => setIsAdvancedSearchOpen(true)}
-            className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded bg-indigo-50 text-indigo-500 hover:bg-indigo-100 transition"
-            title="البحث الذكي"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-          </button>
+        <div className="flex flex-col-reverse sm:flex-row gap-3 items-center justify-between w-full">
+          {/* Filters, Sorting & Print on the right (RTL start) */}
+          <div className="flex gap-2 w-full sm:w-auto shrink-0 flex-wrap sm:flex-nowrap justify-start">
+            {/* Filter Toggle Button */}
+            <button 
+               onClick={() => {
+                 setIsFilterPanelOpen(!isFilterPanelOpen);
+                 setIsSortPanelOpen(false);
+               }}
+               className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${
+                 isFilterPanelOpen || (roleFilter !== 'all' || showOngoingOnly || showPastSessionsOnly || showWithAttachmentsOnly || showImportantOnly || showSessionlessOnly)
+                   ? 'bg-indigo-100 text-indigo-700 border-indigo-200' 
+                   : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+               }`}
+               title="خيارات الفلترة والتصفية"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              <span>الفلترة</span>
+              {(roleFilter !== 'all' || showOngoingOnly || showPastSessionsOnly || showWithAttachmentsOnly || showImportantOnly || showSessionlessOnly) && (
+                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
+              )}
+            </button>
 
-          {searchQuery || advancedParams ? (
-             <button onClick={() => { setSearchQuery(''); setAdvancedParams(null); navigate('/files'); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-               <X className="w-4 h-4" />
-             </button>
-          ) : (
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          )}
+            {/* Sort Toggle Button */}
+            <button 
+               onClick={() => {
+                 setIsSortPanelOpen(!isSortPanelOpen);
+                 setIsFilterPanelOpen(false);
+               }}
+               className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${
+                 isSortPanelOpen || sortBy !== 'none'
+                   ? 'bg-amber-100 text-amber-700 border-amber-200' 
+                   : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+               }`}
+               title="ترتيب المعروض"
+            >
+              <ArrowUpDown className="w-4 h-4" />
+              <span>الترتيب</span>
+              {sortBy !== 'none' && (
+                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+              )}
+            </button>
+
+            {/* Print Button */}
+            <button 
+               onClick={() => setIsExportModalOpen(true)}
+               className="bg-navy-900 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-navy-800 transition shadow-sm border border-navy-950"
+               title="تصدير PDF وطباعة"
+            >
+               <Printer className="w-4 h-4" /> 
+               <span>طباعة</span>
+            </button>
+          </div>
+
+          {/* Search on the left (RTL end) */}
+          <div className="relative w-full sm:max-w-xs">
+            <input 
+              id="search-cases-input"
+              type="text" 
+              placeholder="بحث في القضايا..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2 pl-28 pr-10 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
+            />
+            
+            <button 
+              type="button"
+              onClick={() => setIsAdvancedSearchOpen(true)}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded bg-indigo-50 text-indigo-500 hover:bg-indigo-100 transition"
+              title="البحث الذكي"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+            </button>
+
+            <span className="absolute left-9 top-1/2 -translate-y-1/2 bg-indigo-100/80 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded font-black border border-indigo-200 pointer-events-none select-none">
+              {filteredCases.length} ملف
+            </span>
+
+            {searchQuery || advancedParams ? (
+               <button onClick={() => { setSearchQuery(''); setAdvancedParams(null); navigate('/files'); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                 <X className="w-4 h-4" />
+               </button>
+            ) : (
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            )}
+          </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-2 w-full sm:w-auto shrink-0 flex-wrap sm:flex-nowrap">
-          <button 
-             onClick={() => setRoleFilter(prev => prev === 'all' ? 'appellant' : prev === 'appellant' ? 'appellee' : 'all')}
-             className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${roleFilter === 'all' ? 'bg-slate-100 text-slate-600 border-slate-200' : roleFilter === 'appellant' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}`}
-             title="تصفية حسب الصفة"
-          >
-            <User className="w-4 h-4" />
-            <span className={roleFilter === 'all' ? 'hidden' : 'inline'}>{roleFilter === 'appellant' ? (settings?.roles?.[0] || 'الطاعنين') : (settings?.roles?.[1] || 'المطعون ضدهم')}</span>
-          </button>
-          
-          <button 
-             onClick={() => setShowOngoingOnly(!showOngoingOnly)}
-             className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showOngoingOnly ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
-             title="عرض المتداول فقط"
-          >
-            <Clock className="w-4 h-4" />
-            <span className={showOngoingOnly ? 'inline' : 'hidden'}>المتداول</span>
-          </button>
+        {/* Collapsible Filter Panel */}
+        {isFilterPanelOpen && (
+          <div className="border-t border-slate-100 pt-3 animate-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-black text-slate-500">تصفية القضايا حسب:</h4>
+              {(roleFilter !== 'all' || showOngoingOnly || showPastSessionsOnly || showWithAttachmentsOnly || showImportantOnly || showSessionlessOnly) && (
+                <button 
+                  onClick={() => {
+                    setRoleFilter('all');
+                    setShowOngoingOnly(false);
+                    setShowPastSessionsOnly(false);
+                    setShowWithAttachmentsOnly(false);
+                    setShowImportantOnly(false);
+                    setShowSessionlessOnly(false);
+                  }}
+                  className="text-[10px] font-black text-rose-500 hover:text-rose-600 transition"
+                >
+                  إعادة ضبط الفلاتر
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button 
+                 onClick={() => setRoleFilter(prev => prev === 'all' ? 'appellant' : prev === 'appellant' ? 'appellee' : 'all')}
+                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${roleFilter === 'all' ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' : roleFilter === 'appellant' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}`}
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>الصفة: {roleFilter === 'all' ? 'الكل' : roleFilter === 'appellant' ? (settings?.roles?.[0] || 'الطاعن') : (settings?.roles?.[1] || 'المطعون ضده')}</span>
+              </button>
+              
+              <button 
+                 onClick={() => setShowOngoingOnly(!showOngoingOnly)}
+                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showOngoingOnly ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>المتداول (جلسات هذا الشهر)</span>
+              </button>
 
-          <button 
-             onClick={() => setShowPastSessionsOnly(!showPastSessionsOnly)}
-             className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showPastSessionsOnly ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
-             title="جلسات سابقة (للمتابعة)"
-          >
-            <CalendarDays className="w-4 h-4" />
-            <span className={showPastSessionsOnly ? 'inline' : 'hidden'}>جلسات سابقة</span>
-          </button>
+              <button 
+                 onClick={() => setShowPastSessionsOnly(!showPastSessionsOnly)}
+                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showPastSessionsOnly ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              >
+                <CalendarDays className="w-3.5 h-3.5" />
+                <span>جلسات سابقة</span>
+              </button>
 
-          <button 
-             onClick={() => setShowWithAttachmentsOnly(!showWithAttachmentsOnly)}
-             className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showWithAttachmentsOnly ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
-             title="يحتوي على مرفقات/غلاف"
-          >
-            <FileBox className="w-4 h-4" />
-            <span className={showWithAttachmentsOnly ? 'inline' : 'hidden'}>مرفقات</span>
-          </button>
+              <button 
+                 onClick={() => setShowWithAttachmentsOnly(!showWithAttachmentsOnly)}
+                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showWithAttachmentsOnly ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              >
+                <FileBox className="w-3.5 h-3.5" />
+                <span>بها مرفقات</span>
+              </button>
 
-          <button 
-             onClick={() => setShowImportantOnly(!showImportantOnly)}
-             className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showImportantOnly ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
-             title="الدعاوى الهامة فقط"
-          >
-            <Sparkles className={`w-4 h-4 ${showImportantOnly ? 'fill-amber-700' : ''}`} />
-            <span className={showImportantOnly ? 'inline' : 'hidden'}>هامة</span>
-          </button>
+              <button 
+                 onClick={() => setShowImportantOnly(!showImportantOnly)}
+                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showImportantOnly ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              >
+                <Sparkles className={`w-3.5 h-3.5 ${showImportantOnly ? 'fill-amber-700' : ''}`} />
+                <span>قضايا هامة</span>
+              </button>
 
-          <button 
-             onClick={() => setShowSessionlessOnly(!showSessionlessOnly)}
-             className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showSessionlessOnly ? 'bg-slate-700 text-white border-slate-800' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
-             title="تصفية: دعاوى بدون جلسة"
-          >
-            <X className="w-4 h-4" />
-            <span className={showSessionlessOnly ? 'inline' : 'hidden'}>بدون جلسة</span>
-          </button>
+              <button 
+                 onClick={() => setShowSessionlessOnly(!showSessionlessOnly)}
+                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showSessionlessOnly ? 'bg-slate-700 text-white border-slate-800' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>بدون جلسة</span>
+              </button>
+            </div>
+          </div>
+        )}
 
-          <button 
-             onClick={() => setIsExportModalOpen(true)}
-             className="bg-navy-900 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-navy-800 transition"
-             title="تصدير PDF"
-          >
-             <Printer className="w-4 h-4" /> 
-             <span className="hidden sm:inline">طباعة</span>
-          </button>
-        </div>
-      </div>
+        {/* Collapsible Sort Panel */}
+        {isSortPanelOpen && (
+          <div className="border-t border-slate-100 pt-3 animate-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-black text-slate-500">ترتيب القضايا حسب:</h4>
+              {sortBy !== 'none' && (
+                <button 
+                  onClick={() => setSortBy('none')}
+                  className="text-[10px] font-black text-rose-500 hover:text-rose-600 transition"
+                >
+                  إلغاء الترتيب
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button 
+                 onClick={() => setSortBy(prev => prev === 'appellant_asc' ? 'appellant_desc' : 'appellant_asc')}
+                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${
+                   sortBy.startsWith('appellant') ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                 }`}
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>أبجدي (اسم الطاعن) {sortBy === 'appellant_asc' ? '▲' : sortBy === 'appellant_desc' ? '▼' : ''}</span>
+              </button>
 
-      {/* Results Meta */}
-      <div className="flex items-center justify-between px-1">
-        <p className="text-xs font-bold text-slate-500">
-           يعرض <span className="text-navy-900">{currentCases.length}</span> من <span className="text-navy-900">{filteredCases.length}</span> ملف
-        </p>
+              <button 
+                 onClick={() => setSortBy(prev => prev === 'number_asc' ? 'number_desc' : 'number_asc')}
+                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${
+                   sortBy.startsWith('number') ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                 }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>رقم الدعوى {sortBy === 'number_asc' ? '▲' : sortBy === 'number_desc' ? '▼' : ''}</span>
+              </button>
+
+              <button 
+                 onClick={() => setSortBy(prev => prev === 'year_desc' ? 'year_asc' : 'year_desc')}
+                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${
+                   sortBy.startsWith('year') ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                 }`}
+              >
+                <CalendarDays className="w-3.5 h-3.5" />
+                <span>سنة الدعوى {sortBy === 'year_desc' ? '▼ الأحدث' : sortBy === 'year_asc' ? '▲ الأقدم' : ''}</span>
+              </button>
+
+              <button 
+                 onClick={() => setSortBy(prev => prev === 'date_desc' ? 'date_asc' : 'date_desc')}
+                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${
+                   sortBy.startsWith('date') ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                 }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>تاريخ الجلسة {sortBy === 'date_desc' ? '▼ الأحدث' : sortBy === 'date_asc' ? '▲ الأقدم' : ''}</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Grid of Folder-like Cards */}

@@ -156,6 +156,7 @@ export default function CaseDetails() {
   const lastSessionRaw = getFieldValue(caseData, ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة']);
   const lastSession = formatDateString(lastSessionRaw);
   const decision = getFieldValue(caseData, ['القرار', 'قرار الجلسة', 'المنطوق']);
+  const sessionType = getFieldValue(caseData, ['نوع الجلسة', 'نوع_الجلسة']) || '';
   const caseRoll = getFieldValue(caseData, ['الرول']) || '';
   const role = getFieldValue(caseData, ['الصفة', 'صفة']) || '';
   const fileLocation = getFieldValue(caseData, ['مكان الملف']) || '';
@@ -172,19 +173,24 @@ export default function CaseDetails() {
 
   let roleBadgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
   let accentLineClass = 'bg-amber-500';
+  let textColorClass = 'text-amber-500';
   
   if (isAppellant) {
     roleBadgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
     accentLineClass = 'bg-rose-500';
+    textColorClass = 'text-rose-600';
   } else if (isAppellee) {
     roleBadgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
     accentLineClass = 'bg-emerald-500';
+    textColorClass = 'text-emerald-600';
   } else if (isOutOfJurisdiction) {
     roleBadgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200';
     accentLineClass = 'bg-indigo-500';
+    textColorClass = 'text-indigo-600';
   } else if (isNoInterest) {
     roleBadgeClass = 'bg-slate-100 text-slate-500 border-slate-300';
     accentLineClass = 'bg-slate-400';
+    textColorClass = 'text-slate-500';
   }
 
   const coverImageDoc = (caseData.documents || []).find(doc => doc.type === 'غلاف الملف' && doc.fileType === 'image');
@@ -335,16 +341,25 @@ export default function CaseDetails() {
              )}
           </div>
           
-          <div className="flex items-center gap-3 justify-center mt-1">
-            <h1 className="text-2xl sm:text-3xl font-black text-navy-900 flex items-center gap-2 flex-wrap justify-center">
-              دعوى رقم {localizeNumber(caseNo, settings?.numberFormat)} <span className="text-slate-400 font-bold text-lg">لسنة</span> {localizeNumber(year, settings?.numberFormat)}
+          {/* Case Number and Year */}
+          <div className="text-center">
+            <h1 className="flex items-center gap-2 flex-wrap justify-center">
+              <span className={`${textColorClass} font-black text-3xl sm:text-4xl`}>
+                {localizeNumber(caseNo, settings?.numberFormat)}
+              </span>
+              <span className="text-slate-400 font-normal text-lg sm:text-xl mr-1">
+                لسنة {localizeNumber(year, settings?.numberFormat)}
+              </span>
               {hasJoinedCases && (
                 <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-lg flex items-center gap-1 border border-indigo-200" title={`دعاوى منضمة: ${joinedCasesArr.map(c => `${localizeNumber(c.no, settings?.numberFormat)} لسنة ${localizeNumber(c.year, settings?.numberFormat)}`).join('، ')} ${legacyJoinedStr}`}>
                   <Files className="w-4 h-4" /> مجمعة
                 </span>
               )}
             </h1>
-            
+          </div>
+          
+          {/* Action Buttons Centered Below */}
+          <div className="flex items-center justify-center gap-3 mt-2">
             {/* Star Button */}
             <button
                onClick={async () => {
@@ -406,11 +421,11 @@ export default function CaseDetails() {
           </div>
 
           {(decision || lastSession) && (
-            <div className={`mt-3 p-3 rounded-xl border flex flex-row items-center justify-center gap-4 flex-wrap ${isJudgment ? 'bg-rose-50 border-rose-100 text-rose-800' : 'bg-amber-50/50 border-amber-100 text-amber-800'}`}>
+            <div className={`mt-3 p-3 rounded-xl border flex flex-row items-center justify-center gap-3 flex-wrap ${isJudgment ? 'bg-rose-50 border-rose-100 text-rose-800' : 'bg-amber-50/50 border-amber-100 text-amber-800'}`}>
               {caseRoll && (
-                <div className="text-sm font-black flex items-center gap-1.5 shrink-0">
+                <div className="text-sm font-black flex items-center gap-1 shrink-0">
                   <Hash className="w-4 h-4 text-slate-500" />
-                  رول: <span dir="ltr">{caseRoll}</span>
+                  <span dir="ltr">{caseRoll}</span>
                 </div>
               )}
               {caseRoll && lastSession && <div className="w-px h-4 bg-current opacity-20"></div>}
@@ -420,15 +435,21 @@ export default function CaseDetails() {
                   className="text-sm font-black flex items-center gap-1.5 shrink-0 hover:text-indigo-600 transition"
                   title="عرض رول الجلسة"
                 >
-                  📅 تاريخ الجلسة: <span dir="ltr">{lastSession}</span>
+                  📅 جلسة: <span dir="ltr">{lastSession}</span>
                   <BookOpen className="w-4 h-4 text-indigo-500" />
                 </button>
               )}
               {lastSession && decision && <div className="w-px h-4 bg-current opacity-20"></div>}
               {decision && (
-                <p className="text-sm font-black text-center">
-                  القرار: {decision}
-                </p>
+                <span className="text-sm font-black text-center">
+                  {decision}
+                </span>
+              )}
+              {((lastSession || decision) && sessionType) && <div className="w-px h-4 bg-current opacity-20"></div>}
+              {sessionType && (
+                <span className="text-sm font-black text-center">
+                  {sessionType}
+                </span>
               )}
             </div>
           )}

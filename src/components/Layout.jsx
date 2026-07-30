@@ -42,9 +42,9 @@ export default function Layout() {
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
             <Scale className="w-4 h-4 sm:w-5 sm:h-5 text-navy-900" />
           </div>
-          <div className="flex items-baseline gap-1.5 sm:gap-2">
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">اختصاص</h1>
-            <span className="text-[13px] sm:text-[15px] font-black text-amber-400">
+          <div className="flex flex-col justify-center">
+            <h1 className="text-base sm:text-xl font-black text-white tracking-tight leading-none">اختصاص</h1>
+            <span className="text-[11px] sm:text-[13px] font-bold text-amber-400 leading-none mt-0.5">
               م. أحمد وجيه
             </span>
           </div>
