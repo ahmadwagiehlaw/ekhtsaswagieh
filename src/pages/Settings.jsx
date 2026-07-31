@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useAppContext } from '../context/AppState';
-import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList, Scale } from 'lucide-react';
+import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList, Scale, Download, FileJson, ArrowUpFromLine } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useUI } from '../context/UIContext';
 
@@ -37,6 +37,91 @@ export default function Settings() {
     'رفض': 'بقبول الدعوي شكلا ورفضها موضوعا وإلزام رافعها المصروفات'
   });
   const [deletePassword, setDeletePassword] = useState('');
+  const backupInputRef = useRef(null);
+  const [backupRestoreStatus, setBackupRestoreStatus] = useState(null); // { type: 'success'|'error'|'preview', data: ... }
+
+  // ===== BACKUP FUNCTIONS =====
+  const handleExportBackup = () => {
+    const backup = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      cases: cases,
+      settings: settings,
+      schema: schema,
+    };
+    const json = JSON.stringify(backup, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `اختصاصي-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`تم تصدير نسخة احتياطية شاملة (${cases.length} قضية)`, 'success');
+  };
+
+  const handleExportExcel = () => {
+    if (!cases || cases.length === 0) { toast('لا توجد بيانات للتصدير', 'error'); return; }
+    const rows = cases.map(c => {
+      const base = {};
+      Object.keys(c).forEach(k => {
+        if (typeof c[k] !== 'object') base[k] = c[k];
+      });
+      base['عدد الجلسات'] = (c.sessions || []).length;
+      base['عدد المرفقات'] = (c.documents || []).length;
+      base['عدد الإجراءات'] = (c.procedures || []).length;
+      return base;
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'القضايا');
+    XLSX.writeFile(wb, `اختصاصي-export-${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast(`تم تصدير ${cases.length} قضية إلى Excel`, 'success');
+  };
+
+  const handleImportBackup = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data.cases || !Array.isArray(data.cases)) {
+        toast('الملف غير صالح - لا يحتوي على بيانات قضايا', 'error');
+        return;
+      }
+      setBackupRestoreStatus({
+        type: 'preview',
+        data: data,
+        casesCount: data.cases.length,
+        exportedAt: data.exportedAt,
+      });
+    } catch (err) {
+      toast('فشل قراءة الملف - تأكد من أنه ملف JSON صحيح', 'error');
+    }
+    if (backupInputRef.current) backupInputRef.current.value = '';
+  };
+
+  const confirmRestoreBackup = async () => {
+    if (!backupRestoreStatus?.data) return;
+    const confirmed = await showConfirm(
+      'تأكيد الاستعادة',
+      `سيتم استبدال البيانات الحالية بـ ${backupRestoreStatus.casesCount} قضية من النسخة الاحتياطية. هل تريد المتابعة؟`
+    );
+    if (!confirmed) return;
+    setIsProcessing(true);
+    const { data } = backupRestoreStatus;
+    try {
+      await saveBatchCasesToFirebase(data.cases);
+      if (data.settings) await saveSettingsToFirebase(data.settings);
+      if (data.schema) await saveSchemaToFirebase(data.schema);
+      setBackupRestoreStatus({ type: 'success', casesCount: data.cases.length });
+      toast(`✅ تم استعادة ${data.cases.length} قضية بنجاح`, 'success');
+    } catch (err) {
+      toast('حدث خطأ أثناء الاستعادة', 'error');
+      setBackupRestoreStatus(null);
+    }
+    setIsProcessing(false);
+  };
   
   // Sync settings when loaded
   React.useEffect(() => {
@@ -298,11 +383,12 @@ export default function Settings() {
 
       {/* Tabs */}
       <div className="flex bg-slate-200/50 p-1 rounded-xl flex-wrap">
-        <button onClick={() => setActiveTab('sync')} className={`flex-1 min-w-[100px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'sync' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>💾 مزامنة الداتا</button>
-        <button onClick={() => setActiveTab('schema')} className={`flex-1 min-w-[100px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'schema' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🧩 هيكلة الحقول</button>
-        <button onClick={() => setActiveTab('judgments')} className={`flex-1 min-w-[100px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'judgments' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚖️ الجلسات والأحكام</button>
-        <button onClick={() => setActiveTab('lists')} className={`flex-1 min-w-[100px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'lists' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>📁 قوائم النظام</button>
-        <button onClick={() => setActiveTab('other')} className={`flex-1 min-w-[100px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'other' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚙️ إعدادات أخرى</button>
+        <button onClick={() => setActiveTab('sync')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'sync' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>💾 مزامنة الداتا</button>
+        <button onClick={() => setActiveTab('backup')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'backup' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🛡️ نسخ احتياطية</button>
+        <button onClick={() => setActiveTab('schema')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'schema' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🧩 هيكلة الحقول</button>
+        <button onClick={() => setActiveTab('judgments')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'judgments' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚖️ الجلسات والأحكام</button>
+        <button onClick={() => setActiveTab('lists')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'lists' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>📁 قوائم النظام</button>
+        <button onClick={() => setActiveTab('other')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'other' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚙️ إعدادات أخرى</button>
       </div>
 
       {/* SYNC TAB */}
@@ -351,6 +437,112 @@ export default function Settings() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* BACKUP TAB */}
+      {activeTab === 'backup' && (
+        <div className="space-y-4 animate-in fade-in zoom-in duration-300">
+          
+          {/* Export Section */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <Download className="w-5 h-5 text-emerald-600" />
+              <h3 className="font-black text-sm text-navy-900">تصدير نسخة احتياطية</h3>
+            </div>
+            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+              قم بتصدير نسخة احتياطية شاملة من جميع بيانات التطبيق (القضايا، الجلسات، المرفقات، الإجراءات، الإعدادات) بصيغة JSON أو Excel.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={handleExportBackup}
+                className="flex flex-col items-center gap-2 p-4 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 hover:border-emerald-400 rounded-2xl transition group"
+              >
+                <div className="w-10 h-10 bg-emerald-100 group-hover:bg-emerald-200 rounded-xl flex items-center justify-center transition">
+                  <FileJson className="w-5 h-5 text-emerald-700" />
+                </div>
+                <span className="text-xs font-black text-emerald-800">JSON شامل</span>
+                <span className="text-[10px] font-bold text-emerald-600 text-center">كل البيانات + الإعدادات</span>
+              </button>
+              <button
+                onClick={handleExportExcel}
+                className="flex flex-col items-center gap-2 p-4 bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 hover:border-blue-400 rounded-2xl transition group"
+              >
+                <div className="w-10 h-10 bg-blue-100 group-hover:bg-blue-200 rounded-xl flex items-center justify-center transition">
+                  <Download className="w-5 h-5 text-blue-700" />
+                </div>
+                <span className="text-xs font-black text-blue-800">Excel مبسط</span>
+                <span className="text-[10px] font-bold text-blue-600 text-center">البيانات الأساسية فقط</span>
+              </button>
+            </div>
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+              <p className="text-[11px] font-bold text-slate-600">
+                📊 إجمالي البيانات الحالية: <span className="text-navy-900 font-black">{cases.length} قضية</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Import/Restore Section */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <ArrowUpFromLine className="w-5 h-5 text-amber-600" />
+              <h3 className="font-black text-sm text-navy-900">استعادة من نسخة احتياطية</h3>
+            </div>
+            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+              استعد بيانات كاملة من ملف JSON تم تصديره سابقاً. سيتم دمج البيانات بذكاء مع البيانات الحالية.
+            </p>
+
+            <input type="file" accept=".json" ref={backupInputRef} onChange={handleImportBackup} className="hidden" />
+
+            {!backupRestoreStatus && (
+              <button
+                onClick={() => backupInputRef.current?.click()}
+                disabled={isProcessing}
+                className="w-full border-2 border-dashed border-amber-300 hover:border-amber-500 hover:bg-amber-50 text-slate-600 font-bold py-6 rounded-2xl flex flex-col items-center justify-center gap-2 transition"
+              >
+                <ArrowUpFromLine className="w-8 h-8 text-amber-500" />
+                <span className="text-sm">اختر ملف النسخة الاحتياطية (.json)</span>
+              </button>
+            )}
+
+            {backupRestoreStatus?.type === 'preview' && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                <h4 className="font-black text-sm text-amber-900 flex items-center gap-2">
+                  <Check className="w-4 h-4" /> تم قراءة الملف بنجاح
+                </h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-white rounded-lg p-2 border border-amber-100 text-center">
+                    <p className="text-lg font-black text-amber-700">{backupRestoreStatus.casesCount}</p>
+                    <p className="text-[10px] font-bold text-slate-500">قضية في النسخة</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-2 border border-amber-100 text-center">
+                    <p className="text-lg font-black text-navy-900">{cases.length}</p>
+                    <p className="text-[10px] font-bold text-slate-500">قضية حالية</p>
+                  </div>
+                </div>
+                {backupRestoreStatus.exportedAt && (
+                  <p className="text-[10px] font-bold text-slate-500">
+                    تاريخ التصدير: {new Date(backupRestoreStatus.exportedAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <button onClick={() => setBackupRestoreStatus(null)} className="flex-1 bg-white border border-slate-200 py-2 rounded-xl text-xs font-bold">إلغاء</button>
+                  <button onClick={confirmRestoreBackup} disabled={isProcessing} className="flex-[2] bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 rounded-xl text-xs shadow-sm disabled:opacity-50">
+                    {isProcessing ? 'جاري الاستعادة...' : '✅ تأكيد الاستعادة'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {backupRestoreStatus?.type === 'success' && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center space-y-2">
+                <p className="text-2xl">✅</p>
+                <p className="font-black text-emerald-800">تمت الاستعادة بنجاح!</p>
+                <p className="text-[11px] font-bold text-emerald-600">تم استعادة {backupRestoreStatus.casesCount} قضية</p>
+                <button onClick={() => setBackupRestoreStatus(null)} className="text-xs font-bold text-emerald-700 underline">إغلاق</button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
