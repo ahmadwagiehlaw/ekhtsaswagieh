@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Edit3, Check, X, ChevronRight, ChevronLeft, Search,
   CheckSquare, Square, ClipboardList, Bell, Eye, CopyPlus,
-  Printer, ExternalLink, Save, RefreshCcw, AlertCircle
+  Printer, ExternalLink, Save, RefreshCcw, AlertCircle, Plus, Trash2
 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
@@ -16,6 +16,7 @@ import { getSafeDateObj } from '../utils/dateUtils';
 import BulkProcedureFromRollModal from './BulkProcedureFromRollModal';
 import BulkSessionRolloverModal from './BulkSessionRolloverModal';
 import ExportPDFModal from './ExportPDFModal';
+import QuickAddCaseModal from './QuickAddCaseModal';
 
 const PREDEFINED_DECISIONS = [
   'للحكم','تصريح','للإعلان','للاطلاع','للإخطار',
@@ -31,7 +32,7 @@ const getFieldVal = (obj, keys) => {
 };
 
 export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
-  const { cases, saveCaseToFirebase, settings } = useAppContext();
+  const { cases, saveCaseToFirebase, settings, deleteCaseFromFirebase } = useAppContext();
   const { showPrompt, toast } = useUI();
   const navigate = useNavigate();
 
@@ -52,6 +53,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   const [isBulkProcedureOpen, setIsBulkProcedureOpen] = useState(false);
   const [isRolloverOpen, setIsRolloverOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
 
   const filteredCases = useMemo(() => {
     if (!searchQ.trim()) return dayCases;
@@ -173,6 +175,12 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
 
         {/* Actions */}
         <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => setIsQuickAddOpen(true)}
+            className="flex items-center gap-1 bg-emerald-500 text-white hover:bg-emerald-600 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition"
+          >
+            <Plus className="w-3.5 h-3.5" /> إضافة
+          </button>
           <button onClick={() => setIsExportOpen(true)}
             className="flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition">
             <Printer className="w-3.5 h-3.5" /> طباعة
@@ -214,6 +222,21 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
               className="flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-slate-50 transition"
             >
               <CopyPlus className="w-3.5 h-3.5" /> ترحيل
+            </button>
+            <button
+              onClick={async () => {
+                if (!window.confirm(`هل أنت متأكد من حذف ${selectedIds.size} دعوى/دعاوى؟\nتحذير: لا يمكن التراجع عن هذا!`)) return;
+                let count = 0;
+                for (const id of selectedIds) {
+                  const ok = await deleteCaseFromFirebase(id);
+                  if (ok) count++;
+                }
+                toast(`تم حذف ${count} دعوى`, 'success');
+                setSelectedIds(new Set());
+              }}
+              className="flex items-center gap-1 bg-red-700 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-red-800 transition"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> حذف المحدد
             </button>
           </div>
           <button onClick={() => setSelectedIds(new Set())}
@@ -447,6 +470,11 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
         onClose={() => setIsExportOpen(false)}
         data={dayCases}
         defaultTitle={`رول جلسات ${date}`}
+      />
+      <QuickAddCaseModal
+        isOpen={isQuickAddOpen}
+        onClose={() => setIsQuickAddOpen(false)}
+        prefillDate={date}
       />
     </div>
   );

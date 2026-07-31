@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Edit3, Check, X, ChevronRight, ChevronLeft, AlertCircle,
   CheckSquare, Square, Camera, ExternalLink, Printer, Search, Image,
-  ClipboardList, Bell, Eye, CopyPlus
+  ClipboardList, Bell, Eye, CopyPlus, Scale, Plus, Trash2
 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
@@ -12,22 +12,8 @@ import { uploadToR2 } from '../lib/r2';
 import ExportPDFModal from './ExportPDFModal';
 import BulkProcedureFromRollModal from './BulkProcedureFromRollModal';
 import BulkSessionRolloverModal from './BulkSessionRolloverModal';
-
-const JUDGMENT_CATEGORIES = ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
-const JUDGMENT_RESULTS = [
-  { value: 'صالح', label: 'صالح ✅', color: 'text-emerald-700 bg-emerald-50 border-emerald-300' },
-  { value: 'ضد', label: 'ضد ❌', color: 'text-rose-700 bg-rose-50 border-rose-300' },
-  { value: 'حكم منه للخصومة', label: 'منه للخصومة', color: 'text-amber-700 bg-amber-50 border-amber-300' },
-  { value: 'غير منه للخصومة', label: 'غير منه', color: 'text-orange-700 bg-orange-50 border-orange-300' },
-  { value: 'تمهيدي', label: 'تمهيدي', color: 'text-indigo-700 bg-indigo-50 border-indigo-300' },
-];
-const JUDGMENT_TYPES = {
-  'حكم منه للخصومة': ['اعتبار كأن لم تكن', 'سقوط الخصومة', 'انقضاء الخصومة', 'شطب'],
-  'غير منه للخصومة': ['وقف جزائي', 'وقف تعليقي', 'إحالة للموضوع', 'إحالة لمحكمة أخرى'],
-  'تمهيدي': ['ندب خبير', 'تكليف خبير', 'إعادة للمحكمة المختصة', 'إحالة للنيابة', 'تعجيل من الوقف'],
-  'صالح': ['رفض الدعوى', 'عدم القبول شكلاً', 'عدم جواز نظر الدعوى', 'عدم الاختصاص', 'إلغاء القرار', 'تعويض', 'رفض الطعن', 'قبول الطعن', 'وقف تنفيذي', 'رفض'],
-  'ضد': ['رفض الدعوى', 'عدم القبول شكلاً', 'عدم جواز نظر الدعوى', 'عدم الاختصاص', 'إلغاء القرار', 'تعويض', 'رفض الطعن', 'قبول الطعن', 'وقف تنفيذي', 'رفض'],
-};
+import BulkJudgmentRegistrationModal from './BulkJudgmentRegistrationModal';
+import QuickAddCaseModal from './QuickAddCaseModal';
 
 const getFieldVal = (obj, keys) => {
   for (const k of keys) {
@@ -156,7 +142,7 @@ function ImagePasteZone({ caseId, sessionDate, caseData, onImageSaved }) {
 }
 
 export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
-  const { cases, saveCaseToFirebase, settings } = useAppContext();
+  const { cases, saveCaseToFirebase, settings, deleteCaseFromFirebase } = useAppContext();
   const { showPrompt, toast } = useUI();
   const navigate = useNavigate();
 
@@ -170,7 +156,12 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
     });
   }, [date, allCasesMap]);
 
+  const judgmentCategories = settings?.judgmentCategories || ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
+  const judgmentClassifications = settings?.judgmentClassifications || ['صالح', 'ضد', 'حكم منه للخصومة', 'غير منه للخصومة', 'تمهيدي'];
+  const roles = settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص'];
+
   const [searchQ, setSearchQ] = useState('');
+  const [sessionTypeFilter, setSessionTypeFilter] = useState('الكل');
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -179,6 +170,8 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [isBulkProcedureOpen, setIsBulkProcedureOpen] = useState(false);
   const [isRolloverOpen, setIsRolloverOpen] = useState(false);
+  const [isBulkJudgmentOpen, setIsBulkJudgmentOpen] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
 
   const toggleSelect = (id) => {
     const n = new Set(selectedIds);
@@ -192,13 +185,24 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
   };
 
   const filteredCases = useMemo(() => {
-    if (!searchQ.trim()) return judgmentCases;
+    let result = judgmentCases;
+    
+    // Filter by session type
+    if (sessionTypeFilter !== 'الكل') {
+      result = result.filter(c => {
+         const session = c.sessions?.find(s => s.date === date);
+         const sType = session?.type || getFieldVal(c, ['نوع الجلسة']) || '';
+         return sType.includes(sessionTypeFilter);
+      });
+    }
+
+    if (!searchQ.trim()) return result;
     const q = searchQ.toLowerCase();
-    return judgmentCases.filter(c =>
+    return result.filter(c =>
       [c['رقم الدعوى'], c['السنة'], c['المدعي'], c['المدعى_عليه'], c['الصفة']]
         .some(v => String(v || '').toLowerCase().includes(q))
     );
-  }, [judgmentCases, searchQ]);
+  }, [judgmentCases, searchQ, sessionTypeFilter, date]);
 
   const startEdit = (cObj) => {
     const session = cObj.sessions?.find(s => s.date === date);
@@ -211,6 +215,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
       _verdict: j.fullVerdict || session?.verdict || '',
       _isFinal: j.isFinal || false,
       _role: getFieldVal(cObj, ['الصفة', 'صفة']) || '',
+      _rollNumber: session?.rollNumber || j.rollNumber || '',
     });
   };
 
@@ -219,7 +224,10 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
     if (!settings?.judgmentDefaults?.length) return currentData;
     const newData = { ...currentData };
     for (const rule of settings.judgmentDefaults) {
-      if (rule.triggerField === 'category' && field === '_category' && value === rule.triggerValue) {
+      if (
+        (rule.triggerField === 'category' && field === '_category' && value === rule.triggerValue) ||
+        (rule.triggerField === 'classification' && field === '_result' && value === rule.triggerValue)
+      ) {
         if (rule.setClassification && !newData._result) newData._result = rule.setClassification;
         if (rule.setType && !newData._type) newData._type = rule.setType;
         if (rule.setText && !newData._verdict) newData._verdict = rule.setText;
@@ -253,6 +261,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
         result: editData._result,
         fullVerdict: editData._verdict,
         isFinal: editData._isFinal,
+        rollNumber: editData._rollNumber,
         recordedAt: new Date().toISOString().split('T')[0],
       };
 
@@ -265,6 +274,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
           shortJudgment: editData._type,
           judgmentClassification: editData._result,
           verdict: editData._verdict,
+          rollNumber: editData._rollNumber,
           hasJudgment: true,
         };
       } else {
@@ -275,6 +285,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
           shortJudgment: editData._type,
           judgmentClassification: editData._result,
           verdict: editData._verdict,
+          rollNumber: editData._rollNumber,
           hasJudgment: true,
         });
         existingSessions.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -337,14 +348,37 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
           </button>
         </div>
 
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 flex-1 min-w-[160px]">
-          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <input type="text" placeholder="بحث في رول الأحكام..." value={searchQ}
-            onChange={e => setSearchQ(e.target.value)}
-            className="bg-transparent text-xs font-bold text-navy-900 outline-none flex-1 w-full" />
+        <div className="flex items-center gap-2">
+          <div className="flex bg-slate-100 p-1 rounded-xl">
+            {['الكل', 'موضوع', 'فحص'].map(t => (
+              <button
+                key={t}
+                onClick={() => setSessionTypeFilter(t)}
+                className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-colors ${
+                  sessionTypeFilter === t
+                    ? 'bg-white text-navy-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {t === 'الكل' ? 'كل الجلسات' : t}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 flex-1 min-w-[160px]">
+            <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <input type="text" placeholder="بحث في رول الأحكام..." value={searchQ}
+              onChange={e => setSearchQ(e.target.value)}
+              className="bg-transparent text-xs font-bold text-navy-900 outline-none flex-1 w-full" />
+          </div>
         </div>
 
         <div className="flex gap-1.5">
+          <button
+            onClick={() => setIsQuickAddOpen(true)}
+            className="flex items-center gap-1 bg-emerald-500 text-white hover:bg-emerald-600 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition"
+          >
+            <Plus className="w-3.5 h-3.5" /> إضافة
+          </button>
           <button onClick={() => setIsExportOpen(true)}
             className="flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition">
             <Printer className="w-3.5 h-3.5" /> طباعة
@@ -364,6 +398,12 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
           </span>
           <div className="flex gap-1.5 flex-wrap">
             <button
+              onClick={() => setIsBulkJudgmentOpen(true)}
+              className="flex items-center gap-1 bg-teal-600 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-teal-700 transition"
+            >
+              <Scale className="w-3.5 h-3.5" /> تسجيل أحكام
+            </button>
+            <button
               onClick={() => setIsBulkProcedureOpen(true)}
               className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-indigo-700 transition"
             >
@@ -382,10 +422,19 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
               <Bell className="w-3.5 h-3.5" /> تذكير
             </button>
             <button
-              onClick={() => setIsRolloverOpen(true)}
-              className="flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-slate-50 transition"
+              onClick={async () => {
+                if (!window.confirm(`هل أنت متأكد من حذف ${selectedIds.size} دعوى/دعاوى؟ لا يمكن التراجع عن هذا!`)) return;
+                let count = 0;
+                for (const id of selectedIds) {
+                  const ok = await deleteCaseFromFirebase(id);
+                  if (ok) count++;
+                }
+                toast(`تم حذف ${count} دعوى`, 'success');
+                setSelectedIds(new Set());
+              }}
+              className="flex items-center gap-1 bg-red-700 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-red-800 transition"
             >
-              <CopyPlus className="w-3.5 h-3.5" /> ترحيل
+              <Trash2 className="w-3.5 h-3.5" /> حذف المحدد
             </button>
           </div>
           <button onClick={() => setSelectedIds(new Set())}
@@ -424,6 +473,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                   <th className="px-2 py-2.5 text-[10px] font-black text-rose-600">الدعوى</th>
                   <th className="px-2 py-2.5 text-[10px] font-black text-rose-600">الخصوم</th>
                   <th className="px-2 py-2.5 text-[10px] font-black text-rose-600 w-24">الصفة</th>
+                  <th className="px-2 py-2.5 text-[10px] font-black text-rose-600 w-16 text-center">الرول</th>
                   <th className="px-2 py-2.5 text-[10px] font-black text-rose-600 w-24">فئة الحكم</th>
                   <th className="px-2 py-2.5 text-[10px] font-black text-rose-600 w-28">التصنيف</th>
                   <th className="px-2 py-2.5 text-[10px] font-black text-rose-600 w-24">نوع الحكم</th>
@@ -484,10 +534,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                               className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white"
                             >
                               <option value="">--اختر--</option>
-                              <option value="طاعن">طاعن</option>
-                              <option value="مطعون ضدنا">مطعون ضدنا</option>
-                              <option value="خصم مدخل">خصم مدخل</option>
-                              <option value="لا شأن">لا شأن</option>
+                              {roles.map(r => <option key={r} value={r}>{r}</option>)}
                             </select>
                           </div>
                         ) : (
@@ -504,22 +551,34 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                         )}
                       </td>
 
+                      {/* Roll Number */}
+                      <td className="px-2 py-2 text-center">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editData._rollNumber}
+                            onChange={e => setEditData(d => ({ ...d, _rollNumber: e.target.value }))}
+                            placeholder="الرول"
+                            className="w-full text-center text-[10px] font-bold p-1 rounded border border-rose-200 bg-white"
+                          />
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-700">{session?.rollNumber || j.rollNumber || '-'}</span>
+                        )}
+                      </td>
+
                       {/* Category */}
                       <td className="px-2 py-2">
                         {isEditing ? (
                           <select
                             value={editData._category}
-                            onChange={e => {
-                              const v = e.target.value;
-                              setEditData(d => applyDefaultRules('_category', v, { ...d, _category: v }));
-                            }}
-                            className="w-full text-[10px] font-bold p-1 rounded border border-rose-200"
+                            onChange={e => setEditData(d => applyDefaultRules('_category', e.target.value, { ...d, _category: e.target.value }))}
+                            className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white"
                           >
-                            <option value="">-- فئة --</option>
-                            {JUDGMENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            <option value="">- اختر -</option>
+                            {judgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
                         ) : (
-                          <span className="text-[10px] font-bold text-slate-600">{j.category || '-'}</span>
+                          <span className="text-[10px] font-bold text-slate-700">{j.category || '-'}</span>
                         )}
                       </td>
 
@@ -528,17 +587,15 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                         {isEditing ? (
                           <select
                             value={editData._result}
-                            onChange={e => setEditData(d => ({ ...d, _result: e.target.value, _type: '' }))}
-                            className="w-full text-[10px] font-bold p-1 rounded border border-rose-200"
+                            onChange={e => setEditData(d => applyDefaultRules('_result', e.target.value, { ...d, _result: e.target.value, _type: '' }))}
+                            className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white"
                           >
-                            <option value="">-- تصنيف --</option>
-                            {JUDGMENT_RESULTS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                            <option value="">- اختر -</option>
+                            {judgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
                         ) : (
                           j.result ? (
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full border ${
-                              JUDGMENT_RESULTS.find(r => r.value === j.result)?.color || 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}>
+                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full border bg-slate-100 text-slate-600 border-slate-200">
                               {j.result}
                             </span>
                           ) : <span className="text-slate-300 text-[10px]">-</span>
@@ -561,7 +618,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                               className="w-full text-[10px] font-bold p-1 rounded border border-rose-200"
                             />
                             <datalist id={`jtype-${cObj.id}`}>
-                              {(JUDGMENT_TYPES[editData._result] || []).map(t => <option key={t} value={t} />)}
+                              {Object.keys(settings?.judgmentTextMap || {}).map(t => <option key={t} value={t} />)}
                             </datalist>
                           </div>
                         ) : (
@@ -650,6 +707,12 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
       )}
 
       {/* Modals */}
+      <BulkJudgmentRegistrationModal
+        isOpen={isBulkJudgmentOpen}
+        onClose={() => setIsBulkJudgmentOpen(false)}
+        sessionDate={date}
+        selectedCaseIds={selectedIds}
+      />
       <BulkProcedureFromRollModal
         isOpen={isBulkProcedureOpen}
         onClose={() => setIsBulkProcedureOpen(false)}
@@ -668,6 +731,11 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
         onClose={() => setIsExportOpen(false)}
         data={filteredCases}
         defaultTitle={`رول أحكام ${date}`}
+      />
+      <QuickAddCaseModal
+        isOpen={isQuickAddOpen}
+        onClose={() => setIsQuickAddOpen(false)}
+        prefillDate={date}
       />
     </div>
   );

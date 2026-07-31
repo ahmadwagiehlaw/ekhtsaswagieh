@@ -26,7 +26,7 @@ export default function Settings() {
   const [localReviewTasks, setLocalReviewTasks] = useState(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
   const [localRollTypes, setLocalRollTypes] = useState(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
   const [localNumberFormat, setLocalNumberFormat] = useState(settings?.numberFormat || 'en');
-  const [localRoles, setLocalRoles] = useState(settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل']);
+  const [localRoles, setLocalRoles] = useState(settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص']);
   const [localSessionTypes, setLocalSessionTypes] = useState(settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة']);
   const [localFileLocations, setLocalFileLocations] = useState(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
   const [localCommonProcedures, setLocalCommonProcedures] = useState(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
@@ -37,6 +37,8 @@ export default function Settings() {
     'رفض': 'بقبول الدعوي شكلا ورفضها موضوعا وإلزام رافعها المصروفات'
   });
   const [localJudgmentDefaults, setLocalJudgmentDefaults] = useState(settings?.judgmentDefaults || []);
+  const [localJudgmentCategories, setLocalJudgmentCategories] = useState(settings?.judgmentCategories || ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص']);
+  const [localJudgmentClassifications, setLocalJudgmentClassifications] = useState(settings?.judgmentClassifications || ['صالح', 'ضد', 'حكم منه للخصومة', 'غير منه للخصومة', 'تمهيدي']);
   const [deletePassword, setDeletePassword] = useState('');
   const backupInputRef = useRef(null);
   const [backupRestoreStatus, setBackupRestoreStatus] = useState(null); // { type: 'success'|'error'|'preview', data: ... }
@@ -131,11 +133,13 @@ export default function Settings() {
     setLocalReviewTasks(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
     setLocalRollTypes(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
     setLocalNumberFormat(settings?.numberFormat || 'en');
-    setLocalRoles(settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل']);
+    setLocalRoles(settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص']);
     setLocalSessionTypes(settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة']);
     setLocalFileLocations(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
     setLocalCommonProcedures(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
     setLocalCaseClassifications(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
+    setLocalJudgmentCategories(settings?.judgmentCategories || ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص']);
+    setLocalJudgmentClassifications(settings?.judgmentClassifications || ['صالح', 'ضد', 'حكم منه للخصومة', 'غير منه للخصومة', 'تمهيدي']);
     setLocalJudgmentTextMap(settings?.judgmentTextMap || {
       'وقف جزائي': 'وقف الدعوى جزائيا لمدة شهر',
       'اعتبار': 'اعتبار الدعوى كأن لم تكن',
@@ -157,6 +161,8 @@ export default function Settings() {
       fileLocations: localFileLocations,
       commonProcedures: localCommonProcedures,
       caseClassifications: localCaseClassifications,
+      judgmentCategories: localJudgmentCategories,
+      judgmentClassifications: localJudgmentClassifications,
       judgmentTextMap: localJudgmentTextMap,
       judgmentDefaults: localJudgmentDefaults
     });
@@ -957,6 +963,60 @@ export default function Settings() {
             </div>
           </div>
 
+          {/* Judgment Categories Management */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <Scale className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-black text-sm text-navy-900">إدارة فئات الأحكام</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {localJudgmentCategories.map((cat, i) => (
+                <div key={i} className="flex items-center gap-1 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+                  <span>{cat}</span>
+                  <button onClick={() => setLocalJudgmentCategories(localJudgmentCategories.filter((_, idx) => idx !== i))} className="text-indigo-400 hover:text-rose-500 mr-2">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <button 
+                onClick={async () => {
+                  const newCat = await showPrompt('إضافة فئة', 'أدخل اسم فئة الحكم الجديدة (مثال: شق عاجل، نهائي):');
+                  if (newCat?.trim()) setLocalJudgmentCategories([...localJudgmentCategories, newCat.trim()]);
+                }} 
+                className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
+              >
+                <Plus className="w-3 h-3" /> إضافة فئة
+              </button>
+            </div>
+          </div>
+
+          {/* Judgment Classifications Management */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <ClipboardList className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-black text-sm text-navy-900">إدارة تصنيفات الأحكام</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {localJudgmentClassifications.map((cls, i) => (
+                <div key={i} className="flex items-center gap-1 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+                  <span>{cls}</span>
+                  <button onClick={() => setLocalJudgmentClassifications(localJudgmentClassifications.filter((_, idx) => idx !== i))} className="text-indigo-400 hover:text-rose-500 mr-2">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <button 
+                onClick={async () => {
+                  const newCls = await showPrompt('إضافة تصنيف', 'أدخل تصنيف الحكم الجديد (مثال: صالح، ضد):');
+                  if (newCls?.trim()) setLocalJudgmentClassifications([...localJudgmentClassifications, newCls.trim()]);
+                }} 
+                className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
+              >
+                <Plus className="w-3 h-3" /> إضافة تصنيف
+              </button>
+            </div>
+          </div>
+
           {/* Default Judgment Settings Management */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -998,34 +1058,51 @@ export default function Settings() {
                           <option value="category">فئة الحكم</option>
                           <option value="classification">تصنيف الحكم</option>
                         </select>
-                        <input 
-                          type="text" 
-                          placeholder="مثال: فحص، حكم منه للخصومة" 
-                          value={rule.triggerValue}
-                          onChange={(e) => {
-                            const newRules = [...localJudgmentDefaults];
-                            newRules[idx].triggerValue = e.target.value;
-                            setLocalJudgmentDefaults(newRules);
-                          }}
-                          className="text-xs font-bold p-2 rounded-lg border border-slate-300 w-2/3"
-                        />
+                        {rule.triggerField === 'category' ? (
+                          <select 
+                            value={rule.triggerValue}
+                            onChange={(e) => {
+                              const newRules = [...localJudgmentDefaults];
+                              newRules[idx].triggerValue = e.target.value;
+                              setLocalJudgmentDefaults(newRules);
+                            }}
+                            className="text-xs font-bold p-2 rounded-lg border border-slate-300 w-2/3 bg-white"
+                          >
+                            <option value="">- اختر الفئة -</option>
+                            {localJudgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        ) : (
+                          <select 
+                            value={rule.triggerValue}
+                            onChange={(e) => {
+                              const newRules = [...localJudgmentDefaults];
+                              newRules[idx].triggerValue = e.target.value;
+                              setLocalJudgmentDefaults(newRules);
+                            }}
+                            className="text-xs font-bold p-2 rounded-lg border border-slate-300 w-2/3 bg-white"
+                          >
+                            <option value="">- اختر التصنيف -</option>
+                            {localJudgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        )}
                       </div>
                     </div>
                     
                     <div className="space-y-2 border-r-[3px] border-emerald-400 pr-3">
                       <p className="text-xs font-black text-slate-600">يتم التعبئة التلقائية بـ:</p>
                       <div className="grid grid-cols-2 gap-2">
-                        <input 
-                          type="text" 
-                          placeholder="التصنيف (اختياري)" 
+                        <select 
                           value={rule.setClassification}
                           onChange={(e) => {
                             const newRules = [...localJudgmentDefaults];
                             newRules[idx].setClassification = e.target.value;
                             setLocalJudgmentDefaults(newRules);
                           }}
-                          className="text-xs font-bold p-2 rounded-lg border border-slate-300"
-                        />
+                          className="text-xs font-bold p-2 rounded-lg border border-slate-300 bg-white"
+                        >
+                          <option value="">-- تصنيف (اختياري) --</option>
+                          {localJudgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
                         <input 
                           type="text" 
                           placeholder="النوع (اختياري)" 
