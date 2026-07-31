@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CalendarDays, Filter, ChevronRight, ChevronLeft, Gavel, Printer, Zap, CheckCircle2, CalendarX2, CopyPlus, ClipboardList } from 'lucide-react';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isPast, isToday, startOfWeek, endOfWeek, parseISO } from 'date-fns';
+import { format, addMonths, subMonths, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isPast, isToday, startOfWeek, endOfWeek, parseISO } from 'date-fns';
 import { useAppContext } from '../context/AppState';
 import ExportPDFModal from '../components/ExportPDFModal';
 import BulkSessionRolloverModal from '../components/BulkSessionRolloverModal';
@@ -25,6 +25,7 @@ export default function Agenda() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isRolloverModalOpen, setIsRolloverModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'list'
+  const [calendarView, setCalendarView] = useState('month'); // 'month' or 'week'
   const [singleDateSearch, setSingleDateSearch] = useState('');
   const [sessionTypeSearch, setSessionTypeSearch] = useState('');
 
@@ -61,42 +62,60 @@ export default function Agenda() {
     setFilterMode('none');
   };
 
-  const SearchControls = () => (
-    <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center gap-2 mb-4">
-      <div className="flex items-center gap-2 flex-1 w-full">
-        <input 
-          type="date" 
-          value={singleDateSearch} 
-          onChange={e => setSingleDateSearch(e.target.value)} 
-          className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900" 
-        />
-        <select
-          value={sessionTypeSearch}
-          onChange={e => setSessionTypeSearch(e.target.value)}
-          className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-900"
-        >
-          <option value="">كل الجلسات</option>
-          <option value="فحص">فحص</option>
-          <option value="موضوع">موضوع</option>
-          <option value="للحكم">للحكم</option>
-        </select>
+  const CalendarControls = () => {
+    const isCurrentMonth = currentDate.getMonth() === new Date().getMonth() && currentDate.getFullYear() === new Date().getFullYear();
+    const isNextMonth = currentDate.getMonth() === addMonths(new Date(), 1).getMonth() && currentDate.getFullYear() === addMonths(new Date(), 1).getFullYear();
+    const isPrevMonth = currentDate.getMonth() === subMonths(new Date(), 1).getMonth() && currentDate.getFullYear() === subMonths(new Date(), 1).getFullYear();
+
+    return (
+      <div className="bg-white rounded-2xl p-2 sm:p-3 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center gap-2 mb-4 overflow-x-auto">
+        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+          <button 
+            onClick={() => { setCalendarView('month'); setCurrentDate(new Date()); }}
+            className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition ${isCurrentMonth && calendarView === 'month' ? 'bg-navy-900 text-amber-300' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+          >
+            الشهر الحالي
+          </button>
+          <button 
+            onClick={() => { setCalendarView('month'); setCurrentDate(addMonths(new Date(), 1)); }}
+            className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition ${isNextMonth && calendarView === 'month' ? 'bg-navy-900 text-amber-300' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+          >
+            الشهر القادم
+          </button>
+          <button 
+            onClick={() => { setCalendarView('month'); setCurrentDate(subMonths(new Date(), 1)); }}
+            className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition ${isPrevMonth && calendarView === 'month' ? 'bg-navy-900 text-amber-300' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+          >
+            الشهر السابق
+          </button>
+          <div className="h-4 w-px bg-slate-200 mx-1"></div>
+          <button 
+            onClick={() => { setCalendarView('week'); setCurrentDate(new Date()); }}
+            className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition ${calendarView === 'week' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+          >
+            عرض أسبوعي
+          </button>
+        </div>
+
+        <div className="h-4 w-px bg-slate-200 hidden sm:block mx-1"></div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 sm:mr-auto">
+          <span className="text-[10px] font-bold text-slate-400">انتقال سريع:</span>
+          <input 
+            type="date" 
+            onChange={e => {
+              if (e.target.value) {
+                const d = new Date(e.target.value);
+                setCurrentDate(d);
+                setSelectedDateKey(e.target.value);
+              }
+            }} 
+            className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-navy-900 w-full sm:w-[130px]" 
+          />
+        </div>
       </div>
-      <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0 shrink-0">
-        <button 
-          onClick={handleResetSearch}
-          className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-4 py-2 rounded-xl text-xs transition"
-        >
-          مسح
-        </button>
-        <button 
-          onClick={handleSearch}
-          className="bg-navy-900 hover:bg-navy-800 text-amber-300 font-bold px-6 py-2 rounded-xl text-xs transition shadow-sm flex-1 sm:flex-none flex items-center justify-center gap-2"
-        >
-          بحث
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const sessionsMap = useMemo(() => {
     const map = {};
@@ -122,11 +141,19 @@ export default function Agenda() {
     return map;
   }, [cases, sessionTypeSearch]);
 
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart);
-  const endDate = endOfWeek(monthEnd);
-  const days = eachDayOfInterval({ start: startDate, end: endDate });
+  const days = useMemo(() => {
+    if (calendarView === 'week') {
+      const start = startOfWeek(currentDate);
+      const end = endOfWeek(currentDate);
+      return eachDayOfInterval({ start, end });
+    } else {
+      const monthStart = startOfMonth(currentDate);
+      const monthEnd = endOfMonth(monthStart);
+      const start = startOfWeek(monthStart);
+      const end = endOfWeek(monthEnd);
+      return eachDayOfInterval({ start, end });
+    }
+  }, [currentDate, calendarView]);
 
   const monthSessionKeys = Object.keys(sessionsMap).filter(k => k.startsWith(format(currentDate, "yyyy-MM")));
   const monthSessionFiles = monthSessionKeys.reduce((acc, k) => acc + sessionsMap[k].length, 0);
@@ -188,19 +215,21 @@ export default function Agenda() {
 
       {activeTab === 'calendar' && (
         <div className="space-y-3">
-          <SearchControls />
+          <CalendarControls />
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="bg-navy-900 text-white px-4 py-3 flex items-center justify-between">
-              <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="w-8 h-8 rounded-lg bg-navy-800 hover:bg-navy-700 flex items-center justify-center transition active:scale-95">
+              <button onClick={() => setCurrentDate(calendarView === 'week' ? addDays(currentDate, 7) : addMonths(currentDate, 1))} className="w-8 h-8 rounded-lg bg-navy-800 hover:bg-navy-700 flex items-center justify-center transition active:scale-95">
                 <ChevronRight className="w-4 h-4 text-amber-300" />
               </button>
               <div className="text-center">
-                <h2 className="font-black text-base text-white">{ARABIC_MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}</h2>
+                <h2 className="font-black text-base text-white">
+                  {calendarView === 'week' ? 'الأسبوع الحالي' : `${ARABIC_MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`}
+                </h2>
                 <p className="text-[10px] text-amber-300 font-bold mt-0.5">
                   {monthSessionKeys.length > 0 ? `${monthSessionKeys.length} يوم جلسة • ${monthSessionFiles} ملف هذا الشهر` : 'لا توجد جلسات مسجلة هذا الشهر'}
                 </p>
               </div>
-              <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="w-8 h-8 rounded-lg bg-navy-800 hover:bg-navy-700 flex items-center justify-center transition active:scale-95">
+              <button onClick={() => setCurrentDate(calendarView === 'week' ? subDays(currentDate, 7) : subMonths(currentDate, 1))} className="w-8 h-8 rounded-lg bg-navy-800 hover:bg-navy-700 flex items-center justify-center transition active:scale-95">
                 <ChevronLeft className="w-4 h-4 text-amber-300" />
               </button>
             </div>

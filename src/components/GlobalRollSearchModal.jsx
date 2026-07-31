@@ -3,7 +3,7 @@ import { X, Search, Plus, CalendarPlus } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 
-export default function GlobalRollSearchModal({ isOpen, onClose, initialQuery, sessionDate }) {
+export default function GlobalRollSearchModal({ isOpen, onClose, initialQuery, sessionDate, isJudgmentRoll = false }) {
   const { cases, saveCaseToFirebase } = useAppContext();
   const { toast } = useUI();
   
@@ -39,12 +39,21 @@ export default function GlobalRollSearchModal({ isOpen, onClose, initialQuery, s
       }
       
       // Add new session
-      sessions.push({
+      const newSession = {
         id: Date.now().toString(),
         date: sessionDate,
-        createdAt: new Date().toISOString()
-      });
+        createdAt: new Date().toISOString(),
+        ...(isJudgmentRoll ? { decision: 'للحكم', type: 'للحكم' } : {})
+      };
+      sessions.push(newSession);
       newData.sessions = sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
+      
+      // Update top-level fields so the case reflects the latest session globally
+      const sessionKey = Object.keys(newData).find(k => k === 'آخر جلسة' || k === 'تاريخ الجلسة' || k === 'أخر جلسة') || 'آخر جلسة';
+      const decisionKey = Object.keys(newData).find(k => k === 'القرار' || k === 'قرار الجلسة' || k === 'المنطوق') || 'القرار';
+
+      newData[sessionKey] = newData.sessions[0].date;
+      newData[decisionKey] = newData.sessions[0].decision || '';
       
       await saveCaseToFirebase(cObj.id, newData);
       toast('تم إضافة الدعوى للرول بنجاح', 'success');

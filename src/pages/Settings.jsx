@@ -679,7 +679,9 @@ export default function Settings() {
                     <option value="dd/MM/yyyy">يوم/شهر/سنة (31/12/2026)</option>
                     <option value="yyyy/MM/dd">سنة/شهر/يوم (2026/12/31)</option>
                     <option value="dd-MM-yyyy">يوم-شهر-سنة (31-12-2026)</option>
-                    <option value="d MMMM yyyy">نصي (31 ديسمبر 2026)</option>
+                    <option value="d MMMM yyyy">نصي كامل (31 ديسمبر 2026)</option>
+                    <option value="MM/dd">رقمي مختصر (12/31)</option>
+                    <option value="d MMMM">نصي مختصر (31 ديسمبر)</option>
                   </select>
                 </div>
               </div>

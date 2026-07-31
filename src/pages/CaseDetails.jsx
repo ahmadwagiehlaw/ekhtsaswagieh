@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2, Bell, AlertTriangle, FileText, ExternalLink, BookOpen, Files, Hash, Paperclip, Scale, Loader2, Plus, Star } from 'lucide-react';
+import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2, Bell, AlertTriangle, FileText, ExternalLink, BookOpen, Files, Hash, Paperclip, Scale, Loader2, Plus, Star, MessageSquare } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import AddSessionModal from '../components/AddSessionModal';
@@ -43,6 +43,10 @@ export default function CaseDetails() {
   const [activeSessionIdx, setActiveSessionIdx] = useState(null);
   const [isUploadingSessionFile, setIsUploadingSessionFile] = useState(false);
   const [pastedFile, setPastedFile] = useState(null);
+  const [editingSessionIdx, setEditingSessionIdx] = useState(null);
+  const [editSessionData, setEditSessionData] = useState({});
+  const [activeNoteSessionIdx, setActiveNoteSessionIdx] = useState(null);
+  const [activeJudgmentSessionIdx, setActiveJudgmentSessionIdx] = useState(null);
 
   // Global Paste Handler for the Case
   React.useEffect(() => {
@@ -235,6 +239,28 @@ export default function CaseDetails() {
 
   const coverImageDoc = (caseData.documents || []).find(doc => doc.type === 'غلاف الملف' && doc.fileType === 'image');
   const coverImageUrl = coverImageDoc ? coverImageDoc.url : null;
+
+  const handleSaveSessionEdit = async (idx) => {
+    const newSessions = [...caseData.sessions];
+    newSessions[idx] = { ...newSessions[idx], ...editSessionData };
+    // Sort descending by date
+    newSessions.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    const updateData = { sessions: newSessions };
+    
+    const sessionKey = Object.keys(caseData).find(k => k === 'آخر جلسة' || k === 'تاريخ الجلسة' || k === 'أخر جلسة') || 'آخر جلسة';
+    const decisionKey = Object.keys(caseData).find(k => k === 'القرار' || k === 'قرار الجلسة' || k === 'المنطوق') || 'القرار';
+
+    if (newSessions.length > 0) {
+      updateData[sessionKey] = newSessions[0].date;
+      updateData[decisionKey] = newSessions[0].decision || '';
+    }
+
+    await saveCaseToFirebase(caseData.id, updateData);
+    setEditingSessionIdx(null);
+    setEditSessionData({});
+    toast('تم حفظ الجلسة وتحديث الترتيب', 'success');
+  };
 
   const handleSave = async () => {
     if (!canEditData) return;
@@ -977,67 +1003,122 @@ export default function CaseDetails() {
                      <div className="flex items-center gap-2 w-full flex-wrap justify-between">
                         {/* Right side (Fields) */}
                         <div className="flex items-center gap-2 flex-wrap">
-                           {/* Roll */}
-                           <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-md border border-slate-200">
-                              <span className="text-[10px] font-black text-slate-500">رول:</span>
-                              <input
-                                 type="text"
-                                 defaultValue={session.roll || ''}
-                                 className="w-8 text-[10px] font-black text-indigo-700 bg-transparent text-center focus:outline-none"
-                                 onBlur={async (e) => {
-                                    if (e.target.value !== (session.roll || '')) {
-                                       const newSessions = [...caseData.sessions];
-                                       newSessions[idx] = { ...newSessions[idx], roll: e.target.value };
-                                       await saveCaseToFirebase(caseData.id, { sessions: newSessions });
-                                    }
-                                 }}
-                              />
-                           </div>
-                           
-                           {/* Date */}
-                           <input
-                              type="date"
-                              defaultValue={session.date}
-                              className="text-[10px] font-black text-slate-500 bg-white px-2 py-1 rounded-md border border-slate-200 w-[110px] text-center focus:outline-none focus:border-amber-400"
-                              onBlur={async (e) => {
-                                 if (e.target.value !== session.date && e.target.value) {
-                                    const newSessions = [...caseData.sessions];
-                                    newSessions[idx] = { ...newSessions[idx], date: e.target.value };
-                                    await saveCaseToFirebase(caseData.id, { sessions: newSessions });
-                                 }
-                              }}
-                           />
-                           
-                           {/* Type */}
-                           <select
-                              defaultValue={session.type || 'فحص'}
-                              className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 focus:outline-none focus:border-emerald-400"
-                              onBlur={async (e) => {
-                                 if (e.target.value !== (session.type || 'فحص')) {
-                                    const newSessions = [...caseData.sessions];
-                                    newSessions[idx] = { ...newSessions[idx], type: e.target.value };
-                                    await saveCaseToFirebase(caseData.id, { sessions: newSessions });
-                                 }
-                              }}
-                           >
-                              <option value="فحص">فحص</option>
-                              <option value="موضوع">موضوع</option>
-                           </select>
-                           
-                           {/* Decision */}
-                           <input
-                              list="decisions-list"
-                              defaultValue={session.decision || ''}
-                              placeholder="القرار..."
-                              className="text-xs font-black text-navy-900 bg-white px-3 py-1 rounded-md border border-slate-200 w-[120px] focus:outline-none focus:border-amber-400"
-                              onBlur={async (e) => {
-                                 if (e.target.value !== (session.decision || '')) {
-                                    const newSessions = [...caseData.sessions];
-                                    newSessions[idx] = { ...newSessions[idx], decision: e.target.value };
-                                    await saveCaseToFirebase(caseData.id, { sessions: newSessions });
-                                 }
-                              }}
-                           />
+                           {editingSessionIdx === idx ? (
+                              <>
+                                 {/* Roll Edit */}
+                                 <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-md border border-slate-200">
+                                    <span className="text-[10px] font-black text-slate-500">رول:</span>
+                                    <input
+                                       type="text"
+                                       value={editSessionData.roll ?? session.roll ?? ''}
+                                       onChange={(e) => setEditSessionData({ ...editSessionData, roll: e.target.value })}
+                                       className="w-8 text-[10px] font-black text-indigo-700 bg-transparent text-center focus:outline-none"
+                                    />
+                                 </div>
+                                 
+                                 {/* Date Edit */}
+                                 <input
+                                    type="date"
+                                    value={editSessionData.date ?? session.date ?? ''}
+                                    onChange={(e) => setEditSessionData({ ...editSessionData, date: e.target.value })}
+                                    className="text-[10px] font-black text-slate-500 bg-white px-2 py-1 rounded-md border border-slate-200 w-[110px] text-center focus:outline-none focus:border-amber-400"
+                                 />
+                                 
+                                 {/* Type Edit */}
+                                 <select
+                                    value={editSessionData.type ?? session.type ?? 'فحص'}
+                                    onChange={(e) => setEditSessionData({ ...editSessionData, type: e.target.value })}
+                                    className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 focus:outline-none focus:border-emerald-400"
+                                 >
+                                    <option value="فحص">فحص</option>
+                                    <option value="موضوع">موضوع</option>
+                                 </select>
+                                 
+                                 {/* Decision Edit */}
+                                 <input
+                                    list="decisions-list"
+                                    value={editSessionData.decision ?? session.decision ?? ''}
+                                    onChange={(e) => setEditSessionData({ ...editSessionData, decision: e.target.value })}
+                                    placeholder="القرار..."
+                                    className="text-xs font-black text-navy-900 bg-white px-3 py-1 rounded-md border border-slate-200 w-[120px] focus:outline-none focus:border-amber-400"
+                                 />
+                              </>
+                           ) : (
+                              <>
+                                 {/* Roll View */}
+                                 {session.roll && (
+                                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-md border border-slate-200">
+                                       <span className="text-[10px] font-black text-slate-500">رول:</span>
+                                       <span className="text-[10px] font-black text-indigo-700">{session.roll}</span>
+                                    </div>
+                                 )}
+                                 
+                                 {/* Date View */}
+                                 <div className="text-[11px] font-black text-slate-600 bg-white px-3 py-1.5 rounded-md border border-slate-200 flex items-center gap-2">
+                                    <CalendarPlus className="w-3.5 h-3.5 text-slate-400" />
+                                    {formatDateString(session.date)}
+                                 </div>
+                                 
+                                 {/* Type View */}
+                                 <div className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-1.5 rounded-md border border-emerald-200">
+                                    {session.type || 'فحص'}
+                                 </div>
+                                 
+                                 {/* Decision View */}
+                                 {session.decision && (
+                                    <div className="text-xs font-black text-navy-900 bg-white px-3 py-1.5 rounded-md border border-slate-200 max-w-[200px] truncate" title={session.decision}>
+                                       {session.decision}
+                                    </div>
+                                 )}
+
+                                 {/* Judgment Badge View */}
+                                 {session.hasJudgment && (session.judgment || session.shortJudgment) && (
+                                    <div className={`text-[10px] font-black px-2 py-1.5 rounded-md border flex items-center gap-1 ${
+                                       (() => {
+                                          const res = (session.judgment && session.judgment.result) || session.judgmentClassification;
+                                          const rc = res === 'صالح' ? 'emerald' : res === 'ضد' ? 'rose' : res === 'مختلط' ? 'indigo' : res === 'اعتبار' ? 'amber' : (res === 'وقف جزائي' || res === 'غير منه للخصومة') ? 'orange' : res === 'وقف تعليقي' ? 'purple' : res === 'خبراء' ? 'cyan' : res === 'حكم منه للخصومة' ? 'amber' : res === 'تمهيدي' ? 'indigo' : 'slate';
+                                          return `bg-${rc}-50 text-${rc}-700 border-${rc}-200`;
+                                       })()
+                                    }`}>
+                                       <Scale className="w-3 h-3" />
+                                       {(session.judgment && session.judgment.type) || session.shortJudgment} {((session.judgment && session.judgment.result) || session.judgmentClassification) ? `- ${(session.judgment && session.judgment.result) || session.judgmentClassification}` : ''}
+                                    </div>
+                                 )}
+
+                                 {/* Notes Bubble */}
+                                 <div className="relative">
+                                    <button 
+                                       onClick={() => setActiveNoteSessionIdx(activeNoteSessionIdx === idx ? null : idx)}
+                                       className={`p-1.5 rounded-md border transition flex items-center justify-center shadow-sm ${session.notes ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                                       title={session.notes ? "استعراض/تعديل الملاحظات" : "إضافة ملاحظة"}
+                                    >
+                                       <MessageSquare className="w-3.5 h-3.5" />
+                                    </button>
+                                    
+                                    {activeNoteSessionIdx === idx && (
+                                       <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 p-3 z-[100]">
+                                          <div className="flex items-center justify-between mb-2">
+                                             <span className="text-[10px] font-black text-slate-500">ملاحظات الجلسة</span>
+                                             <button onClick={() => setActiveNoteSessionIdx(null)} className="text-slate-400 hover:text-rose-500 transition"><X className="w-3 h-3" /></button>
+                                          </div>
+                                          <textarea
+                                             autoFocus
+                                             defaultValue={session.notes || ''}
+                                             placeholder="اكتب ملاحظاتك هنا..."
+                                             className="w-full text-xs font-bold text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-400 min-h-[80px]"
+                                             onBlur={async (e) => {
+                                                if (e.target.value !== (session.notes || '')) {
+                                                   const newSessions = [...caseData.sessions];
+                                                   newSessions[idx] = { ...newSessions[idx], notes: e.target.value };
+                                                   await saveCaseToFirebase(caseData.id, { sessions: newSessions });
+                                                }
+                                             }}
+                                          />
+                                       </div>
+                                    )}
+                                 </div>
+                              </>
+                           )}
                         </div>
 
                         {/* Left side (Actions) */}
@@ -1059,28 +1140,13 @@ export default function CaseDetails() {
                               {(isUploadingSessionFile && activeSessionIdx === idx) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
                            </button>
 
-                           {/* Notes Toggle */}
-                           <button 
-                               onClick={async () => {
-                                  const newSessions = [...caseData.sessions];
-                                  newSessions[idx] = { ...newSessions[idx], _showNotes: !session._showNotes };
-                                  await saveCaseToFirebase(caseData.id, { sessions: newSessions });
-                               }}
-                               className={`p-1 rounded border transition flex items-center justify-center h-7 w-7 shadow-sm ${session._showNotes || session.notes ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200 hover:text-navy-900'}`}
-                               title={(session._showNotes || session.notes) ? "إخفاء الملاحظات" : "إضافة/عرض الملاحظات"}
-                           >
-                               <FileText className="w-3.5 h-3.5" />
-                           </button>
-
                            {/* Judgment Toggle */}
                            <button 
-                              onClick={async () => {
-                                 const newSessions = [...caseData.sessions];
-                                 newSessions[idx] = { ...newSessions[idx], hasJudgment: !session.hasJudgment };
-                                 await saveCaseToFirebase(caseData.id, { sessions: newSessions });
+                              onClick={() => {
+                                 setActiveJudgmentSessionIdx(activeJudgmentSessionIdx === idx ? null : idx);
                               }}
-                              className={`p-1 rounded border transition flex items-center justify-center h-7 w-7 shadow-sm ${session.hasJudgment ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200 hover:text-navy-900'}`}
-                              title={session.hasJudgment ? "إلغاء حقول الحكم" : "إضافة بيانات الحكم"}
+                              className={`p-1.5 rounded-md border transition flex items-center justify-center h-7 w-7 shadow-sm ${session.hasJudgment ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200 hover:text-navy-900'}`}
+                              title={session.hasJudgment ? "استعراض/تعديل الحكم" : "إضافة حكم"}
                            >
                               <Scale className="w-3.5 h-3.5" />
                            </button>
@@ -1100,8 +1166,38 @@ export default function CaseDetails() {
                               );
                            })()}
                            
+                           {/* Edit/Save Actions */}
+                           {canEditData && editingSessionIdx === idx ? (
+                              <>
+                                 <button
+                                    onClick={() => handleSaveSessionEdit(idx)}
+                                    className="text-white hover:bg-emerald-600 bg-emerald-500 transition p-1 rounded h-7 w-7 flex items-center justify-center shadow-sm"
+                                    title="حفظ"
+                                 >
+                                    <Save className="w-4 h-4" />
+                                 </button>
+                                 <button
+                                    onClick={() => { setEditingSessionIdx(null); setEditSessionData({}); }}
+                                    className="text-slate-500 hover:text-slate-700 bg-slate-100 border border-slate-200 hover:bg-slate-200 transition p-1 rounded h-7 w-7 flex items-center justify-center shadow-sm"
+                                    title="إلغاء"
+                                 >
+                                    <X className="w-4 h-4" />
+                                 </button>
+                              </>
+                           ) : (
+                              canEditData && (
+                                 <button
+                                    onClick={() => { setEditingSessionIdx(idx); setEditSessionData({ ...session }); }}
+                                    className="text-slate-400 hover:text-amber-600 hover:bg-amber-50 bg-white border border-transparent hover:border-amber-100 transition p-1 rounded h-7 w-7 flex items-center justify-center"
+                                    title="تعديل الجلسة"
+                                 >
+                                    <Edit3 className="w-4 h-4" />
+                                 </button>
+                              )
+                           )}
+
                            {/* Trash Icon */}
-                           {canEditData && (
+                           {canEditData && editingSessionIdx !== idx && (
                               <button
                                  onClick={async () => {
                                  const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذه الجلسة؟', 'delete_session');
@@ -1122,7 +1218,7 @@ export default function CaseDetails() {
                      </div>
 
                      {/* Judgment Fields Block */}
-                     {session.hasJudgment && (() => {
+                     {activeJudgmentSessionIdx === idx && (() => {
                         const resColorMap = { 'صالح':'emerald', 'ضد':'rose', 'مختلط':'indigo', 'اعتبار':'amber', 'وقف جزائي':'orange', 'وقف تعليقي':'purple', 'خبراء':'cyan', 'حكم منه للخصومة':'amber', 'غير منه للخصومة':'orange', 'تمهيدي':'indigo' };
                         const j = session.judgment || {};
                         
@@ -1206,9 +1302,25 @@ export default function CaseDetails() {
                           if (!isEditing) {
                             return (
                               <div className="flex flex-col gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 mt-1 shadow-sm relative group transition-all hover:border-indigo-200">
-                                <button onClick={() => setIsEditing(true)} className="absolute left-2 top-2 p-1.5 bg-white text-slate-400 hover:text-indigo-600 rounded-lg shadow-sm border border-slate-200 transition opacity-0 group-hover:opacity-100" title="تعديل بيانات الحكم">
-                                  <Edit3 className="w-3 h-3" />
-                                </button>
+                                <div className="absolute left-2 top-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                                  <button onClick={() => setIsEditing(true)} className="p-1.5 bg-white text-slate-400 hover:text-indigo-600 rounded-lg shadow-sm border border-slate-200" title="تعديل بيانات الحكم">
+                                    <Edit3 className="w-3 h-3" />
+                                  </button>
+                                  <button onClick={async () => {
+                                      const confirmed = await showConfirm('حذف الحكم', 'هل أنت متأكد من حذف هذا الحكم؟', 'delete_judgment');
+                                      if (confirmed) {
+                                         const newSessions = [...caseData.sessions];
+                                         newSessions[idx] = { ...newSessions[idx], hasJudgment: false, judgment: null, shortJudgment: null, judgmentClassification: null, verdict: null };
+                                         await saveCaseToFirebase(caseData.id, { sessions: newSessions });
+                                         setActiveJudgmentSessionIdx(null);
+                                      }
+                                  }} className="p-1.5 bg-white text-slate-400 hover:text-rose-600 rounded-lg shadow-sm border border-slate-200" title="حذف الحكم">
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                  <button onClick={() => setActiveJudgmentSessionIdx(null)} className="p-1.5 bg-white text-slate-400 hover:text-slate-600 rounded-lg shadow-sm border border-slate-200" title="إغلاق التفاصيل">
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="text-[10px] font-black text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">⚖️ حكم مسجل</span>
                                   {final && <span className="text-[9px] font-black px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">نهائي</span>}
@@ -1239,7 +1351,7 @@ export default function CaseDetails() {
                                 {res && <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border bg-${rc}-50 text-${rc}-700 border-${rc}-200`}>{res}</span>}
                               </div>
                               <div className="mb-2">
-                                <label className="text-[9px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
+                                 <label className="text-[9px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
                                 <div>
                                   <input
                                     list={`jtype-${session.id}`}
@@ -1279,11 +1391,12 @@ export default function CaseDetails() {
                                   حكم نهائي في الدعوى
                                 </label>
                                 <div className="flex gap-2">
-                                  {session.hasJudgment && (
-                                    <button onClick={() => setIsEditing(false)} disabled={saving} className="text-[10px] font-bold px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition disabled:opacity-50">
-                                      إلغاء
-                                    </button>
-                                  )}
+                                  <button onClick={() => {
+                                      if (session.hasJudgment) setIsEditing(false);
+                                      else setActiveJudgmentSessionIdx(null);
+                                  }} disabled={saving} className="text-[10px] font-bold px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition disabled:opacity-50">
+                                    إلغاء
+                                  </button>
                                   <button onClick={handleSave} disabled={saving} className="text-[10px] font-black px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition disabled:opacity-50">
                                     {saving ? '...' : '💾 حفظ الحكم'}
                                   </button>
@@ -1295,20 +1408,6 @@ export default function CaseDetails() {
                         return <JudgmentEditor />;
                      })()}
 
-                     {(session.notes || session._showNotes) && (
-                        <textarea 
-                           placeholder="ملاحظات الجلسة..."
-                           className="w-full text-[10px] font-bold text-slate-600 bg-white p-2 rounded-lg border border-slate-200 whitespace-pre-wrap focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 resize-none min-h-[40px]"
-                           defaultValue={session.notes}
-                           onBlur={async (e) => {
-                              if (e.target.value !== session.notes) {
-                                 const newSessions = [...caseData.sessions];
-                                 newSessions[idx] = { ...newSessions[idx], notes: e.target.value };
-                                 await saveCaseToFirebase(caseData.id, { sessions: newSessions });
-                              }
-                           }}
-                        />
-                     )}
                   </div>
                 </div>
               ))}

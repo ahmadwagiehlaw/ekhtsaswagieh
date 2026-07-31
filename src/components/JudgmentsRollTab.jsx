@@ -4,7 +4,7 @@ import {
   Edit3, Check, X, ChevronRight, ChevronLeft, AlertCircle,
   CheckSquare, Square, Camera, ExternalLink, Printer, Search, Image,
   ClipboardList, Bell, Eye, CopyPlus, Scale, Plus, Trash2,
-  ArrowUpDown, ArrowUp, ArrowDown, Columns
+  ArrowUpDown, ArrowUp, ArrowDown, Columns, Filter
 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
@@ -172,6 +172,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
   const [editData, setEditData] = useState({});
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [savingId, setSavingId] = useState(null);
+  const [judgmentFilter, setJudgmentFilter] = useState('all');
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [isBulkProcedureOpen, setIsBulkProcedureOpen] = useState(false);
@@ -227,10 +228,35 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
       );
     }
 
+    // Filter by judgment status
+    if (judgmentFilter === 'recorded') {
+      result = result.filter(c => {
+         const session = c.sessions?.find(s => s.date === date);
+         return session?.hasJudgment;
+      });
+    } else if (judgmentFilter === 'unrecorded') {
+      result = result.filter(c => {
+         const session = c.sessions?.find(s => s.date === date);
+         return !session?.hasJudgment;
+      });
+    }
+
     // Sort
     result = [...result].sort((a, b) => {
-      let valA = getFieldVal(a, [sortConfig.key]) || '';
-      let valB = getFieldVal(b, [sortConfig.key]) || '';
+      let valA = '';
+      let valB = '';
+
+      if (sortConfig.key.startsWith('_')) {
+        const keyMap = { '_type': 'type', '_category': 'category', '_result': 'result', '_verdict': 'verdict' };
+        const realKey = keyMap[sortConfig.key];
+        const sA = a.sessions?.find(s => s.date === date);
+        const sB = b.sessions?.find(s => s.date === date);
+        valA = sA?.judgment?.[realKey] || '';
+        valB = sB?.judgment?.[realKey] || '';
+      } else {
+        valA = getFieldVal(a, [sortConfig.key]) || '';
+        valB = getFieldVal(b, [sortConfig.key]) || '';
+      }
       
       if (sortConfig.key === 'الرول') {
         valA = Number(valA) || 999999;
@@ -239,6 +265,10 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
         valA = String(valA).toLowerCase();
         valB = String(valB).toLowerCase();
       }
+
+      // Group empty values together at the bottom
+      if (!valA && valB) return 1;
+      if (valA && !valB) return -1;
 
       if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
       if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
@@ -464,9 +494,18 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
             className="flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition">
             <Printer className="w-3.5 h-3.5" /> طباعة
           </button>
-          <button onClick={() => window.open(`/day-roll/${date}/judgments`, '_blank')}
-            className="flex items-center gap-1 bg-rose-50 text-rose-700 hover:bg-rose-100 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition">
-            <ExternalLink className="w-3.5 h-3.5" /> شاشة كاملة
+          <button 
+            onClick={() => setJudgmentFilter(prev => prev === 'all' ? 'recorded' : prev === 'recorded' ? 'unrecorded' : 'all')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition shadow-sm border ${
+              judgmentFilter === 'all' 
+                ? 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                : judgmentFilter === 'recorded'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+            }`}
+          >
+            <Filter className="w-3.5 h-3.5" /> 
+            {judgmentFilter === 'all' ? 'عرض: الكل' : judgmentFilter === 'recorded' ? 'عرض: الأحكام المسجلة' : 'عرض: بدون أحكام'}
           </button>
         </div>
       </div>
@@ -832,6 +871,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
         onClose={() => setIsGlobalSearchOpen(false)}
         initialQuery={searchQ}
         sessionDate={date}
+        isJudgmentRoll={true}
       />
     </div>
   );
