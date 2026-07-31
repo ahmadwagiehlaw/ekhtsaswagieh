@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Filter, FolderClosed, Plus, Clock, FileText, Upload, Download, Loader2, Info, Building2, Gavel, FileBox, X, CalendarDays, Printer, CheckSquare, Square, ClipboardList, AlertTriangle, Sparkles, MapPin, User, Files as FilesIcon, ArrowUpDown, SlidersHorizontal, Edit3, Trash2 } from 'lucide-react';
+import { Search, Filter, FolderClosed, Plus, Clock, FileText, Upload, Download, Loader2, Info, Building2, Gavel, FileBox, X, CalendarDays, Printer, CheckSquare, Square, ClipboardList, AlertTriangle, Sparkles, MapPin, User, Files as FilesIcon, ArrowUpDown, SlidersHorizontal, Edit3, Trash2, Pin, PinOff } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import ExportPDFModal from '../components/ExportPDFModal';
@@ -39,6 +39,41 @@ export default function Files() {
   const [sortBy, setSortBy] = useState('none');
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isSortPanelOpen, setIsSortPanelOpen] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
+
+  // Load pinned filters from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('pinnedFilters');
+      if (saved) {
+        const pinned = JSON.parse(saved);
+        setIsPinned(true);
+        setRoleFilter(pinned.roleFilter ?? 'all');
+        setShowOngoingOnly(pinned.showOngoingOnly ?? false);
+        setShowWithAttachmentsOnly(pinned.showWithAttachmentsOnly ?? false);
+        setShowImportantOnly(pinned.showImportantOnly ?? false);
+        setShowSessionlessOnly(pinned.showSessionlessOnly ?? false);
+        setShowPastSessionsOnly(pinned.showPastSessionsOnly ?? false);
+        setSortBy(pinned.sortBy ?? 'none');
+      }
+    } catch (e) {}
+  }, []);
+
+  const handlePinFilters = () => {
+    if (isPinned) {
+      // Unpin: clear saved filters
+      localStorage.removeItem('pinnedFilters');
+      setIsPinned(false);
+    } else {
+      // Pin current filters
+      const toSave = {
+        roleFilter, showOngoingOnly, showWithAttachmentsOnly,
+        showImportantOnly, showSessionlessOnly, showPastSessionsOnly, sortBy
+      };
+      localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
+      setIsPinned(true);
+    }
+  };
 
   const itemsPerPage = 20;
 
@@ -330,7 +365,8 @@ export default function Files() {
             >
               <SlidersHorizontal className="w-4 h-4" />
               <span>الفلترة</span>
-              {(roleFilter !== 'all' || showOngoingOnly || showPastSessionsOnly || showWithAttachmentsOnly || showImportantOnly || showSessionlessOnly) && (
+              {isPinned && <Pin className="w-3 h-3 text-amber-500" />}
+              {!isPinned && (roleFilter !== 'all' || showOngoingOnly || showPastSessionsOnly || showWithAttachmentsOnly || showImportantOnly || showSessionlessOnly) && (
                 <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
               )}
             </button>
@@ -404,21 +440,41 @@ export default function Files() {
           <div className="border-t border-slate-100 pt-3 animate-in slide-in-from-top-2 duration-200">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-xs font-black text-slate-500">تصفية القضايا حسب:</h4>
-              {(roleFilter !== 'all' || showOngoingOnly || showPastSessionsOnly || showWithAttachmentsOnly || showImportantOnly || showSessionlessOnly) && (
+              <div className="flex items-center gap-2">
+                {/* PIN Button */}
                 <button
-                  onClick={() => {
-                    setRoleFilter('all');
-                    setShowOngoingOnly(false);
-                    setShowPastSessionsOnly(false);
-                    setShowWithAttachmentsOnly(false);
-                    setShowImportantOnly(false);
-                    setShowSessionlessOnly(false);
-                  }}
-                  className="text-[10px] font-black text-rose-500 hover:text-rose-600 transition"
+                  onClick={handlePinFilters}
+                  title={isPinned ? 'إلغاء تثبيت الفلاتر الحالية' : 'تثبيت الفلاتر الحالية (تبقى محفوظة)'}
+                  className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg border transition ${
+                    isPinned
+                      ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200'
+                      : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-amber-50 hover:text-amber-600'
+                  }`}
                 >
-                  إعادة ضبط الفلاتر
+                  {isPinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
+                  {isPinned ? 'إلغاء التثبيت' : 'تثبيت الفلاتر'}
                 </button>
-              )}
+                {(roleFilter !== 'all' || showOngoingOnly || showPastSessionsOnly || showWithAttachmentsOnly || showImportantOnly || showSessionlessOnly) && (
+                  <button
+                    onClick={() => {
+                      setRoleFilter('all');
+                      setShowOngoingOnly(false);
+                      setShowPastSessionsOnly(false);
+                      setShowWithAttachmentsOnly(false);
+                      setShowImportantOnly(false);
+                      setShowSessionlessOnly(false);
+                      if (isPinned) {
+                        // Update pin to reflect cleared state
+                        const toSave = { roleFilter: 'all', showOngoingOnly: false, showWithAttachmentsOnly: false, showImportantOnly: false, showSessionlessOnly: false, showPastSessionsOnly: false, sortBy };
+                        localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
+                      }
+                    }}
+                    className="text-[10px] font-black text-rose-500 hover:text-rose-600 transition"
+                  >
+                    إعادة ضبط الفلاتر
+                  </button>
+                )}
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
