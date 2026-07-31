@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit3, Save, CheckSquare, Square } from 'lucide-react';
+import { X, Edit3, Save, CheckSquare, Square, Gavel } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 
@@ -14,8 +14,11 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
     sessionType: false,
     sessionDate: false,
     decision: false,
+    judgmentCategory: false,
+    judgmentResult: false,
     shortJudgment: false,
-    verdict: false
+    verdict: false,
+    isFinal: false
   });
 
   const [values, setValues] = useState({
@@ -24,8 +27,11 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
     sessionType: '',
     sessionDate: '',
     decision: '',
+    judgmentCategory: '',
+    judgmentResult: '',
     shortJudgment: '',
-    verdict: ''
+    verdict: '',
+    isFinal: false
   });
 
   // Reset states on open
@@ -37,8 +43,11 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
         sessionType: false,
         sessionDate: false,
         decision: false,
+        judgmentCategory: false,
+        judgmentResult: false,
         shortJudgment: false,
-        verdict: false
+        verdict: false,
+        isFinal: false
       });
       setValues({
         fileLocation: '',
@@ -46,8 +55,11 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
         sessionType: '',
         sessionDate: '',
         decision: '',
+        judgmentCategory: '',
+        judgmentResult: '',
         shortJudgment: '',
-        verdict: ''
+        verdict: '',
+        isFinal: false
       });
     }
   }, [isOpen]);
@@ -92,7 +104,7 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
         }
 
         // 2. Session and Judgment fields
-        const hasSessionUpdate = fieldsToUpdate.sessionDate || fieldsToUpdate.decision || fieldsToUpdate.shortJudgment || fieldsToUpdate.verdict;
+        const hasSessionUpdate = fieldsToUpdate.sessionDate || fieldsToUpdate.decision || fieldsToUpdate.judgmentCategory || fieldsToUpdate.judgmentResult || fieldsToUpdate.shortJudgment || fieldsToUpdate.verdict || fieldsToUpdate.isFinal;
 
         if (hasSessionUpdate) {
           const sessionKey = Object.keys(caseData).find(k => k === 'آخر جلسة' || k === 'تاريخ الجلسة' || k === 'أخر جلسة') || 'آخر جلسة';
@@ -101,10 +113,11 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
           const verdictKey = Object.keys(caseData).find(k => k === 'منطوق الحكم' || k === 'المنطوق') || 'منطوق الحكم';
 
           let sessions = [...(caseData.sessions || [])];
+          let targetSession;
 
           if (fieldsToUpdate.sessionDate && values.sessionDate) {
             // Find existing session with exact date
-            let targetSession = sessions.find(s => s.date === values.sessionDate);
+            targetSession = sessions.find(s => s.date === values.sessionDate);
             if (!targetSession) {
               // Create new session
               targetSession = {
@@ -114,26 +127,9 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
               };
               sessions.push(targetSession);
             }
-
-            // Update details
-            if (fieldsToUpdate.decision) {
-              targetSession.decision = values.decision;
-            }
-            if (fieldsToUpdate.shortJudgment) {
-              targetSession.shortJudgment = values.shortJudgment;
-              targetSession.hasJudgment = true;
-            }
-            if (fieldsToUpdate.verdict) {
-              targetSession.verdict = values.verdict;
-              targetSession.hasJudgment = true;
-            }
-
-            // Sort sessions
-            sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
-
           } else {
             // No new session date, update the latest session if available
-            let targetSession = sessions[0];
+            targetSession = sessions[0];
             if (!targetSession) {
               // Create a default session with current case session date or today's date
               const currentDateStr = caseData[sessionKey] || new Date().toISOString().split('T')[0];
@@ -144,22 +140,36 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
               };
               sessions.push(targetSession);
             }
-
-            if (fieldsToUpdate.decision) {
-              targetSession.decision = values.decision;
-            }
-            if (fieldsToUpdate.shortJudgment) {
-              targetSession.shortJudgment = values.shortJudgment;
-              targetSession.hasJudgment = true;
-            }
-            if (fieldsToUpdate.verdict) {
-              targetSession.verdict = values.verdict;
-              targetSession.hasJudgment = true;
-            }
-
-            // Sort sessions
-            sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
           }
+
+          // Update details
+          if (fieldsToUpdate.decision) {
+            targetSession.decision = values.decision;
+          }
+          
+          let hasAnyJudgmentField = fieldsToUpdate.judgmentCategory || fieldsToUpdate.judgmentResult || fieldsToUpdate.shortJudgment || fieldsToUpdate.verdict || fieldsToUpdate.isFinal;
+          if (hasAnyJudgmentField) {
+             const existingJ = targetSession.judgment || {};
+             const newJ = { ...existingJ };
+             
+             if (fieldsToUpdate.judgmentCategory) newJ.category = values.judgmentCategory;
+             if (fieldsToUpdate.shortJudgment) newJ.type = values.shortJudgment;
+             if (fieldsToUpdate.judgmentResult) newJ.result = values.judgmentResult;
+             if (fieldsToUpdate.verdict) newJ.fullVerdict = values.verdict;
+             if (fieldsToUpdate.isFinal) newJ.isFinal = values.isFinal;
+             if (!newJ.recordedAt) newJ.recordedAt = new Date().toISOString().split('T')[0];
+             
+             targetSession.judgment = newJ;
+             targetSession.hasJudgment = true;
+             
+             // Update legacy fields
+             if (fieldsToUpdate.judgmentResult) targetSession.judgmentClassification = values.judgmentResult;
+             if (fieldsToUpdate.shortJudgment) targetSession.shortJudgment = values.shortJudgment;
+             if (fieldsToUpdate.verdict) targetSession.verdict = values.verdict;
+          }
+
+          // Sort sessions
+          sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
           // Apply latest session back to main case fields
           updateData.sessions = sessions;
@@ -191,11 +201,19 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
     }
   };
 
-  // Helper lists for auto-suggest
   const roleOptions = settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل'];
   const sessionTypeOptions = settings?.sessionTypes || ['موضوع', 'فحص', 'للحكم', 'أول جلسة'];
   const fileLocationOptions = settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي'];
   const decisionOptions = settings?.decisions || ['للحكم', 'تصريح', 'للإطلاع', 'للإعلان', 'آخر أجل'];
+
+  const JUDGMENT_CATEGORIES = ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
+  const JUDGMENT_RESULTS = [
+    { value: 'صالح', label: 'صالح' },
+    { value: 'ضد', label: 'ضد' },
+    { value: 'حكم منه للخصومة', label: 'حكم منه للخصومة' },
+    { value: 'غير منه للخصومة', label: 'غير منه للخصومة' },
+    { value: 'تمهيدي', label: 'تمهيدي' }
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -419,59 +437,91 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
                 )}
               </div>
             </div>
-
-            {/* 6. الحكم */}
-            <div className={`p-4 rounded-2xl border transition-all md:col-span-2 ${fieldsToUpdate.shortJudgment ? 'bg-amber-50/20 border-amber-300 shadow-sm' : 'bg-slate-50 border-slate-200 opacity-80'}`}>
-              <div className="flex items-center justify-between mb-2">
-                <button 
-                  type="button"
-                  onClick={() => toggleField('shortJudgment')} 
-                  className="flex items-center gap-2 text-xs font-black text-navy-900 select-none cursor-pointer"
-                >
-                  {fieldsToUpdate.shortJudgment ? (
-                    <CheckSquare className="w-4.5 h-4.5 text-amber-500 shrink-0" />
-                  ) : (
-                    <Square className="w-4.5 h-4.5 text-slate-400 shrink-0" />
-                  )}
-                  <span>الحكم</span>
-                </button>
+            {/* 6. بيانات الحكم (Comprehensive) */}
+            <div className={`p-4 rounded-2xl border transition-all md:col-span-2 ${fieldsToUpdate.judgmentCategory || fieldsToUpdate.judgmentResult || fieldsToUpdate.shortJudgment || fieldsToUpdate.verdict || fieldsToUpdate.isFinal ? 'bg-rose-50/40 border-rose-300 shadow-sm' : 'bg-slate-50 border-slate-200 opacity-80'}`}>
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200">
+                <Gavel className="w-4 h-4 text-rose-600" />
+                <h3 className="text-xs font-black text-rose-900">تعديل بيانات الحكم</h3>
               </div>
 
-              <input 
-                type="text" 
-                placeholder="اكتب تصنيف أو نوع الحكم (رفض، قبول، شطب، إلخ)..."
-                disabled={!fieldsToUpdate.shortJudgment}
-                value={values.shortJudgment}
-                onChange={e => setValues({ ...values, shortJudgment: e.target.value })}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition disabled:bg-slate-100 disabled:text-slate-400"
-              />
-            </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Category */}
+                <div>
+                  <button type="button" onClick={() => toggleField('judgmentCategory')} className="flex items-center gap-2 text-xs font-black text-navy-900 select-none cursor-pointer mb-2">
+                    {fieldsToUpdate.judgmentCategory ? <CheckSquare className="w-4 h-4 text-rose-500 shrink-0" /> : <Square className="w-4 h-4 text-slate-400 shrink-0" />}
+                    <span>فئة الحكم</span>
+                  </button>
+                  <select 
+                    disabled={!fieldsToUpdate.judgmentCategory}
+                    value={values.judgmentCategory}
+                    onChange={e => setValues({ ...values, judgmentCategory: e.target.value })}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <option value="">-- اختر الفئة --</option>
+                    {JUDGMENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
 
-            {/* 7. منطوق الحكم */}
-            <div className={`p-4 rounded-2xl border transition-all md:col-span-2 ${fieldsToUpdate.verdict ? 'bg-amber-50/20 border-amber-300 shadow-sm' : 'bg-slate-50 border-slate-200 opacity-80'}`}>
-              <div className="flex items-center justify-between mb-2">
-                <button 
-                  type="button"
-                  onClick={() => toggleField('verdict')} 
-                  className="flex items-center gap-2 text-xs font-black text-navy-900 select-none cursor-pointer"
-                >
-                  {fieldsToUpdate.verdict ? (
-                    <CheckSquare className="w-4.5 h-4.5 text-amber-500 shrink-0" />
-                  ) : (
-                    <Square className="w-4.5 h-4.5 text-slate-400 shrink-0" />
-                  )}
-                  <span>منطوق الحكم</span>
-                </button>
+                {/* Result */}
+                <div>
+                  <button type="button" onClick={() => toggleField('judgmentResult')} className="flex items-center gap-2 text-xs font-black text-navy-900 select-none cursor-pointer mb-2">
+                    {fieldsToUpdate.judgmentResult ? <CheckSquare className="w-4 h-4 text-rose-500 shrink-0" /> : <Square className="w-4 h-4 text-slate-400 shrink-0" />}
+                    <span>تصنيف الحكم (النتيجة)</span>
+                  </button>
+                  <select 
+                    disabled={!fieldsToUpdate.judgmentResult}
+                    value={values.judgmentResult}
+                    onChange={e => setValues({ ...values, judgmentResult: e.target.value })}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <option value="">-- اختر التصنيف --</option>
+                    {JUDGMENT_RESULTS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                </div>
+
+                {/* Type */}
+                <div>
+                  <button type="button" onClick={() => toggleField('shortJudgment')} className="flex items-center gap-2 text-xs font-black text-navy-900 select-none cursor-pointer mb-2">
+                    {fieldsToUpdate.shortJudgment ? <CheckSquare className="w-4 h-4 text-rose-500 shrink-0" /> : <Square className="w-4 h-4 text-slate-400 shrink-0" />}
+                    <span>نوع الحكم</span>
+                  </button>
+                  <input 
+                    type="text" 
+                    placeholder="مثال: رفض، قبول، شطب..."
+                    disabled={!fieldsToUpdate.shortJudgment}
+                    value={values.shortJudgment}
+                    onChange={e => setValues({ ...values, shortJudgment: e.target.value })}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
+                  />
+                </div>
+                
+                {/* Final status */}
+                <div>
+                  <button type="button" onClick={() => toggleField('isFinal')} className="flex items-center gap-2 text-xs font-black text-navy-900 select-none cursor-pointer mb-2">
+                    {fieldsToUpdate.isFinal ? <CheckSquare className="w-4 h-4 text-rose-500 shrink-0" /> : <Square className="w-4 h-4 text-slate-400 shrink-0" />}
+                    <span>حالة الحكم</span>
+                  </button>
+                  <label className={`flex items-center gap-2 p-2 rounded-lg border text-xs font-bold transition-all cursor-pointer ${values.isFinal && fieldsToUpdate.isFinal ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-600'} ${!fieldsToUpdate.isFinal && 'opacity-50 pointer-events-none'}`}>
+                    <input type="checkbox" checked={values.isFinal} onChange={e => setValues({...values, isFinal: e.target.checked})} className="rounded text-indigo-600" />
+                    هل هذا الحكم نهائي؟ (مستنفد درجات التقاضي)
+                  </label>
+                </div>
+
+                {/* Verdict */}
+                <div className="md:col-span-2">
+                  <button type="button" onClick={() => toggleField('verdict')} className="flex items-center gap-2 text-xs font-black text-navy-900 select-none cursor-pointer mb-2">
+                    {fieldsToUpdate.verdict ? <CheckSquare className="w-4 h-4 text-rose-500 shrink-0" /> : <Square className="w-4 h-4 text-slate-400 shrink-0" />}
+                    <span>منطوق الحكم كاملاً</span>
+                  </button>
+                  <textarea 
+                    placeholder="اكتب منطوق الحكم كاملاً هنا..."
+                    disabled={!fieldsToUpdate.verdict}
+                    value={values.verdict}
+                    onChange={e => setValues({ ...values, verdict: e.target.value })}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 min-h-[80px] focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
+                  />
+                </div>
               </div>
-
-              <textarea 
-                placeholder="اكتب منطوق الحكم كاملاً هنا..."
-                disabled={!fieldsToUpdate.verdict}
-                value={values.verdict}
-                onChange={e => setValues({ ...values, verdict: e.target.value })}
-                rows={3}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none transition disabled:bg-slate-100 disabled:text-slate-400"
-              />
             </div>
 
           </div>

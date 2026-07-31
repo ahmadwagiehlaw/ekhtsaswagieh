@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, X, Upload, Edit3, Gavel, Settings2, Copy, Maximize2, CheckSquare, Square, Save, CopyPlus, RefreshCcw, Search, Settings, Plus, Trash2 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
+import { useUI } from '../context/UIContext';
 import { uploadToR2 } from '../lib/r2';
 import QuickEditCaseModal from './QuickEditCaseModal';
 
@@ -22,16 +23,18 @@ const ALL_COLUMNS = [
 const JUDGMENT_CATEGORIES = ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
 
 const JUDGMENT_TYPES = {
-  'غير منه للخصومة': ['وقف جزائي','وقف تعليقي','شطب','اعتبار كأن لم تكن','إحالة للموضوع'],
+  'حكم منه للخصومة': ['اعتبار كأن لم تكن', 'سقوط الخصومة', 'انقضاء الخصومة', 'شطب'],
+  'غير منه للخصومة': ['وقف جزائي', 'وقف تعليقي', 'إحالة للموضوع', 'إحالة لمحكمة أخرى'],
   'تمهيدي': ['ندب خبير','تكليف خبير','إعادة للمحكمة المختصة','إحالة للنيابة','تعجيل من الوقف'],
-  'صالح': ['رفض الدعوى','عدم القبول شكلاً','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)','وقف تنفيذي','رفض الشق العاجل', 'رفض'],
-  'ضد': ['رفض الدعوى','عدم القبول شكلاً','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)','وقف تنفيذي','رفض الشق العاجل', 'رفض'],
+  'صالح': ['رفض الدعوى','عدم القبول شكلاً','عدم جواز نظر الدعوى','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)','وقف تنفيذي','رفض الشق العاجل', 'رفض'],
+  'ضد': ['رفض الدعوى','عدم القبول شكلاً','عدم جواز نظر الدعوى','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)','وقف تنفيذي','رفض الشق العاجل', 'رفض'],
 };
 
 const JUDGMENT_RESULTS = [
   { value: 'صالح',  label: 'صالح',  color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
   { value: 'ضد',    label: 'ضد',    color: 'text-rose-700 bg-rose-50 border-rose-200' },
-  { value: 'غير منه للخصومة',   label: 'غير منه للخصومة',   color: 'text-amber-700 bg-amber-50 border-amber-200' },
+  { value: 'حكم منه للخصومة',   label: 'حكم منه للخصومة',   color: 'text-amber-700 bg-amber-50 border-amber-200' },
+  { value: 'غير منه للخصومة',   label: 'غير منه للخصومة',   color: 'text-orange-700 bg-orange-50 border-orange-200' },
   { value: 'تمهيدي', label: 'تمهيدي', color: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
 ];
 
@@ -42,9 +45,10 @@ const getResultStyle = (result) => {
 
 const PREDEFINED_DECISIONS = ['للحكم', 'تصريح', 'للإعلان', 'للاطلاع', 'للإخطار', 'لورود التقرير', 'لتنفيذ قرار الإعادة', 'للاستعلام', 'استبعاد', 'إحالة للموضوع', 'رفض'];
 
-export default function SessionTable({ dayCases, date }) {
+export default function SessionTable({ dayCases, date, onDateClick }) {
+  const { saveCaseToFirebase, settings, currentUser, cases } = useAppContext();
+  const { showPrompt, toast } = useUI();
   const navigate = useNavigate();
-  const { saveCaseToFirebase, settings, saveSettingsToFirebase, cases } = useAppContext();
   
   const defaultDecisions = settings?.decisions || PREDEFINED_DECISIONS;
   const [isManageDecisionsOpen, setIsManageDecisionsOpen] = useState(false);
@@ -105,6 +109,9 @@ export default function SessionTable({ dayCases, date }) {
     let result = [...dayCases];
     if (filterDecision === 'للحكم') {
       result = result.filter(c => getFieldValueLocal(c, ['القرار'])?.includes('للحكم'));
+    } else {
+      // If not specifically asking for 'للحكم', hide those cases so we only see active sessions
+      result = result.filter(c => !getFieldValueLocal(c, ['القرار'])?.includes('للحكم'));
     }
     if (filterType) {
       result = result.filter(c => getFieldValueLocal(c, ['نوع الجلسة']) === filterType || getFieldValueLocal(c, ['نوع الدعوى']) === filterType);
@@ -269,7 +276,36 @@ export default function SessionTable({ dayCases, date }) {
 
     // Judgment saving logic for current session (new structured format)
     const hasJudgmentData = !!(newData['_judgmentCategory'] || newData['_judgmentType'] || newData['_judgmentResult'] || newData['منطوق الحكم']);
+    
+    // Apply Dynamic Rules if missing result or type
+    if (hasJudgmentData && settings?.judgmentDefaults?.length > 0) {
+       for (const rule of settings.judgmentDefaults) {
+         if (rule.triggerField === 'category' && rule.triggerValue && newData['_judgmentCategory'] === rule.triggerValue) {
+           if (rule.setClassification && !newData['_judgmentResult']) newData['_judgmentResult'] = rule.setClassification;
+           if (rule.setType && !newData['_judgmentType']) newData['_judgmentType'] = rule.setType;
+           if (rule.setText && !newData['منطوق الحكم']) newData['منطوق الحكم'] = rule.setText;
+           break;
+         }
+         if (rule.triggerField === 'classification' && rule.triggerValue && newData['_judgmentResult'] === rule.triggerValue) {
+           if (rule.setType && !newData['_judgmentType']) newData['_judgmentType'] = rule.setType;
+           if (rule.setText && !newData['منطوق الحكم']) newData['منطوق الحكم'] = rule.setText;
+           break;
+         }
+       }
+    }
+
     if (hasJudgmentData) {
+      let currentRole = getFieldValueLocal(cObj, ['الصفة', 'صفة']) || '';
+      if (!currentRole.trim()) {
+        const promptRes = await showPrompt('تحديد الصفة ضروري', 'يرجى تحديد صفتنا في هذه الدعوى لحساب الإحصائيات بدقة (مثلاً: طاعن، مطعون ضدنا):');
+        if (promptRes?.trim()) {
+          currentRole = promptRes.trim();
+          newData['الصفة'] = currentRole;
+        } else {
+          toast('تنبيه: لم يتم تحديد الصفة! الإحصائيات ستتأثر ولن تكون دقيقة.', 'error');
+        }
+      }
+
       const newJudgmentObj = {
         category: newData['_judgmentCategory'] || '',
         type: newData['_judgmentType'] || '',
@@ -349,7 +385,7 @@ export default function SessionTable({ dayCases, date }) {
             className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition border flex items-center gap-1 ${filterDecision === 'للحكم' ? 'bg-rose-100 text-rose-700 border-rose-200 shadow-inner' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}
           >
             <Gavel className="w-3 h-3" />
-            للحكم فقط
+            قضايا للحكم
           </button>
           <div className="w-px h-5 bg-slate-200 mx-1"></div>
           <button 

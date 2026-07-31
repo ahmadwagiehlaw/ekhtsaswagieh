@@ -47,18 +47,44 @@ export default function Reports() {
     } else if (reportType === 'judgments') {
       const monthStr = targetMonth.toString().padStart(2, '0');
       const targetPrefix = `${targetYear}-${monthStr}`;
-      const summary = { 'للصالح': 0, 'للضد': 0, 'جزئي': 0, 'إجرائي': 0, 'غير مصنف': 0 };
+      const summary = { 'صالح': 0, 'ضد': 0, 'حكم منه للخصومة': 0, 'غير منه للخصومة': 0, 'تمهيدي': 0, 'غير مصنف': 0 };
       
       cases.forEach(c => {
+        const role = String(c['الصفة'] || c['صفة'] || '').trim();
+        // Ignore specific roles from stats completely
+        if (role === 'لا شأن' || role === 'خارج الاختصاص') return;
+
+        const appRole = settings?.roles?.[0] || 'طاعن';
+        const isAppellant = role.includes(appRole) || role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
+        const apeRole = settings?.roles?.[1] || 'مطعون ضدنا';
+        const isAppellee = role.includes(apeRole) || role.includes('مطعون ضده') || role.includes('مطعون ضدنا') || role.includes('مستأنف ضده') || role.includes('مدعى عليه') || role.includes('مدعى علينا');
+
         const sessions = Array.isArray(c.sessions) ? c.sessions : Object.values(c.sessions || {});
         sessions.forEach(s => {
           if (!s.hasJudgment) return;
           if (!s.date?.startsWith(targetPrefix)) return;
           // Read new structured judgment first, fallback to legacy
-          const result = s.judgment?.result || s.judgmentClassification || 'غير مصنف';
+          let result = s.judgment?.result || s.judgmentClassification || 'غير مصنف';
           const type   = s.judgment?.type   || s.shortJudgment || '';
+          
+          // Old data mapping
+          if (result === 'للصالح') result = 'صالح';
+          if (result === 'للضد') result = 'ضد';
+          if (result === 'إجرائي') result = 'تمهيدي';
+          if (result === 'جزئي') result = 'غير منه للخصومة';
+
           if (judgmentResultFilter && result !== judgmentResultFilter) return;
-          if (summary[result] !== undefined) summary[result]++; else summary['غير مصنف']++;
+          
+          // Logic for win/loss computation
+          let computeAs = result;
+          if (result === 'حكم منه للخصومة') {
+            if (isAppellee) computeAs = 'صالح';
+            else if (isAppellant) computeAs = 'ضد';
+          }
+          
+          // Increment the summary based on computeAs to affect Win/Loss stats accurately
+          if (summary[computeAs] !== undefined) summary[computeAs]++; else summary['غير مصنف']++;
+          
           results.push({
             id: c.id + s.id,
             caseNumber: `${c['رقم الدعوى'] || c.id} لسنة ${c['السنة']}`,
@@ -68,6 +94,7 @@ export default function Reports() {
             decision: type,
             notes: result,
             judgmentResult: result,
+            computeAs: computeAs, // passed down for UI coloring
             isFinal: s.judgment?.isFinal || false,
           });
         });
@@ -243,7 +270,7 @@ export default function Reports() {
           {/* Judgment Summary Cards */}
           {reportType === 'judgments' && judgmentSummary && generatedData.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 no-print">
-              {[{k:'للصالح',c:'emerald'},{k:'للضد',c:'rose'},{k:'جزئي',c:'amber'},{k:'إجرائي',c:'indigo'}].map(({k,c}) => (
+              {[{k:'صالح',c:'emerald'},{k:'ضد',c:'rose'},{k:'حكم منه للخصومة',c:'amber'},{k:'تمهيدي',c:'indigo'}].map(({k,c}) => (
                 <div key={k} className={`bg-${c}-50 border border-${c}-200 rounded-xl p-3 text-center`}>
                   <p className={`text-2xl font-black text-${c}-700`}>{judgmentSummary[k] || 0}</p>
                   <p className={`text-xs font-bold text-${c}-600 mt-0.5`}>{k}</p>
@@ -286,9 +313,10 @@ export default function Reports() {
                     <td className="border border-slate-800 p-2 text-sm font-bold text-center">{row.sessionDate}</td>
                     <td className="border border-slate-800 p-2 text-sm font-bold">{row.decision}</td>
                     <td className={`border border-slate-800 p-2 text-sm font-black text-center ${
-                      row.judgmentResult === 'للصالح' ? 'text-emerald-700 bg-emerald-50' :
-                      row.judgmentResult === 'للضد' ? 'text-rose-700 bg-rose-50' :
-                      row.judgmentResult === 'جزئي' ? 'text-amber-700 bg-amber-50' : ''
+                      row.computeAs === 'صالح' ? 'text-emerald-700 bg-emerald-50' :
+                      row.computeAs === 'ضد' ? 'text-rose-700 bg-rose-50' :
+                      row.computeAs === 'تمهيدي' ? 'text-indigo-700 bg-indigo-50' :
+                      'text-amber-700 bg-amber-50'
                     }`}>{row.notes}</td>
                   </tr>
                 ))}

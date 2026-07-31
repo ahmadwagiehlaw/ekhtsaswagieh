@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, Filter, ChevronRight, ChevronLeft, Gavel, Printer, Zap, CheckCircle2, CalendarX2, CopyPlus } from 'lucide-react';
+import { CalendarDays, Filter, ChevronRight, ChevronLeft, Gavel, Printer, Zap, CheckCircle2, CalendarX2, CopyPlus, ClipboardList } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isPast, isToday, startOfWeek, endOfWeek, parseISO } from 'date-fns';
 import { useAppContext } from '../context/AppState';
 import ExportPDFModal from '../components/ExportPDFModal';
 import BulkSessionRolloverModal from '../components/BulkSessionRolloverModal';
 import SessionTable from '../components/SessionTable';
+import SessionsRollTab from '../components/SessionsRollTab';
+import JudgmentsRollTab from '../components/JudgmentsRollTab';
 import { getSafeDateObj } from '../utils/dateUtils';
 
 const ARABIC_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
@@ -169,11 +171,17 @@ export default function Agenda() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center bg-white rounded-2xl border border-slate-200 shadow-sm p-1.5 gap-1 no-print">
-        <button onClick={() => setActiveTab('calendar')} className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition ${activeTab === 'calendar' ? 'bg-navy-900 text-amber-300 shadow' : 'text-slate-500 hover:text-navy-900'}`}>
-          <CalendarDays className="w-4 h-4" /><span>التقويم الشهري</span>
+      <div className="flex items-center bg-white rounded-2xl border border-slate-200 shadow-sm p-1.5 gap-1 no-print flex-wrap">
+        <button onClick={() => setActiveTab('calendar')} className={`flex-1 min-w-[80px] py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition ${activeTab === 'calendar' ? 'bg-navy-900 text-amber-300 shadow' : 'text-slate-500 hover:text-navy-900'}`}>
+          <CalendarDays className="w-4 h-4" /><span>التقويم</span>
         </button>
-        <button onClick={() => setActiveTab('filter')} className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition ${activeTab === 'filter' ? 'bg-navy-900 text-amber-300 shadow' : 'text-slate-500 hover:text-navy-900'}`}>
+        <button onClick={() => setActiveTab('sessions')} className={`flex-1 min-w-[80px] py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition ${activeTab === 'sessions' ? 'bg-navy-900 text-amber-300 shadow' : 'text-slate-500 hover:text-navy-900'}`}>
+          <ClipboardList className="w-4 h-4" /><span>رول الجلسات</span>
+        </button>
+        <button onClick={() => setActiveTab('judgments')} className={`flex-1 min-w-[80px] py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition ${activeTab === 'judgments' ? 'bg-rose-600 text-white shadow' : 'text-slate-500 hover:text-rose-600'}`}>
+          <Gavel className="w-4 h-4" /><span>رول الأحكام</span>
+        </button>
+        <button onClick={() => setActiveTab('filter')} className={`flex-1 min-w-[80px] py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition ${activeTab === 'filter' ? 'bg-navy-900 text-amber-300 shadow' : 'text-slate-500 hover:text-navy-900'}`}>
           <Filter className="w-4 h-4" /><span>الفلترة الذكية</span>
         </button>
       </div>
@@ -312,6 +320,33 @@ export default function Agenda() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Sessions Roll Tab */}
+      {activeTab === 'sessions' && (
+        <SessionsRollTab
+          date={selectedDateKey}
+          onDateChange={(newDate) => {
+            setSelectedDateKey(newDate);
+            // Try to navigate the calendar month if needed
+            const d = parseISO(newDate);
+            if (d) setCurrentDate(d);
+          }}
+          allCasesMap={sessionsMap}
+        />
+      )}
+
+      {/* Judgments Roll Tab */}
+      {activeTab === 'judgments' && (
+        <JudgmentsRollTab
+          date={selectedDateKey}
+          onDateChange={(newDate) => {
+            setSelectedDateKey(newDate);
+            const d = parseISO(newDate);
+            if (d) setCurrentDate(d);
+          }}
+          allCasesMap={sessionsMap}
+        />
       )}
 
       {activeTab === 'filter' && (

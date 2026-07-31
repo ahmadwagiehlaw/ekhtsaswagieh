@@ -4,7 +4,7 @@ import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { getSafeDateObj, formatDateString } from '../utils/dateUtils';
 
-export default function BulkSessionRolloverModal({ isOpen, onClose, initialDateKey }) {
+export default function BulkSessionRolloverModal({ isOpen, onClose, initialDateKey, initialSelectedIds }) {
   const { cases, saveBatchCasesToFirebase } = useAppContext();
   const { toast } = useUI();
   
@@ -15,10 +15,15 @@ export default function BulkSessionRolloverModal({ isOpen, onClose, initialDateK
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (isOpen && initialDateKey) {
-      setSourceDate(initialDateKey);
+    if (isOpen) {
+      if (initialDateKey) setSourceDate(initialDateKey);
+      if (initialSelectedIds && initialSelectedIds.length > 0) {
+        setSelectedCaseIds(initialSelectedIds);
+      } else {
+        setSelectedCaseIds([]);
+      }
     }
-  }, [isOpen, initialDateKey]);
+  }, [isOpen]); // Only run when modal opens/closes to prevent overriding user changes if props change mid-way
 
   if (!isOpen) return null;
 

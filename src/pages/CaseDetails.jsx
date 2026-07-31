@@ -1118,13 +1118,14 @@ export default function CaseDetails() {
                      {session.hasJudgment && (() => {
                         const JCAT = ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
                         const JTYPES = {
-                          'غير منه للخصومة': ['وقف جزائي','وقف تعليقي','شطب','اعتبار كأن لم تكن','إحالة للموضوع'],
+                          'حكم منه للخصومة': ['اعتبار كأن لم تكن', 'سقوط الخصومة', 'انقضاء الخصومة', 'شطب'],
+                          'غير منه للخصومة': ['وقف جزائي', 'وقف تعليقي', 'إحالة للموضوع', 'إحالة لمحكمة أخرى'],
                           'تمهيدي': ['ندب خبير','تكليف خبير','إعادة للمحكمة المختصة','إحالة للنيابة','تعجيل من الوقف'],
-                          'صالح': ['رفض الدعوى','عدم القبول شكلاً','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)','وقف تنفيذي','رفض الشق العاجل', 'رفض'],
-                          'ضد': ['رفض الدعوى','عدم القبول شكلاً','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)','وقف تنفيذي','رفض الشق العاجل', 'رفض'],
+                          'صالح': ['رفض الدعوى','عدم القبول شكلاً','عدم جواز نظر الدعوى','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)','وقف تنفيذي','رفض الشق العاجل', 'رفض'],
+                          'ضد': ['رفض الدعوى','عدم القبول شكلاً','عدم جواز نظر الدعوى','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)','وقف تنفيذي','رفض الشق العاجل', 'رفض'],
                         };
-                        const JRESULTS = ['صالح','ضد','غير منه للخصومة','تمهيدي'];
-                        const resColorMap = { 'صالح':'emerald', 'ضد':'rose', 'غير منه للخصومة':'amber', 'تمهيدي':'indigo' };
+                        const JRESULTS = ['صالح','ضد','حكم منه للخصومة','غير منه للخصومة','تمهيدي'];
+                        const resColorMap = { 'صالح':'emerald', 'ضد':'rose', 'حكم منه للخصومة':'amber', 'غير منه للخصومة':'orange', 'تمهيدي':'indigo' };
                         const j = session.judgment || {};
                         
                         const JudgmentEditor = () => {
@@ -1140,6 +1141,26 @@ export default function CaseDetails() {
                           const [final, setFinal] = React.useState(j.isFinal || false);
                           
                           React.useEffect(() => {
+                            // 1. Dynamic Rules from Settings
+                            if (settings?.judgmentDefaults?.length > 0) {
+                               let matched = false;
+                               for (const rule of settings.judgmentDefaults) {
+                                 if (rule.triggerField === 'category' && rule.triggerValue && cat === rule.triggerValue) {
+                                   if (rule.setClassification && !res) setRes(rule.setClassification);
+                                   if (rule.setType && !type) setType(rule.setType);
+                                   if (rule.setText && !verd) setVerd(rule.setText);
+                                   matched = true; break;
+                                 }
+                                 if (rule.triggerField === 'classification' && rule.triggerValue && res === rule.triggerValue) {
+                                   if (rule.setType && !type) setType(rule.setType);
+                                   if (rule.setText && !verd) setVerd(rule.setText);
+                                   matched = true; break;
+                                 }
+                               }
+                               if (matched) return;
+                            }
+                            
+                            // 2. Legacy Fallback
                             if (cat === 'فحص' && !j.result && !res) {
                               const role = String(caseData['الصفة'] || '');
                               if (role.includes('مطعون ضد')) {
@@ -1150,7 +1171,7 @@ export default function CaseDetails() {
                                 setRes('ضد');
                               }
                             }
-                          }, [cat]);
+                          }, [cat, res, settings?.judgmentDefaults]);
 
                           React.useEffect(() => {
                             if (res === 'تمهيدي' && !type && !j.type) {
@@ -1166,12 +1187,29 @@ export default function CaseDetails() {
                           };
                           const [saving, setSaving] = React.useState(false);
                           const rc = resColorMap[res] || 'slate';
+                          
                           const handleSave = async () => {
+                            let currentRole = caseData['الصفة'] || caseData['صفة'] || '';
+                            if (!currentRole.trim()) {
+                              const promptRes = await showPrompt('تحديد الصفة ضروري', 'يرجى تحديد صفتنا في هذه الدعوى لحساب الإحصائيات بدقة (مثلاً: طاعن، مطعون ضدنا):');
+                              if (promptRes?.trim()) {
+                                currentRole = promptRes.trim();
+                              } else {
+                                toast('تنبيه: لم يتم تحديد الصفة! الإحصائيات ستتأثر ولن تكون دقيقة.', 'error');
+                              }
+                            }
+                            
                             setSaving(true);
                             const newJudgmentObj = { category: cat, type, result: res, fullVerdict: verd, isFinal: final, recordedAt: new Date().toISOString().split('T')[0] };
                             const newSessions = [...caseData.sessions];
                             newSessions[idx] = { ...newSessions[idx], judgment: newJudgmentObj, shortJudgment: type, judgmentClassification: res, verdict: verd, hasJudgment: true };
-                            await saveCaseToFirebase(caseData.id, { sessions: newSessions });
+                            
+                            const payload = { sessions: newSessions };
+                            if (currentRole !== (caseData['الصفة'] || caseData['صفة'])) {
+                                payload['الصفة'] = currentRole;
+                            }
+                            
+                            await saveCaseToFirebase(caseData.id, payload);
                             setSaving(false);
                           };
                           return (
