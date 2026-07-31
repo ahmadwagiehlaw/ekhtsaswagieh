@@ -1116,16 +1116,7 @@ export default function CaseDetails() {
 
                      {/* Judgment Fields Block */}
                      {session.hasJudgment && (() => {
-                        const JCAT = ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
-                        const JTYPES = {
-                          'حكم منه للخصومة': ['اعتبار كأن لم تكن', 'سقوط الخصومة', 'انقضاء الخصومة', 'شطب'],
-                          'غير منه للخصومة': ['وقف جزائي', 'وقف تعليقي', 'إحالة للموضوع', 'إحالة لمحكمة أخرى'],
-                          'تمهيدي': ['ندب خبير','تكليف خبير','إعادة للمحكمة المختصة','إحالة للنيابة','تعجيل من الوقف'],
-                          'صالح': ['رفض الدعوى','عدم القبول شكلاً','عدم جواز نظر الدعوى','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)','وقف تنفيذي','رفض الشق العاجل', 'رفض'],
-                          'ضد': ['رفض الدعوى','عدم القبول شكلاً','عدم جواز نظر الدعوى','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)','وقف تنفيذي','رفض الشق العاجل', 'رفض'],
-                        };
-                        const JRESULTS = ['صالح','ضد','حكم منه للخصومة','غير منه للخصومة','تمهيدي'];
-                        const resColorMap = { 'صالح':'emerald', 'ضد':'rose', 'حكم منه للخصومة':'amber', 'غير منه للخصومة':'orange', 'تمهيدي':'indigo' };
+                        const resColorMap = { 'صالح':'emerald', 'ضد':'rose', 'مختلط':'indigo', 'اعتبار':'amber', 'وقف جزائي':'orange', 'وقف تعليقي':'purple', 'خبراء':'cyan', 'حكم منه للخصومة':'amber', 'غير منه للخصومة':'orange', 'تمهيدي':'indigo' };
                         const j = session.judgment || {};
                         
                         const JudgmentEditor = () => {
@@ -1154,8 +1145,10 @@ export default function CaseDetails() {
                                  const catMatch = !conds.category || cat === conds.category;
                                  const classMatch = !conds.classification || res === conds.classification;
                                  const typeMatch = !conds.type || type === conds.type;
+                                 const sessionTypeMatch = !conds.sessionType || session.type === conds.sessionType;
+                                 const decisionMatch = !conds.decision || session.decision === conds.decision;
                                  
-                                 if (roleMatch && catMatch && classMatch && typeMatch && (conds.role || conds.category || conds.classification || conds.type)) {
+                                 if (roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch && (conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision)) {
                                     const acts = rule.actions || {};
                                     if (acts.category && !cat) setCat(acts.category);
                                     if (acts.classification && !res) setRes(acts.classification);
@@ -1238,34 +1231,42 @@ export default function CaseDetails() {
                                 <span className="text-[10px] font-black text-rose-700">⚖️ بيانات الحكم</span>
                                 {res && <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border bg-${rc}-50 text-${rc}-700 border-${rc}-200`}>{res}</span>}
                               </div>
-                              <div className="grid grid-cols-2 gap-2">
+                              <div className="mb-2">
+                                <label className="text-[9px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
+                                <div>
+                                  <input
+                                    list={`jtype-${session.id}`}
+                                    value={type}
+                                    onChange={e => handleTypeChange(e.target.value)}
+                                    placeholder="نوع الحكم..."
+                                    className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400"
+                                  />
+                                  <datalist id={`jtype-${session.id}`}>
+                                    {Object.keys(settings?.judgmentTextMap || {}).map(t => <option key={t} value={t}>{t}</option>)}
+                                  </datalist>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 mb-2">
                                 <div>
                                   <label className="text-[9px] font-bold text-slate-500 block mb-0.5">فئة الحكم</label>
-                                  <select value={cat} onChange={e => { setCat(e.target.value); setType(''); }} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
+                                  <select value={cat} onChange={e => { setCat(e.target.value); }} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
                                     <option value="">-- اختر --</option>
-                                    {JCAT.map(c => <option key={c} value={c}>{c}</option>)}
+                                    {(settings?.judgmentCategories || []).map(c => <option key={c} value={c}>{c}</option>)}
                                   </select>
                                 </div>
                                 <div>
                                   <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تصنيف الحكم</label>
-                                  <select value={res} onChange={e => { setRes(e.target.value); setType(''); }} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
+                                  <select value={res} onChange={e => { setRes(e.target.value); }} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
                                     <option value="">-- اختر --</option>
-                                    {JRESULTS.map(r => <option key={r} value={r}>{r}</option>)}
+                                    {(settings?.judgmentClassifications || []).map(r => <option key={r} value={r}>{r}</option>)}
                                   </select>
                                 </div>
-                              </div>
-                              <div>
-                                <label className="text-[9px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
-                                <select value={type} onChange={e => handleTypeChange(e.target.value)} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
-                                  <option value="">-- اختر --</option>
-                                  {(JTYPES[res] || []).map(t => <option key={t} value={t}>{t}</option>)}
-                                </select>
                               </div>
                               <div>
                                 <label className="text-[9px] font-bold text-slate-500 block mb-0.5">منطوق الحكم كاملاً</label>
                                 <textarea value={verd} onChange={e => setVerd(e.target.value)} placeholder="أكتب منطوق الحكم كاملاً..." className="w-full text-[10px] font-bold bg-white p-2 rounded-lg border border-rose-200 whitespace-pre-wrap focus:outline-none focus:border-rose-400 resize-none min-h-[50px]" rows={2} />
                               </div>
-                              <div className="flex items-center justify-between pt-1 border-t border-rose-100">
+                              <div className="flex items-center justify-between pt-1 border-t border-rose-100 mt-2">
                                 <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer">
                                   <input type="checkbox" checked={final} onChange={e => setFinal(e.target.checked)} className="rounded accent-rose-600" />
                                   حكم نهائي في الدعوى

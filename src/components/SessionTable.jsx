@@ -280,15 +280,21 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
     // Apply Dynamic Rules if missing result or type
     if (hasJudgmentData && settings?.judgmentDefaults?.length > 0) {
        for (const rule of settings.judgmentDefaults) {
-         if (rule.triggerField === 'category' && rule.triggerValue && newData['_judgmentCategory'] === rule.triggerValue) {
-           if (rule.setClassification && !newData['_judgmentResult']) newData['_judgmentResult'] = rule.setClassification;
-           if (rule.setType && !newData['_judgmentType']) newData['_judgmentType'] = rule.setType;
-           if (rule.setText && !newData['منطوق الحكم']) newData['منطوق الحكم'] = rule.setText;
-           break;
-         }
-         if (rule.triggerField === 'classification' && rule.triggerValue && newData['_judgmentResult'] === rule.triggerValue) {
-           if (rule.setType && !newData['_judgmentType']) newData['_judgmentType'] = rule.setType;
-           if (rule.setText && !newData['منطوق الحكم']) newData['منطوق الحكم'] = rule.setText;
+         const conds = rule.conditions || {};
+         const currentRole = getFieldValueLocal(cObj, ['الصفة', 'صفة']) || '';
+         const roleMatch = !conds.role || currentRole.includes(conds.role) || conds.role === currentRole;
+         const catMatch = !conds.category || newData['_judgmentCategory'] === conds.category;
+         const classMatch = !conds.classification || newData['_judgmentResult'] === conds.classification;
+         const typeMatch = !conds.type || newData['_judgmentType'] === conds.type;
+         const sessionTypeMatch = !conds.sessionType || newData['نوع الجلسة'] === conds.sessionType;
+         const decisionMatch = !conds.decision || newData['القرار'] === conds.decision;
+         
+         if (roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch && (conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision)) {
+           const acts = rule.actions || {};
+           if (acts.category && !newData['_judgmentCategory']) newData['_judgmentCategory'] = acts.category;
+           if (acts.classification && !newData['_judgmentResult']) newData['_judgmentResult'] = acts.classification;
+           if (acts.type && !newData['_judgmentType']) newData['_judgmentType'] = acts.type;
+           if (acts.text && !newData['منطوق الحكم']) newData['منطوق الحكم'] = acts.text;
            break;
          }
        }

@@ -43,8 +43,10 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
       const catMatch = !conds.category || newData._category === conds.category;
       const classMatch = !conds.classification || newData._result === conds.classification;
       const typeMatch = !conds.type || newData._type === conds.type;
+      const sessionTypeMatch = !conds.sessionType || newData._sessionType === conds.sessionType;
+      const decisionMatch = !conds.decision || newData._decision === conds.decision;
       
-      if (roleMatch && catMatch && classMatch && typeMatch && (conds.role || conds.category || conds.classification || conds.type)) {
+      if (roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch && (conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision)) {
         const acts = rule.actions || {};
         if (acts.category && !newData._category) newData._category = acts.category;
         if (acts.classification && !newData._result) newData._result = acts.classification;
@@ -145,8 +147,8 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
     }
   };
 
-  const judgmentCategories = settings?.judgmentCategories || ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
-  const judgmentClassifications = settings?.judgmentClassifications || ['صالح', 'ضد', 'حكم منه للخصومة', 'غير منه للخصومة', 'تمهيدي'];
+  const judgmentCategories = settings?.judgmentCategories || ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي'];
+  const judgmentClassifications = settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء'];
   // Always use the 4 correct roles regardless of what's saved in Firebase
   const CORRECT_ROLES = ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص'];
   const roles = (settings?.roles?.length >= 3) ? settings.roles : CORRECT_ROLES;
@@ -188,6 +190,23 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
             </select>
           </div>
 
+          <div className="space-y-1.5">
+            <label className="text-xs font-black text-slate-600 block">نوع الحكم</label>
+            <div>
+              <input
+                list="jtype-bulk"
+                type="text"
+                value={formData._type}
+                onChange={e => handleFieldChange('_type', e.target.value)}
+                placeholder="مثال: رفض الطعن، وقف تنفيذي، إلخ..."
+                className="w-full text-sm font-bold p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition outline-none"
+              />
+              <datalist id="jtype-bulk">
+                {Object.keys(settings?.judgmentTextMap || {}).map(t => <option key={t} value={t}>{t}</option>)}
+              </datalist>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-black text-slate-600 block">فئة الحكم</label>
@@ -212,17 +231,6 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
                 {judgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-black text-slate-600 block">نوع الحكم</label>
-            <input
-              type="text"
-              value={formData._type}
-              onChange={e => handleFieldChange('_type', e.target.value)}
-              placeholder="مثال: رفض الطعن، وقف تنفيذي، إلخ..."
-              className="w-full text-sm font-bold p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition outline-none"
-            />
           </div>
 
           <div className="space-y-1.5">

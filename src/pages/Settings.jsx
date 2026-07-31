@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useAppContext } from '../context/AppState';
-import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList, Scale, Download, FileJson, ArrowUpFromLine } from 'lucide-react';
+import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList, Scale, Download, FileJson, ArrowUpFromLine, Copy } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useUI } from '../context/UIContext';
 
@@ -18,7 +18,7 @@ export default function Settings() {
 
   // Schema state
   const [localSchema, setLocalSchema] = useState(schema || []);
-  const [activeTab, setActiveTab] = useState('sync'); // sync, schema, advanced
+  const [activeTab, setActiveTab] = useState('schema'); // schema, judgments, lists, other, data
 
   // Advanced state
   const [localEmployees, setLocalEmployees] = useState(settings?.employees || []);
@@ -54,14 +54,14 @@ export default function Settings() {
       };
     }
     return {
-      conditions: rule.conditions || { role: '', category: '', classification: '', type: '' },
+      conditions: rule.conditions || { role: '', category: '', classification: '', type: '', sessionType: '', decision: '' },
       actions: rule.actions || { category: '', classification: '', type: '', text: '' }
     };
   };
 
   const [localJudgmentDefaults, setLocalJudgmentDefaults] = useState((settings?.judgmentDefaults || []).map(migrateJudgmentRule));
-  const [localJudgmentCategories, setLocalJudgmentCategories] = useState(settings?.judgmentCategories || ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص']);
-  const [localJudgmentClassifications, setLocalJudgmentClassifications] = useState(settings?.judgmentClassifications || ['صالح', 'ضد', 'حكم منه للخصومة', 'غير منه للخصومة', 'تمهيدي']);
+  const [localJudgmentCategories, setLocalJudgmentCategories] = useState(settings?.judgmentCategories || ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي']);
+  const [localJudgmentClassifications, setLocalJudgmentClassifications] = useState(settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء']);
   const [deletePassword, setDeletePassword] = useState('');
   const backupInputRef = useRef(null);
   const [backupRestoreStatus, setBackupRestoreStatus] = useState(null); // { type: 'success'|'error'|'preview', data: ... }
@@ -161,8 +161,8 @@ export default function Settings() {
     setLocalFileLocations(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
     setLocalCommonProcedures(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
     setLocalCaseClassifications(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
-    setLocalJudgmentCategories(settings?.judgmentCategories || ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص']);
-    setLocalJudgmentClassifications(settings?.judgmentClassifications || ['صالح', 'ضد', 'حكم منه للخصومة', 'غير منه للخصومة', 'تمهيدي']);
+    setLocalJudgmentCategories(settings?.judgmentCategories || ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي']);
+    setLocalJudgmentClassifications(settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء']);
     setLocalJudgmentTextMap(settings?.judgmentTextMap || {
       'وقف جزائي': 'وقف الدعوى جزائيا لمدة شهر',
       'اعتبار': 'اعتبار الدعوى كأن لم تكن',
@@ -1040,6 +1040,81 @@ export default function Settings() {
             </div>
           </div>
 
+          {/* Judgment Types Management */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-sky-600" />
+                <h3 className="font-black text-sm text-navy-900">إدارة أنواع الأحكام (نصوص المنطوق الافتراضية)</h3>
+              </div>
+              <button 
+                onClick={async () => {
+                  const newType = await showPrompt('إضافة نوع حكم', 'أدخل اسم نوع الحكم الجديد (مثال: عدم اختصاص):');
+                  if (newType?.trim() && !localJudgmentTextMap[newType.trim()]) {
+                    const newText = await showPrompt('إضافة نوع حكم', `أدخل المنطوق الافتراضي للحكم '${newType.trim()}':`);
+                    if (newText !== null) {
+                      setLocalJudgmentTextMap({ ...localJudgmentTextMap, [newType.trim()]: newText.trim() });
+                    }
+                  } else if (localJudgmentTextMap[newType?.trim()]) {
+                    toast('نوع الحكم موجود بالفعل', 'error');
+                  }
+                }}
+                className="bg-sky-50 text-sky-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-sky-100"
+              >
+                <Plus className="w-4 h-4"/> إضافة نوع
+              </button>
+            </div>
+            
+            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+              قم بإدارة أنواع الأحكام ونصوص المنطوق المرتبطة بها لتسريع إدخال الأحكام. هذه الأنواع ستظهر في قوائم الإكمال التلقائي لنوع الحكم.
+            </p>
+
+            <div className="space-y-3">
+              {Object.keys(localJudgmentTextMap).length === 0 && (
+                <div className="text-center py-4 bg-slate-50 rounded-xl border border-slate-100 text-slate-400 text-xs font-bold">لا توجد أنواع أحكام مضافة</div>
+              )}
+              {Object.entries(localJudgmentTextMap).map(([typeKey, verdictText], idx) => (
+                <div key={idx} className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-black text-slate-400">النوع:</span>
+                      <span className="text-xs font-bold text-sky-800 bg-sky-100 px-2 py-0.5 rounded-md">{typeKey}</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-[11px] font-black text-slate-400 mt-0.5">المنطوق:</span>
+                      <span className="text-xs font-bold text-slate-700 leading-relaxed">{verdictText || <span className="text-slate-400 italic">بدون منطوق</span>}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button 
+                      onClick={async () => {
+                        const newText = await showPrompt('تعديل المنطوق', `قم بتعديل المنطوق الافتراضي لـ '${typeKey}':`, verdictText);
+                        if (newText !== null) {
+                          setLocalJudgmentTextMap({ ...localJudgmentTextMap, [typeKey]: newText });
+                        }
+                      }}
+                      className="text-sky-600 hover:bg-sky-100 px-2 py-1 rounded-lg flex items-center gap-1 text-[10px] font-bold transition"
+                    >
+                      تعديل
+                    </button>
+                    <button 
+                      onClick={async () => {
+                        const confirm = await showConfirm('حذف نوع الحكم', `هل أنت متأكد من حذف نوع الحكم '${typeKey}'؟`, 'delete_judgment_type');
+                        if (confirm) {
+                          const newMap = { ...localJudgmentTextMap };
+                          delete newMap[typeKey];
+                          setLocalJudgmentTextMap(newMap);
+                        }
+                      }}
+                      className="text-rose-500 hover:bg-rose-100 px-2 py-1 rounded-lg flex items-center gap-1 text-[10px] font-bold transition"
+                    >
+                      <Trash2 className="w-4 h-4"/> حذف
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
           {/* Default Judgment Settings Management */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -1048,7 +1123,7 @@ export default function Settings() {
                 <h3 className="font-black text-sm text-navy-900">قواعد التعبئة التلقائية للأحكام</h3>
               </div>
               <button 
-                onClick={() => setLocalJudgmentDefaults([...localJudgmentDefaults, { conditions: { role: '', category: '', classification: '', type: '' }, actions: { category: '', classification: '', type: '', text: '' } }])}
+                onClick={() => setLocalJudgmentDefaults([...localJudgmentDefaults, { conditions: { role: '', category: '', classification: '', type: '', sessionType: '', decision: '' }, actions: { category: '', classification: '', type: '', text: '' } }])}
                 className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-indigo-100"
               >
                 <Plus className="w-4 h-4"/> إضافة قاعدة
@@ -1060,15 +1135,25 @@ export default function Settings() {
             </p>
 
             <div className="space-y-3">
+              <datalist id="judgmentTypesSettings">
+                {Object.keys(localJudgmentTextMap).map(typeKey => (
+                  <option key={typeKey} value={typeKey} />
+                ))}
+              </datalist>
               {localJudgmentDefaults.map((rule, idx) => (
                 <div key={idx} className="flex flex-col gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 text-[10px] font-black text-indigo-800 bg-indigo-100 px-2 py-1 rounded w-max">
                       قاعدة رقم {idx + 1}
                     </div>
-                    <button onClick={() => setLocalJudgmentDefaults(localJudgmentDefaults.filter((_, i) => i !== idx))} className="text-rose-500 hover:bg-rose-100 px-2 py-1 rounded-lg flex items-center gap-1 text-[10px] font-bold transition">
-                      <Trash2 className="w-4 h-4"/> حذف القاعدة
-                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={() => setLocalJudgmentDefaults([...localJudgmentDefaults, JSON.parse(JSON.stringify(rule))])} className="text-sky-500 hover:bg-sky-100 px-2 py-1 rounded-lg flex items-center gap-1 text-[10px] font-bold transition">
+                        <Copy className="w-4 h-4"/> تكرار
+                      </button>
+                      <button onClick={() => setLocalJudgmentDefaults(localJudgmentDefaults.filter((_, i) => i !== idx))} className="text-rose-500 hover:bg-rose-100 px-2 py-1 rounded-lg flex items-center gap-1 text-[10px] font-bold transition">
+                        <Trash2 className="w-4 h-4"/> حذف القاعدة
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1126,6 +1211,7 @@ export default function Settings() {
                           <label className="text-[9px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
                           <input 
                             type="text"
+                            list="judgmentTypesSettings"
                             value={rule.conditions.type}
                             onChange={(e) => {
                               const newRules = [...localJudgmentDefaults];
@@ -1135,6 +1221,36 @@ export default function Settings() {
                             placeholder="- أي نوع -"
                             className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
                           />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">نوع الجلسة</label>
+                          <select 
+                            value={rule.conditions.sessionType}
+                            onChange={(e) => {
+                              const newRules = [...localJudgmentDefaults];
+                              newRules[idx].conditions.sessionType = e.target.value;
+                              setLocalJudgmentDefaults(newRules);
+                            }}
+                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                          >
+                            <option value="">- أي نوع جلسة -</option>
+                            {localSessionTypes.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">القرار</label>
+                          <select 
+                            value={rule.conditions.decision}
+                            onChange={(e) => {
+                              const newRules = [...localJudgmentDefaults];
+                              newRules[idx].conditions.decision = e.target.value;
+                              setLocalJudgmentDefaults(newRules);
+                            }}
+                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                          >
+                            <option value="">- أي قرار -</option>
+                            {localDecisions.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
                         </div>
                       </div>
                     </div>
@@ -1179,6 +1295,7 @@ export default function Settings() {
                         <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تعبئة نوع الحكم بـ</label>
                         <input 
                           type="text" 
+                          list="judgmentTypesSettings"
                           placeholder="النوع (اختياري)" 
                           value={rule.actions.type}
                           onChange={(e) => {

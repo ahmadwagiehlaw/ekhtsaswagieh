@@ -162,8 +162,8 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
     });
   }, [date, allCasesMap]);
 
-  const judgmentCategories = settings?.judgmentCategories || ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
-  const judgmentClassifications = settings?.judgmentClassifications || ['صالح', 'ضد', 'حكم منه للخصومة', 'غير منه للخصومة', 'تمهيدي'];
+  const judgmentCategories = settings?.judgmentCategories || ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي'];
+  const judgmentClassifications = settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء'];
   const roles = settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص'];
 
   const [searchQ, setSearchQ] = useState('');
@@ -184,7 +184,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
   const [sortConfig, setSortConfig] = useState({ key: 'الرول', direction: 'asc' });
   const [visibleCols, setVisibleCols] = useState({
     roll: true, caseName: true, plaintiff: true, defendant: true,
-    sessionType: true, judgmentCategory: true, judgmentClassification: true, judgmentType: true, verdict: true, image: true
+    sessionType: true, judgmentType: true, judgmentCategory: true, judgmentClassification: true, verdict: true, image: true
   });
 
   const handleSort = (key) => {
@@ -260,6 +260,8 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
       _isFinal: j.isFinal !== undefined ? j.isFinal : (j._isFinal || false),
       _role: getFieldVal(cObj, ['الصفة', 'صفة']) || '',
       _rollNumber: session?.rollNumber || j.rollNumber || '',
+      _sessionType: session?.type || '',
+      _decision: session?.decision || ''
     });
   };
 
@@ -274,8 +276,10 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
       const catMatch = !conds.category || newData._category === conds.category;
       const classMatch = !conds.classification || newData._result === conds.classification;
       const typeMatch = !conds.type || newData._type === conds.type;
+      const sessionTypeMatch = !conds.sessionType || newData._sessionType === conds.sessionType;
+      const decisionMatch = !conds.decision || newData._decision === conds.decision;
       
-      if (roleMatch && catMatch && classMatch && typeMatch && (conds.role || conds.category || conds.classification || conds.type)) {
+      if (roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch && (conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision)) {
         const acts = rule.actions || {};
         if (acts.category && !newData._category) newData._category = acts.category;
         if (acts.classification && !newData._result) newData._result = acts.classification;
@@ -560,9 +564,9 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                   {visibleCols.plaintiff && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="المدعي" label="المدعي" />}
                   {visibleCols.defendant && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="المدعى_عليه" label="ضد" />}
                   {visibleCols.sessionType && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="الصفة" label="الصفة" width="w-24" />}
+                  {visibleCols.judgmentType && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="_type" label="نوع الحكم" width="w-24" />}
                   {visibleCols.judgmentCategory && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="_category" label="فئة الحكم" width="w-24" />}
                   {visibleCols.judgmentClassification && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="_result" label="التصنيف" width="w-24" />}
-                  {visibleCols.judgmentType && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="_type" label="نوع الحكم" width="w-24" />}
                   {visibleCols.verdict && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="_verdict" label="المنطوق" />}
                   {visibleCols.image && <th className="px-2 py-2.5 text-[10px] font-black text-rose-600 w-20 text-center">📸 صورة</th>}
                   <th className="px-2 py-2.5 w-16"></th>
@@ -665,6 +669,32 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                         </td>
                       )}
 
+                      {/* Type */}
+                      {visibleCols.judgmentType && (
+                        <td className="px-2 py-2">
+                          {isEditing ? (
+                            <div>
+                              <input
+                                list={`jtype-${cObj.id}`}
+                                value={editData._type}
+                                onChange={e => {
+                                  const v = e.target.value;
+                                  const map = settings?.judgmentTextMap || {};
+                                  setEditData(d => applyDefaultRules('_type', v, { ...d, _type: v, _verdict: map[v] || d._verdict }));
+                                }}
+                                placeholder="نوع الحكم..."
+                                className="w-full text-[10px] font-bold p-1 rounded border border-rose-200"
+                              />
+                              <datalist id={`jtype-${cObj.id}`}>
+                                {Object.keys(settings?.judgmentTextMap || {}).map(t => <option key={t} value={t} />)}
+                              </datalist>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-600">{j.type || j._type || session?.shortJudgment || '-'}</span>
+                          )}
+                        </td>
+                      )}
+
                       {/* Category */}
                       {visibleCols.judgmentCategory && (
                         <td className="px-2 py-2">
@@ -697,32 +727,6 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                             </select>
                           ) : (
                             <span className="text-[10px] font-bold text-slate-700">{j.result || j._result || session?.judgmentClassification || '-'}</span>
-                          )}
-                        </td>
-                      )}
-
-                      {/* Type */}
-                      {visibleCols.judgmentType && (
-                        <td className="px-2 py-2">
-                          {isEditing ? (
-                            <div>
-                              <input
-                                list={`jtype-${cObj.id}`}
-                                value={editData._type}
-                                onChange={e => {
-                                  const v = e.target.value;
-                                  const map = settings?.judgmentTextMap || {};
-                                  setEditData(d => ({ ...d, _type: v, _verdict: map[v] || d._verdict }));
-                                }}
-                                placeholder="نوع الحكم..."
-                                className="w-full text-[10px] font-bold p-1 rounded border border-rose-200"
-                              />
-                              <datalist id={`jtype-${cObj.id}`}>
-                                {Object.keys(settings?.judgmentTextMap || {}).map(t => <option key={t} value={t} />)}
-                              </datalist>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] font-bold text-slate-600">{j.type || j._type || session?.shortJudgment || '-'}</span>
                           )}
                         </td>
                       )}
