@@ -383,67 +383,65 @@ export default function Settings() {
 
       {/* Tabs */}
       <div className="flex bg-slate-200/50 p-1 rounded-xl flex-wrap">
-        <button onClick={() => setActiveTab('sync')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'sync' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>💾 مزامنة الداتا</button>
-        <button onClick={() => setActiveTab('backup')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'backup' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🛡️ نسخ احتياطية</button>
         <button onClick={() => setActiveTab('schema')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'schema' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🧩 هيكلة الحقول</button>
         <button onClick={() => setActiveTab('judgments')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'judgments' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚖️ الجلسات والأحكام</button>
         <button onClick={() => setActiveTab('lists')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'lists' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>📁 قوائم النظام</button>
         <button onClick={() => setActiveTab('other')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'other' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚙️ إعدادات أخرى</button>
+        <button onClick={() => setActiveTab('data')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'data' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🛡️ بيانات ونسخ</button>
       </div>
 
-      {/* SYNC TAB */}
-      {activeTab === 'sync' && (
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4 animate-in fade-in zoom-in duration-300">
-          <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-            <Database className="w-5 h-5 text-navy-900" />
-            <h3 className="font-black text-sm text-navy-900">مزامنة البيانات (Smart Sync)</h3>
-          </div>
-          
-          <input type="file" accept=".xlsx, .xls" ref={fileInputRef} onChange={processExcel} className="hidden" />
-          
-          <button onClick={() => fileInputRef.current?.click()} disabled={isProcessing} className="w-full border-2 border-dashed border-slate-300 hover:border-navy-900 hover:bg-slate-50 text-slate-600 font-bold py-6 rounded-2xl flex flex-col items-center justify-center gap-2">
-            {isProcessing ? (
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-navy-900"></div>
-            ) : (
-              <>
-                <Upload className="w-8 h-8 text-amber-500" />
-                <span className="text-sm">اختر ملف إكسيل (.xlsx) للمزامنة</span>
-              </>
-            )}
-          </button>
-
-          {syncData && syncData.ready && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-4">
-              <h4 className="font-black text-sm text-emerald-900 flex items-center gap-2">
-                <Check className="w-4 h-4" /> تحليل البيانات جاهز
-              </h4>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-white rounded-lg p-2 shadow-sm border border-emerald-100">
-                  <p className="text-lg font-black text-emerald-600">{syncData.added}</p>
-                  <p className="text-[10px] font-bold text-slate-500">قضية جديدة</p>
-                </div>
-                <div className="bg-white rounded-lg p-2 shadow-sm border border-emerald-100">
-                  <p className="text-lg font-black text-blue-600">{syncData.updated}</p>
-                  <p className="text-[10px] font-bold text-slate-500">تم تحديثها</p>
-                </div>
-                <div className="bg-white rounded-lg p-2 shadow-sm border border-emerald-100">
-                  <p className="text-lg font-black text-slate-600">{syncData.kept}</p>
-                  <p className="text-[10px] font-bold text-slate-500">بدون تغيير</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => setSyncData(null)} className="flex-1 bg-white border border-slate-200 py-2 rounded-xl text-xs font-bold">إلغاء</button>
-                <button onClick={confirmSync} className="flex-[2] bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs shadow-sm">حفظ ومزامنة</button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* BACKUP TAB */}
-      {activeTab === 'backup' && (
+      {/* DATA TAB: Sync + Backup merged */}
+      {activeTab === 'data' && (
         <div className="space-y-4 animate-in fade-in zoom-in duration-300">
-          
+
+          {/* Smart Sync Section */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <Database className="w-5 h-5 text-navy-900" />
+              <h3 className="font-black text-sm text-navy-900">مزامنة البيانات من Excel (Smart Sync)</h3>
+            </div>
+            <p className="text-[11px] font-bold text-slate-500">استيراد ملف إكسيل ودمجه بذكاء مع البيانات الحالية دون حذف أي بيانات موجودة.</p>
+
+            <input type="file" accept=".xlsx, .xls" ref={fileInputRef} onChange={processExcel} className="hidden" />
+
+            <button onClick={() => fileInputRef.current?.click()} disabled={isProcessing} className="w-full border-2 border-dashed border-slate-300 hover:border-navy-900 hover:bg-slate-50 text-slate-600 font-bold py-5 rounded-2xl flex flex-col items-center justify-center gap-2">
+              {isProcessing ? (
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-navy-900"></div>
+              ) : (
+                <>
+                  <Upload className="w-7 h-7 text-amber-500" />
+                  <span className="text-sm">اختر ملف إكسيل (.xlsx) للمزامنة</span>
+                </>
+              )}
+            </button>
+
+            {syncData && syncData.ready && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-4">
+                <h4 className="font-black text-sm text-emerald-900 flex items-center gap-2">
+                  <Check className="w-4 h-4" /> تحليل البيانات جاهز
+                </h4>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-white rounded-lg p-2 shadow-sm border border-emerald-100">
+                    <p className="text-lg font-black text-emerald-600">{syncData.added}</p>
+                    <p className="text-[10px] font-bold text-slate-500">قضية جديدة</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-2 shadow-sm border border-emerald-100">
+                    <p className="text-lg font-black text-blue-600">{syncData.updated}</p>
+                    <p className="text-[10px] font-bold text-slate-500">تم تحديثها</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-2 shadow-sm border border-emerald-100">
+                    <p className="text-lg font-black text-slate-600">{syncData.kept}</p>
+                    <p className="text-[10px] font-bold text-slate-500">بدون تغيير</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setSyncData(null)} className="flex-1 bg-white border border-slate-200 py-2 rounded-xl text-xs font-bold">إلغاء</button>
+                  <button onClick={confirmSync} className="flex-[2] bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs shadow-sm">حفظ ومزامنة</button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Export Section */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
@@ -451,7 +449,7 @@ export default function Settings() {
               <h3 className="font-black text-sm text-navy-900">تصدير نسخة احتياطية</h3>
             </div>
             <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
-              قم بتصدير نسخة احتياطية شاملة من جميع بيانات التطبيق (القضايا، الجلسات، المرفقات، الإجراءات، الإعدادات) بصيغة JSON أو Excel.
+              تصدير نسخة احتياطية شاملة (قضايا، جلسات، مرفقات، إجراءات، إعدادات) بصيغة JSON أو Excel.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -498,9 +496,9 @@ export default function Settings() {
               <button
                 onClick={() => backupInputRef.current?.click()}
                 disabled={isProcessing}
-                className="w-full border-2 border-dashed border-amber-300 hover:border-amber-500 hover:bg-amber-50 text-slate-600 font-bold py-6 rounded-2xl flex flex-col items-center justify-center gap-2 transition"
+                className="w-full border-2 border-dashed border-amber-300 hover:border-amber-500 hover:bg-amber-50 text-slate-600 font-bold py-5 rounded-2xl flex flex-col items-center justify-center gap-2 transition"
               >
-                <ArrowUpFromLine className="w-8 h-8 text-amber-500" />
+                <ArrowUpFromLine className="w-7 h-7 text-amber-500" />
                 <span className="text-sm">اختر ملف النسخة الاحتياطية (.json)</span>
               </button>
             )}
