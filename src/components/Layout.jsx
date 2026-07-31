@@ -5,7 +5,9 @@ import { useAppContext } from '../context/AppState';
 import AddCaseModal from './AddCaseModal';
 
 export default function Layout() {
-  const { settings, isAdmin } = useAppContext();
+  const { settings, isAdmin, currentUserPermissions } = useAppContext();
+  const canDeleteData = isAdmin || currentUserPermissions?.canDeleteData;
+  const canEditData = isAdmin || currentUserPermissions?.canEditData;
   const location = useLocation();
   const navigate = useNavigate();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -67,7 +69,7 @@ export default function Layout() {
           >
             <BarChart2 className="w-5 h-5" />
           </button>
-          {isAdmin && (
+          {canDeleteData && (
             <button 
               onClick={() => navigate('/trash')}
               className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-slate-300 hover:text-rose-400"
@@ -120,7 +122,7 @@ export default function Layout() {
       </main>
 
       {/* Floating Action Button */}
-      {!isDetailsPage && (
+      {!isDetailsPage && canEditData && (
         <button 
           onClick={() => setIsAddModalOpen(true)}
           className="fixed bottom-24 left-6 md:left-12 w-14 h-14 bg-amber-500 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-amber-600 hover:-translate-y-1 transition-all z-40"

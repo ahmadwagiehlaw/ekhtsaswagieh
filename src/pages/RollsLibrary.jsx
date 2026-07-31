@@ -7,7 +7,9 @@ import { formatDateString } from '../utils/dateUtils';
 import imageCompression from 'browser-image-compression';
 
 export default function RollsLibrary() {
-  const { rolls, cases, saveRollToFirebase, deleteRollFromFirebase, isAdmin, currentUser, settings } = useAppContext();
+  const { rolls, cases, saveRollToFirebase, deleteRollFromFirebase, isAdmin, currentUser, settings, currentUserPermissions } = useAppContext();
+  
+  const canManageRolls = isAdmin || currentUserPermissions?.canManageRolls;
   const { toast, showConfirm } = useUI();
   
   const rollTypes = settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام'];
@@ -313,7 +315,7 @@ export default function RollsLibrary() {
             </div>
           </div>
           
-          {isAdmin && (
+          {canManageRolls && (
             <button
               onClick={() => setIsUploadModalOpen(true)}
               className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-sm flex items-center gap-2 w-full sm:w-auto justify-center mt-3 sm:mt-0"
@@ -325,7 +327,7 @@ export default function RollsLibrary() {
       </div>
 
       {/* Upload/Edit Modal */}
-      {isAdmin && (isUploadModalOpen || editingRoll) && (
+      {canManageRolls && (isUploadModalOpen || editingRoll) && (
         <div className="fixed inset-0 bg-navy-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
@@ -444,7 +446,7 @@ export default function RollsLibrary() {
                     {/* Top color accent */}
                     <div className={`absolute top-0 inset-x-0 h-1.5 ${style.accent}`}></div>
                     
-                    {isAdmin && (
+                    {canManageRolls && (
                       <div className="absolute top-3 right-3 flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition z-10">
                         <button
                           onClick={() => {

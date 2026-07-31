@@ -17,7 +17,10 @@ import { useRef } from 'react';
 export default function CaseDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { cases, schema, isAdmin, saveCaseToFirebase, settings, rolls, checkDuplicateCase, deleteCaseFromFirebase, restoreCaseFromFirebase, saveSettingsToFirebase, saveGlobalTask, currentUser } = useAppContext();
+  const { cases, schema, isAdmin, saveCaseToFirebase, settings, rolls, checkDuplicateCase, deleteCaseFromFirebase, restoreCaseFromFirebase, saveSettingsToFirebase, saveGlobalTask, currentUser, currentUserPermissions } = useAppContext();
+  
+  const canEditData = isAdmin || currentUserPermissions?.canEditData;
+  const canDeleteData = isAdmin || currentUserPermissions?.canDeleteData;
   const { toast, showConfirm, openRollViewer, showPrompt } = useUI();
 
   // In the new architecture, id is the document id, not the array index.
@@ -234,7 +237,7 @@ export default function CaseDetails() {
   const coverImageUrl = coverImageDoc ? coverImageDoc.url : null;
 
   const handleSave = async () => {
-    if (!isAdmin) return;
+    if (!canEditData) return;
     
     // Check for duplicate Case No + Year
     const newCaseNo = getFieldValue(editData, ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى']);
@@ -263,7 +266,7 @@ export default function CaseDetails() {
   };
 
   const handleDeleteCase = async () => {
-    if (!isAdmin) return;
+    if (!canDeleteData) return;
     const confirmed = await showConfirm("نقل إلى سلة المحذوفات", "هل أنت متأكد من نقل هذه الدعوى إلى سلة المحذوفات؟");
     if (confirmed) {
        const success = await deleteCaseFromFirebase(caseData.id);
@@ -309,7 +312,7 @@ export default function CaseDetails() {
           تفاصيل الدعوى
         </div>
 
-        {isAdmin ? (
+        {(canEditData || canDeleteData) ? (
           isEditing ? (
             <div className="flex gap-2">
               <button 
@@ -327,20 +330,24 @@ export default function CaseDetails() {
             </div>
           ) : (
             <div className="flex gap-2">
-              <button 
-                onClick={handleDeleteCase}
-                className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 shadow-sm flex items-center justify-center transition hover:bg-rose-100"
-                title="حذف الملف"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => setIsEditing(true)}
-                className="w-10 h-10 rounded-xl bg-navy-900 text-amber-300 shadow-sm flex items-center justify-center transition"
-                title="تعديل الملف"
-              >
-                <Edit3 className="w-4 h-4" />
-              </button>
+              {canDeleteData && (
+                <button 
+                  onClick={handleDeleteCase}
+                  className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 shadow-sm flex items-center justify-center transition hover:bg-rose-100"
+                  title="حذف الملف"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+              {canEditData && (
+                <button 
+                  onClick={() => setIsEditing(true)}
+                  className="w-10 h-10 rounded-xl bg-navy-900 text-amber-300 shadow-sm flex items-center justify-center transition"
+                  title="تعديل الملف"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+              )}
             </div>
           )
         ) : (
@@ -937,7 +944,7 @@ export default function CaseDetails() {
               <p className="text-[11px] text-slate-500 font-bold">تتابع الجلسات والقرارات</p>
             </div>
           </div>
-          {isAdmin && (
+          {canEditData && (
             <button 
               onClick={() => setIsAddSessionOpen(true)}
               className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
@@ -1094,7 +1101,7 @@ export default function CaseDetails() {
                            })()}
                            
                            {/* Trash Icon */}
-                           {isAdmin && (
+                           {canEditData && (
                               <button
                                  onClick={async () => {
                                  const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذه الجلسة؟', 'delete_session');

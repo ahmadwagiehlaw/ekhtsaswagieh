@@ -18,7 +18,7 @@ export default function Settings() {
 
   // Schema state
   const [localSchema, setLocalSchema] = useState(schema || []);
-  const [activeTab, setActiveTab] = useState('schema'); // schema, judgments, lists, other, data
+  const [activeTab, setActiveTab] = useState('judgments'); // judgments, lists, schema, other, data
 
   // Advanced state
   const [localEmployees, setLocalEmployees] = useState(settings?.employees || []);
@@ -26,6 +26,7 @@ export default function Settings() {
   const [localReviewTasks, setLocalReviewTasks] = useState(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
   const [localRollTypes, setLocalRollTypes] = useState(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
   const [localNumberFormat, setLocalNumberFormat] = useState(settings?.numberFormat || 'en');
+  const [localDateFormat, setLocalDateFormat] = useState(settings?.dateFormat || 'dd/MM/yyyy');
   const [localRoles, setLocalRoles] = useState(settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص']);
   const [localSessionTypes, setLocalSessionTypes] = useState(settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة']);
   const [localFileLocations, setLocalFileLocations] = useState(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
@@ -156,6 +157,7 @@ export default function Settings() {
     setLocalReviewTasks(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
     setLocalRollTypes(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
     setLocalNumberFormat(settings?.numberFormat || 'en');
+    setLocalDateFormat(settings?.dateFormat || 'dd/MM/yyyy');
     setLocalRoles(settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص']);
     setLocalSessionTypes(settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة']);
     setLocalFileLocations(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
@@ -179,6 +181,7 @@ export default function Settings() {
       reviewTasks: localReviewTasks,
       rollTypes: localRollTypes,
       numberFormat: localNumberFormat,
+      dateFormat: localDateFormat,
       roles: localRoles,
       sessionTypes: localSessionTypes,
       fileLocations: localFileLocations,
@@ -414,9 +417,9 @@ export default function Settings() {
 
       {/* Tabs */}
       <div className="flex bg-slate-200/50 p-1 rounded-xl flex-wrap">
-        <button onClick={() => setActiveTab('schema')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'schema' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🧩 هيكلة الحقول</button>
         <button onClick={() => setActiveTab('judgments')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'judgments' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚖️ الجلسات والأحكام</button>
         <button onClick={() => setActiveTab('lists')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'lists' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>📁 قوائم النظام</button>
+        <button onClick={() => setActiveTab('schema')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'schema' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🧩 هيكلة الحقول</button>
         <button onClick={() => setActiveTab('other')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'other' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚙️ إعدادات أخرى</button>
         <button onClick={() => setActiveTab('data')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'data' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🛡️ بيانات ونسخ</button>
       </div>
@@ -647,25 +650,41 @@ export default function Settings() {
               <h3 className="font-black text-sm text-navy-900">تفضيلات العرض والرسائل</h3>
             </div>
             <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-4">
-                <label className="text-xs font-bold text-slate-700">تنسيق الأرقام والتواريخ:</label>
-                <div className="flex bg-slate-100 p-1 rounded-xl">
-                   <button 
-                     onClick={() => setLocalNumberFormat('en')}
-                     className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'en' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                   >
-                     إنجليزي (123)
-                   </button>
-                   <button 
-                     onClick={() => setLocalNumberFormat('ar')}
-                     className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'ar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                   >
-                     عربي (١٢٣)
-                   </button>
+              <div className="flex flex-col sm:flex-row gap-4 justify-between border-b border-slate-100 pb-4">
+                <div className="flex flex-col gap-2 flex-1">
+                  <label className="text-xs font-bold text-slate-700">تنسيق الأرقام (للعرض والطباعة):</label>
+                  <div className="flex bg-slate-100 p-1 rounded-xl self-start">
+                     <button 
+                       onClick={() => setLocalNumberFormat('en')}
+                       className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'en' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                     >
+                       إنجليزي (123)
+                     </button>
+                     <button 
+                       onClick={() => setLocalNumberFormat('ar')}
+                       className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'ar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                     >
+                       عربي (١٢٣)
+                     </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 flex-1">
+                  <label className="text-xs font-bold text-slate-700">تنسيق التواريخ الافتراضي:</label>
+                  <select 
+                    value={localDateFormat}
+                    onChange={e => setLocalDateFormat(e.target.value)}
+                    className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
+                  >
+                    <option value="dd/MM/yyyy">يوم/شهر/سنة (31/12/2026)</option>
+                    <option value="yyyy/MM/dd">سنة/شهر/يوم (2026/12/31)</option>
+                    <option value="dd-MM-yyyy">يوم-شهر-سنة (31-12-2026)</option>
+                    <option value="d MMMM yyyy">نصي (31 ديسمبر 2026)</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3">
                 <div>
                   <h4 className="text-xs font-black text-navy-900">الرسائل التأكيدية</h4>
                   <p className="text-[10px] text-slate-500 font-bold">إعادة تفعيل الرسائل التأكيدية التي قمت بتعطيلها مسبقاً عبر خيار (عدم الإظهار مجدداً).</p>
@@ -715,43 +734,91 @@ export default function Settings() {
             </div>
             
             <div className="space-y-3">
-              {localEmployees.map((emp, index) => (
-                <div key={index} className="flex flex-col sm:flex-row gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 items-start sm:items-center">
-                  <input type="text" placeholder="الاسم" value={emp.name} onChange={e => {
-                    const newEmp = [...localEmployees];
-                    newEmp[index].name = e.target.value;
-                    setLocalEmployees(newEmp);
-                  }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
-                  
-                  <select 
-                    value={emp.jobTitle || 'السكرتارية'} 
-                    onChange={e => {
+              {localEmployees.map((emp, index) => {
+                const empPerms = emp.permissions || { canEditData: true, canDeleteData: true, canManageRolls: true, canManageTasks: true };
+                return (
+                <div key={index} className="flex flex-col gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                    <input type="text" placeholder="الاسم" value={emp.name} onChange={e => {
                       const newEmp = [...localEmployees];
-                      newEmp[index].jobTitle = e.target.value;
+                      newEmp[index].name = e.target.value;
                       setLocalEmployees(newEmp);
-                    }} 
-                    className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto bg-white"
-                  >
-                    <option value="السكرتارية">السكرتارية</option>
-                    <option value="إطلاع">إطلاع</option>
-                    <option value="صادر">صادر</option>
-                    <option value="محامي">محامي</option>
-                  </select>
+                    }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
+                    
+                    <input 
+                      type="text"
+                      list="jobTitlesList"
+                      placeholder="الوظيفة (مثال: محامي)"
+                      value={emp.jobTitle || ''} 
+                      onChange={e => {
+                        const newEmp = [...localEmployees];
+                        newEmp[index].jobTitle = e.target.value;
+                        setLocalEmployees(newEmp);
+                      }} 
+                      className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto bg-white"
+                    />
+                    <datalist id="jobTitlesList">
+                      <option value="محامي" />
+                      <option value="سكرتارية" />
+                      <option value="إداري" />
+                      <option value="صادر" />
+                      <option value="إطلاع" />
+                    </datalist>
 
-                  <input type="text" placeholder="كلمة المرور" value={emp.password} onChange={e => {
-                    const newEmp = [...localEmployees];
-                    newEmp[index].password = e.target.value;
-                    setLocalEmployees(newEmp);
-                  }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
-                  
-                  <button onClick={() => setLocalEmployees(localEmployees.filter((_, idx) => idx !== index))} className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg shrink-0 self-end sm:self-auto mt-2 sm:mt-0">
-                    <Trash2 className="w-4 h-4"/>
-                  </button>
+                    <input type="text" placeholder="كلمة المرور" value={emp.password} onChange={e => {
+                      const newEmp = [...localEmployees];
+                      newEmp[index].password = e.target.value;
+                      setLocalEmployees(newEmp);
+                    }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
+                    
+                    <button onClick={() => setLocalEmployees(localEmployees.filter((_, idx) => idx !== index))} className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg shrink-0 self-end sm:self-auto mt-2 sm:mt-0">
+                      <Trash2 className="w-4 h-4"/>
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3 mt-1 p-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-navy-900 transition">
+                      <input type="checkbox" checked={empPerms.canEditData} onChange={e => {
+                         const newEmp = [...localEmployees];
+                         newEmp[index].permissions = { ...empPerms, canEditData: e.target.checked };
+                         setLocalEmployees(newEmp);
+                      }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                      📝 إضافة وتعديل القضايا
+                    </label>
+                    
+                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-rose-600 transition">
+                      <input type="checkbox" checked={empPerms.canDeleteData} onChange={e => {
+                         const newEmp = [...localEmployees];
+                         newEmp[index].permissions = { ...empPerms, canDeleteData: e.target.checked };
+                         setLocalEmployees(newEmp);
+                      }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                      🗑️ حذف القضايا
+                    </label>
+
+                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-navy-900 transition">
+                      <input type="checkbox" checked={empPerms.canManageRolls} onChange={e => {
+                         const newEmp = [...localEmployees];
+                         newEmp[index].permissions = { ...empPerms, canManageRolls: e.target.checked };
+                         setLocalEmployees(newEmp);
+                      }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                      📅 إدارة رول الجلسات
+                    </label>
+
+                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-navy-900 transition">
+                      <input type="checkbox" checked={empPerms.canManageTasks} onChange={e => {
+                         const newEmp = [...localEmployees];
+                         newEmp[index].permissions = { ...empPerms, canManageTasks: e.target.checked };
+                         setLocalEmployees(newEmp);
+                      }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                      📋 إدارة المهام
+                    </label>
+                  </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
-            <button onClick={() => setLocalEmployees([...localEmployees, { name: '', jobTitle: 'السكرتارية', password: '' }])} className="w-full border-2 border-dashed border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-2">
+            <button onClick={() => setLocalEmployees([...localEmployees, { name: '', jobTitle: '', password: '', permissions: { canEditData: true, canDeleteData: true, canManageRolls: true, canManageTasks: true } }])} className="w-full border-2 border-dashed border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-2">
               <Plus className="w-4 h-4"/> إضافة موظف جديد
             </button>
           </div>

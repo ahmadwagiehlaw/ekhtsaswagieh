@@ -6,7 +6,9 @@ import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
 
 export default function Trash() {
-  const { deletedCases, restoreCaseFromFirebase, deleteCaseFromFirebase, isAdmin } = useAppContext();
+  const { deletedCases, restoreCaseFromFirebase, deleteCaseFromFirebase, isAdmin, currentUserPermissions } = useAppContext();
+  
+  const canDeleteData = isAdmin || currentUserPermissions?.canDeleteData;
   const { toast, showConfirm } = useUI();
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -69,7 +71,7 @@ export default function Trash() {
           </div>
         </div>
 
-        {isAdmin && deletedCases.length > 0 && (
+        {canDeleteData && deletedCases.length > 0 && (
           <button
             onClick={handleEmptyTrash}
             disabled={isProcessing}
@@ -144,7 +146,7 @@ export default function Trash() {
                 <RotateCcw className="w-4 h-4" />
                 استعادة
               </button>
-              {isAdmin && (
+              {canDeleteData && (
                 <button
                   onClick={(e) => handlePermanentDelete(c.id, e)}
                   className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2 rounded-xl text-sm transition flex items-center justify-center gap-2"

@@ -26,6 +26,7 @@ export const AppProvider = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('isAdmin') === 'true');
   const [isEmployee, setIsEmployee] = useState(() => localStorage.getItem('isEmployee') === 'true');
   const [currentUser, setCurrentUser] = useState(() => localStorage.getItem('currentUser') || '');
+  const [currentUserPermissions, setCurrentPermissions] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -92,7 +93,11 @@ export const AppProvider = ({ children }) => {
     // 3. Listen to settings
     const unsubSettings = onSnapshot(SETTINGS_DOC_REF, (docSnap) => {
       if (docSnap.exists()) {
-        setSettings(prev => ({ ...prev, ...docSnap.data() }));
+        const data = docSnap.data();
+        setSettings(prev => ({ ...prev, ...data }));
+        if (data.dateFormat) {
+          localStorage.setItem('dateFormat', data.dateFormat);
+        }
       }
     });
 
@@ -126,6 +131,39 @@ export const AppProvider = ({ children }) => {
     };
   }, []);
 
+  // Validate employee session and set permissions
+  useEffect(() => {
+    if (isAdmin) {
+      setCurrentPermissions({
+        canEditData: true,
+        canDeleteData: true,
+        canManageRolls: true,
+        canManageTasks: true
+      });
+      return;
+    }
+
+    if (isEmployee && settings?.employees) {
+      const storedPassword = localStorage.getItem('employeePassword');
+      const storedName = localStorage.getItem('currentUser');
+      
+      const employee = settings.employees.find(emp => emp.name === storedName && emp.password === storedPassword);
+      
+      if (!employee && storedName) {
+        // Password changed or employee deleted, force logout
+        logoutAdmin();
+      } else if (employee) {
+        // Set permissions based on employee settings
+        setCurrentPermissions(employee.permissions || {
+          canEditData: true,
+          canDeleteData: true,
+          canManageRolls: true,
+          canManageTasks: true
+        });
+      }
+    }
+  }, [settings?.employees, isEmployee, isAdmin]);
+
   const loginAdmin = (password) => {
     if (password === 'a4450422') {
       setIsAdmin(true);
@@ -146,6 +184,7 @@ export const AppProvider = ({ children }) => {
       localStorage.setItem('isAdmin', 'false');
       localStorage.setItem('isEmployee', 'true');
       localStorage.setItem('currentUser', employee.name);
+      localStorage.setItem('employeePassword', password);
       return true;
     }
     
@@ -159,6 +198,8 @@ export const AppProvider = ({ children }) => {
     localStorage.removeItem('isAdmin');
     localStorage.removeItem('isEmployee');
     localStorage.removeItem('currentUser');
+    localStorage.removeItem('employeePassword');
+    setCurrentPermissions(null);
   };
 
   const sanitizeId = (str) => String(str).replace(/[\/\\?%*:|"<>\s]/g, '_');
@@ -361,6 +402,7 @@ export const AppProvider = ({ children }) => {
       isAdmin,
       isEmployee,
       currentUser,
+      currentUserPermissions,
       loading,
       loginAdmin,
       logoutAdmin,

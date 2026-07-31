@@ -6,7 +6,8 @@ import { uploadToR2 } from '../lib/r2';
 import imageCompression from 'browser-image-compression';
 
 export default function AddSessionModal({ isOpen, onClose, caseData }) {
-  const { saveCaseToFirebase, settings, isAdmin } = useAppContext();
+  const { saveCaseToFirebase, settings, isAdmin, currentUserPermissions } = useAppContext();
+  const canEditData = isAdmin || currentUserPermissions?.canEditData;
   const { toast, showPrompt } = useUI();
   const [sessionDate, setSessionDate] = useState('');
   const [decision, setDecision] = useState('');

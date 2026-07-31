@@ -5,7 +5,8 @@ import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
 
 export default function GlobalTasksModal({ isOpen, onClose }) {
-  const { globalTasks, saveGlobalTask, deleteGlobalTask, settings, isAdmin, currentUser } = useAppContext();
+  const { globalTasks, saveGlobalTask, deleteGlobalTask, settings, isAdmin, currentUser, currentUserPermissions } = useAppContext();
+  const canManageTasks = isAdmin || currentUserPermissions?.canManageTasks;
   const { toast, showConfirm } = useUI();
   const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'completed'
   const [isAdding, setIsAdding] = useState(false);
@@ -99,7 +100,7 @@ export default function GlobalTasksModal({ isOpen, onClose }) {
         </div>
 
         {/* Add Task Form (Inline) */}
-        {isAdding && isAdmin && (
+        {isAdding && canManageTasks && (
           <div className="bg-indigo-50/50 p-5 border-b border-indigo-100 shrink-0 space-y-3">
             <h3 className="font-black text-indigo-900 text-sm">مهمة جديدة</h3>
             <div className="flex flex-col sm:flex-row gap-3">
@@ -166,7 +167,7 @@ export default function GlobalTasksModal({ isOpen, onClose }) {
                مكتملة ({completedTasks.length})
              </button>
           </div>
-          {isAdmin && !isAdding && (
+          {canManageTasks && !isAdding && (
              <button 
                onClick={() => setIsAdding(true)}
                className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-indigo-100 transition"
@@ -189,9 +190,9 @@ export default function GlobalTasksModal({ isOpen, onClose }) {
                   <div className="flex items-start justify-between gap-4">
                      <div className="flex items-start gap-3 flex-1">
                         <button 
-                           onClick={() => isAdmin || task.assignee === currentUser ? handleToggleStatus(task) : null}
-                           disabled={!isAdmin && task.assignee !== currentUser}
-                           className={`shrink-0 mt-0.5 rounded-full transition-colors ${(isAdmin || task.assignee === currentUser) ? 'cursor-pointer hover:scale-110' : 'cursor-default'} ${task.status === 'completed' ? 'text-emerald-500' : 'text-slate-300 hover:text-indigo-500'}`}
+                           onClick={() => canManageTasks || task.assignee === currentUser ? handleToggleStatus(task) : null}
+                           disabled={!canManageTasks && task.assignee !== currentUser}
+                           className={`shrink-0 mt-0.5 rounded-full transition-colors ${(canManageTasks || task.assignee === currentUser) ? 'cursor-pointer hover:scale-110' : 'cursor-default'} ${task.status === 'completed' ? 'text-emerald-500' : 'text-slate-300 hover:text-indigo-500'}`}
                         >
                            <CheckCircle2 className="w-6 h-6" />
                         </button>
@@ -214,7 +215,7 @@ export default function GlobalTasksModal({ isOpen, onClose }) {
                            </h4>
                         </div>
                      </div>
-                     {isAdmin && (
+                     {canManageTasks && (
                         <button onClick={() => handleDelete(task.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition">
                            <Trash2 className="w-4 h-4" />
                         </button>

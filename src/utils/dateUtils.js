@@ -1,4 +1,5 @@
 import { format, parseISO, isValid } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 /**
  * Checks if a value is likely an Excel serial date number.
@@ -30,11 +31,13 @@ const excelToDate = (serial) => {
  * Safely parses and formats a date value from the database.
  * Handles normal date strings and Excel serial numbers.
  * @param {string|number} value - The date value to format
- * @param {string} formatStr - The date-fns format string (default: 'yyyy-MM-dd')
+ * @param {string} formatStr - The date-fns format string (default: from settings or 'dd/MM/yyyy')
  * @returns {string} The formatted date string, or the original value if it can't be parsed.
  */
-export const formatDateString = (value, formatStr = 'yyyy-MM-dd') => {
+export const formatDateString = (value, formatStr) => {
   if (!value) return '';
+  
+  const activeFormat = formatStr || localStorage.getItem('dateFormat') || 'dd/MM/yyyy';
 
   try {
     let dateObj;
@@ -47,7 +50,7 @@ export const formatDateString = (value, formatStr = 'yyyy-MM-dd') => {
     }
 
     if (isValid(dateObj)) {
-      return format(dateObj, formatStr);
+      return format(dateObj, activeFormat, { locale: ar });
     }
   } catch (e) {
     console.warn('Failed to format date:', value);

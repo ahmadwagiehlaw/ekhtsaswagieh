@@ -29,7 +29,8 @@ const getDocTypeStyle = (type) => {
 };
 
 export default function CaseDocuments({ caseId, pastedFile, setPastedFile }) {
-  const { cases, saveCaseToFirebase, currentUser, isAdmin } = useAppContext();
+  const { cases, saveCaseToFirebase, currentUser, isAdmin, currentUserPermissions } = useAppContext();
+  const canEditData = isAdmin || currentUserPermissions?.canEditData;
   const { toast, showConfirm } = useUI();
 
   const caseData = cases.find(c => c.id === caseId);
@@ -205,7 +206,7 @@ export default function CaseDocuments({ caseId, pastedFile, setPastedFile }) {
                 </div>
 
                 {/* Delete and Edit Buttons */}
-                {isAdmin && (
+                {canEditData && (
                   <div className="absolute top-2 left-2 z-10 flex gap-1.5 opacity-90 hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => { e.stopPropagation(); setEditingDoc(doc); setDocType(doc.type || 'ملف الدعوى'); setDocTitle(doc.title || doc.type || ''); setShowUploadModal(true); }}

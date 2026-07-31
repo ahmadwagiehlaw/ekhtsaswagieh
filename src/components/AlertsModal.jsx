@@ -4,7 +4,8 @@ import { useUI } from '../context/UIContext';
 import { useAppContext } from '../context/AppState';
 
 export default function AlertsModal({ isOpen, onClose, caseData }) {
-  const { saveCaseToFirebase, isAdmin } = useAppContext();
+  const { saveCaseToFirebase, isAdmin, currentUserPermissions } = useAppContext();
+  const canEditData = isAdmin || currentUserPermissions?.canEditData;
   const { toast } = useUI();
   const [newAlert, setNewAlert] = useState({ date: '', title: '' });
   const [isAddingAlert, setIsAddingAlert] = useState(false);
@@ -113,7 +114,7 @@ export default function AlertsModal({ isOpen, onClose, caseData }) {
                         )}
                       </p>
                     </div>
-                    {!isCompleted && isAdmin && (
+                    {!isCompleted && canEditData && (
                       <button
                         onClick={async () => {
                           const updatedAlerts = [...alertsList];
@@ -132,7 +133,7 @@ export default function AlertsModal({ isOpen, onClose, caseData }) {
             </div>
           )}
 
-          {isAdmin && (
+          {canEditData && (
             <div className="bg-rose-50/50 p-4 rounded-xl border border-rose-100 mt-6">
               <h4 className="text-xs font-black text-rose-900 mb-3 flex items-center gap-1.5">
                 <CalendarPlus className="w-4 h-4" /> إضافة تنبيه جديد:

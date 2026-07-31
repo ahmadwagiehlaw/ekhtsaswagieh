@@ -7,7 +7,8 @@ import imageCompression from 'browser-image-compression';
 import { formatDateString } from '../utils/dateUtils';
 
 export default function ProceduresModal({ isOpen, onClose, caseData, setCaseData }) {
-  const { saveCaseToFirebase, settings, isAdmin } = useAppContext();
+  const { saveCaseToFirebase, settings, isAdmin, currentUserPermissions } = useAppContext();
+  const canEditData = isAdmin || currentUserPermissions?.canEditData;
   const { toast, showConfirm, showPrompt } = useUI();
   
   const [newProcedure, setNewProcedure] = useState({ date: new Date().toISOString().split('T')[0], title: '', notes: '', sessionDate: '' });
@@ -110,7 +111,7 @@ export default function ProceduresModal({ isOpen, onClose, caseData, setCaseData
                              </div>
                            )}
                          </div>
-                         {isAdmin && (
+                         {canEditData && (
                            <button 
                              onClick={async () => {
                                const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذا الإجراء؟');
@@ -143,7 +144,7 @@ export default function ProceduresModal({ isOpen, onClose, caseData, setCaseData
            )}
 
            {/* Add Procedure Form */}
-           {isAdmin && (
+           {canEditData && (
               <div className="bg-white p-4 sm:p-5 rounded-2xl border border-indigo-100 shadow-sm mt-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500"></div>
                 <h4 className="text-sm font-black text-navy-900 mb-4 flex items-center gap-2">
