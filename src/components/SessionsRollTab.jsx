@@ -8,7 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   Edit3, Check, X, ChevronRight, ChevronLeft, Search,
   CheckSquare, Square, ClipboardList, Bell, Eye, CopyPlus,
-  Printer, ExternalLink, Save, RefreshCcw, AlertCircle, Plus, Trash2
+  Printer, ExternalLink, Save, RefreshCcw, AlertCircle, Plus, Trash2,
+  ArrowUpDown, ArrowUp, ArrowDown, Columns, Settings2
 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
@@ -17,6 +18,7 @@ import BulkProcedureFromRollModal from './BulkProcedureFromRollModal';
 import BulkSessionRolloverModal from './BulkSessionRolloverModal';
 import ExportPDFModal from './ExportPDFModal';
 import QuickAddCaseModal from './QuickAddCaseModal';
+import GlobalRollSearchModal from './GlobalRollSearchModal';
 
 const PREDEFINED_DECISIONS = [
   'للحكم','تصريح','للإعلان','للاطلاع','للإخطار',
@@ -54,15 +56,56 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   const [isRolloverOpen, setIsRolloverOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
+  const [showColPicker, setShowColPicker] = useState(false);
+
+  const [sortConfig, setSortConfig] = useState({ key: 'الرول', direction: 'asc' });
+  const [visibleCols, setVisibleCols] = useState({
+    roll: true, caseName: true, plaintiff: true, defendant: true,
+    type: true, decision: true, nextDate: true, notes: true
+  });
+
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const toggleCol = (key) => setVisibleCols(p => ({ ...p, [key]: !p[key] }));
 
   const filteredCases = useMemo(() => {
-    if (!searchQ.trim()) return dayCases;
-    const q = searchQ.toLowerCase();
-    return dayCases.filter(c =>
-      [c['رقم الدعوى'], c['السنة'], c['المدعي'], c['المدعى_عليه'], c['القرار'], c['الرول']]
-        .some(v => String(v || '').toLowerCase().includes(q))
-    );
-  }, [dayCases, searchQ]);
+    let result = dayCases;
+    
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      result = result.filter(c =>
+        [c['رقم الدعوى'], c['السنة'], c['المدعي'], c['المدعى_عليه'], c['القرار'], c['الرول']]
+          .some(v => String(v || '').toLowerCase().includes(q))
+      );
+    }
+
+    // Sort
+    result = [...result].sort((a, b) => {
+      let valA = getFieldVal(a, [sortConfig.key]) || '';
+      let valB = getFieldVal(b, [sortConfig.key]) || '';
+      
+      if (sortConfig.key === 'الرول') {
+        // Numeric sort for roll number
+        valA = Number(valA) || 999999;
+        valB = Number(valB) || 999999;
+      } else {
+        valA = String(valA).toLowerCase();
+        valB = String(valB).toLowerCase();
+      }
+
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [dayCases, searchQ, sortConfig]);
 
   const toggleSelect = (id) => {
     const n = new Set(selectedIds);
@@ -174,7 +217,34 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap relative">
+          <button
+            onClick={() => setShowColPicker(!showColPicker)}
+            className="flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition"
+          >
+            <Columns className="w-3.5 h-3.5" /> الأعمدة
+          </button>
+
+          {showColPicker && (
+            <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-slate-200 shadow-xl rounded-xl p-2 z-20 flex flex-col gap-1">
+              {Object.entries({
+                roll: 'الرول', caseName: 'الدعوى', plaintiff: 'المدعي',
+                defendant: 'ضد', type: 'نوع الجلسة', decision: 'القرار',
+                nextDate: 'الجلسة القادمة', notes: 'الملاحظات'
+              }).map(([k, label]) => (
+                <label key={k} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={visibleCols[k]}
+                    onChange={() => toggleCol(k)}
+                    className="rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs font-bold text-slate-700">{label}</span>
+                </label>
+              ))}
+            </div>
+          )}
+
           <button
             onClick={() => setIsQuickAddOpen(true)}
             className="flex items-center gap-1 bg-emerald-500 text-white hover:bg-emerald-600 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition"
@@ -259,14 +329,14 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                       : <Square className="w-4 h-4" />}
                   </button>
                 </th>
-                <th className="px-2 py-2.5 text-[11px] font-black text-slate-500 w-12">الرول</th>
-                <th className="px-2 py-2.5 text-[11px] font-black text-slate-500">الدعوى</th>
-                <th className="px-2 py-2.5 text-[11px] font-black text-slate-500">المدعي</th>
-                <th className="px-2 py-2.5 text-[11px] font-black text-slate-500">ضد</th>
-                <th className="px-2 py-2.5 text-[11px] font-black text-slate-500 w-20">نوع الجلسة</th>
-                <th className="px-2 py-2.5 text-[11px] font-black text-slate-500 w-28">القرار</th>
-                <th className="px-2 py-2.5 text-[11px] font-black text-slate-500 w-28">الجلسة القادمة</th>
-                <th className="px-2 py-2.5 text-[11px] font-black text-slate-500">الملاحظات</th>
+                {visibleCols.roll && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="الرول" label="الرول" width="w-16" />}
+                {visibleCols.caseName && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="رقم الدعوى" label="الدعوى" />}
+                {visibleCols.plaintiff && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="المدعي" label="المدعي" />}
+                {visibleCols.defendant && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="المدعى_عليه" label="ضد" />}
+                {visibleCols.type && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="نوع الجلسة" label="نوع الجلسة" width="w-20" />}
+                {visibleCols.decision && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="القرار" label="القرار" width="w-28" />}
+                {visibleCols.nextDate && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="آخر جلسة" label="الجلسة القادمة" width="w-28" />}
+                {visibleCols.notes && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="الملاحظات" label="الملاحظات" />}
                 <th className="px-2 py-2.5 w-20"></th>
               </tr>
             </thead>
@@ -275,6 +345,14 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                 <tr>
                   <td colSpan={10} className="px-4 py-12 text-center">
                     <p className="text-sm font-bold text-slate-400">لا توجد جلسات في هذا اليوم</p>
+                    {searchQ.trim() && (
+                      <button
+                        onClick={() => setIsGlobalSearchOpen(true)}
+                        className="mt-4 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 mx-auto"
+                      >
+                        <Search className="w-4 h-4" /> البحث عن "{searchQ}" في كافة القضايا
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : filteredCases.map((cObj, idx) => {
@@ -296,109 +374,117 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                     </td>
 
                     {/* Roll number */}
-                    <td className="px-2 py-2">
-                      {isEditing ? (
-                        <input type="text" value={editData['الرول']} onChange={e => setEditData({...editData, 'الرول': e.target.value})}
-                          className="w-14 text-[11px] font-bold p-1 rounded border border-slate-300 text-center" />
-                      ) : (
-                        <span className="text-xs font-black text-slate-600">
-                          {getFieldVal(cObj, ['الرول']) || <span className="text-slate-300">-</span>}
-                        </span>
-                      )}
-                    </td>
+                    {visibleCols.roll && (
+                      <td className="px-2 py-2">
+                        {isEditing ? (
+                          <input type="text" value={editData['الرول']} onChange={e => setEditData({...editData, 'الرول': e.target.value})}
+                            className="w-14 text-[11px] font-bold p-1 rounded border border-slate-300 text-center" />
+                        ) : (
+                          <span className="text-xs font-black text-slate-600">
+                            {getFieldVal(cObj, ['الرول']) || <span className="text-slate-300">-</span>}
+                          </span>
+                        )}
+                      </td>
+                    )}
 
                     {/* Case number */}
-                    <td className="px-2 py-2">
-                      <button onClick={() => navigate(`/case/${cObj.id}`)}
-                        className="text-[11px] font-black text-navy-900 hover:text-amber-600 transition text-right">
-                        {getFieldVal(cObj, ['رقم الدعوى'])} / {getFieldVal(cObj, ['السنة'])}
-                      </button>
-                      {role && !isNoInterest && (
-                        <div className={`text-[9px] font-bold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${
-                          role.includes('طاعن') ? 'bg-rose-100 text-rose-700' :
-                          role.includes('مطعون') ? 'bg-emerald-100 text-emerald-700' :
-                          'bg-slate-100 text-slate-600'}`}>
-                          {role}
+                    {visibleCols.caseName && (
+                      <td className="px-2 py-2">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-black text-navy-900" dir="rtl">
+                            {cObj['رقم الدعوى']} <span className="text-slate-400 mx-0.5">/</span> {cObj['السنة']}
+                          </span>
                         </div>
-                      )}
-                    </td>
+                      </td>
+                    )}
 
                     {/* Plaintiff */}
-                    <td className="px-2 py-2">
-                      <span className="text-[11px] font-bold text-slate-700 line-clamp-1">
-                        {getFieldVal(cObj, ['المدعي'])}
-                      </span>
-                    </td>
+                    {visibleCols.plaintiff && (
+                      <td className="px-2 py-2">
+                        <span className="text-[11px] font-bold text-slate-700 line-clamp-2" title={cObj['المدعي']}>{cObj['المدعي'] || '-'}</span>
+                      </td>
+                    )}
 
                     {/* Defendant */}
-                    <td className="px-2 py-2">
-                      <span className="text-[11px] font-bold text-slate-600 line-clamp-1">
-                        {getFieldVal(cObj, ['المدعى_عليه', 'ضد', 'المطعون ضده'])}
-                      </span>
-                    </td>
+                    {visibleCols.defendant && (
+                      <td className="px-2 py-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[11px] font-bold text-slate-700 line-clamp-2" title={cObj['المدعى_عليه']}>{cObj['المدعى_عليه'] || '-'}</span>
+                          {role && <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${isNoInterest ? 'bg-slate-100 text-slate-500' : 'bg-rose-100 text-rose-700'}`}>{role}</span>}
+                        </div>
+                      </td>
+                    )}
 
                     {/* Session type */}
-                    <td className="px-2 py-2">
-                      {isEditing ? (
-                        <select value={editData['نوع الجلسة']} onChange={e => setEditData({...editData, 'نوع الجلسة': e.target.value})}
-                          className="text-[10px] font-bold p-1 rounded border border-slate-300 w-full">
-                          {sessionTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      ) : (
-                        <span className="text-[11px] font-bold text-slate-600">
-                          {getFieldVal(cObj, ['نوع الجلسة']) || '-'}
-                        </span>
-                      )}
-                    </td>
+                    {visibleCols.type && (
+                      <td className="px-2 py-2">
+                        {isEditing ? (
+                          <select value={editData['نوع الجلسة']} onChange={e => setEditData({...editData, 'نوع الجلسة': e.target.value})}
+                            className="text-[10px] font-bold p-1 rounded border border-slate-300 w-full">
+                            {sessionTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        ) : (
+                          <span className="text-[11px] font-bold text-slate-600">
+                            {getFieldVal(cObj, ['نوع الجلسة']) || '-'}
+                          </span>
+                        )}
+                      </td>
+                    )}
 
                     {/* Decision */}
-                    <td className="px-2 py-2">
-                      {isEditing ? (
-                        <div>
-                          <input
-                            list={`dec-${cObj.id}`}
-                            value={editData['القرار']}
-                            onChange={e => setEditData({...editData, 'القرار': e.target.value})}
-                            className="w-full text-[10px] font-bold p-1 rounded border border-amber-300"
-                            placeholder="القرار..."
-                          />
-                          <datalist id={`dec-${cObj.id}`}>
-                            {decisionOptions.map(d => <option key={d} value={d} />)}
-                          </datalist>
-                        </div>
-                      ) : (
-                        <span className="text-[11px] font-bold text-amber-700">
-                          {getFieldVal(cObj, ['القرار']) || '-'}
-                        </span>
-                      )}
-                    </td>
+                    {visibleCols.decision && (
+                      <td className="px-2 py-2">
+                        {isEditing ? (
+                          <div>
+                            <input
+                              list={`dec-${cObj.id}`}
+                              value={editData['القرار']}
+                              onChange={e => setEditData({...editData, 'القرار': e.target.value})}
+                              className="w-full text-[10px] font-bold p-1 rounded border border-amber-300"
+                              placeholder="القرار..."
+                            />
+                            <datalist id={`dec-${cObj.id}`}>
+                              {decisionOptions.map(d => <option key={d} value={d} />)}
+                            </datalist>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] font-bold text-amber-700">
+                            {getFieldVal(cObj, ['القرار']) || '-'}
+                          </span>
+                        )}
+                      </td>
+                    )}
 
                     {/* Next session date */}
-                    <td className="px-2 py-2">
-                      {isEditing ? (
-                        <input type="date" value={editData['آخر جلسة']}
-                          onChange={e => setEditData({...editData, 'آخر جلسة': e.target.value})}
-                          className="text-[10px] font-bold p-1 rounded border border-slate-300 w-full" />
-                      ) : (
-                        <span className="text-[11px] font-bold text-slate-600">
-                          {getFieldVal(cObj, ['آخر جلسة', 'تاريخ الجلسة']) || '-'}
-                        </span>
-                      )}
-                    </td>
+                    {visibleCols.nextDate && (
+                      <td className="px-2 py-2">
+                        {isEditing ? (
+                          <input type="date" value={editData['آخر جلسة']}
+                            onChange={e => setEditData({...editData, 'آخر جلسة': e.target.value})}
+                            className="text-[10px] font-bold p-1 rounded border border-slate-300 w-full" />
+                        ) : (
+                          <span className="text-[11px] font-bold text-slate-600">
+                            {getFieldVal(cObj, ['آخر جلسة', 'تاريخ الجلسة']) || '-'}
+                          </span>
+                        )}
+                      </td>
+                    )}
 
                     {/* Notes */}
-                    <td className="px-2 py-2">
-                      {isEditing ? (
-                        <input type="text" value={editData['الملاحظات']}
-                          onChange={e => setEditData({...editData, 'الملاحظات': e.target.value})}
-                          className="w-full text-[10px] font-bold p-1 rounded border border-slate-300"
-                          placeholder="ملاحظات..." />
-                      ) : (
-                        <span className="text-[10px] text-slate-500 line-clamp-1">
-                          {getFieldVal(cObj, ['الملاحظات']) || ''}
-                        </span>
-                      )}
-                    </td>
+                    {visibleCols.notes && (
+                      <td className="px-2 py-2">
+                        {isEditing ? (
+                          <input type="text" value={editData['الملاحظات']}
+                            onChange={e => setEditData({...editData, 'الملاحظات': e.target.value})}
+                            className="w-full text-[10px] font-bold p-1 rounded border border-slate-300"
+                            placeholder="ملاحظات..." />
+                        ) : (
+                          <span className="text-[10px] text-slate-500 line-clamp-1">
+                            {getFieldVal(cObj, ['الملاحظات']) || ''}
+                          </span>
+                        )}
+                      </td>
+                    )}
 
                     {/* Actions */}
                     <td className="px-2 py-2">
@@ -476,6 +562,33 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
         onClose={() => setIsQuickAddOpen(false)}
         prefillDate={date}
       />
+      <GlobalRollSearchModal
+        isOpen={isGlobalSearchOpen}
+        onClose={() => setIsGlobalSearchOpen(false)}
+        initialQuery={searchQ}
+        sessionDate={date}
+      />
     </div>
+  );
+}
+
+function SortHeader({ sortConfig, onSort, sortKey, label, width = '' }) {
+  const isActive = sortConfig.key === sortKey;
+  return (
+    <th className={`px-2 py-2.5 ${width}`}>
+      <button 
+        onClick={() => onSort(sortKey)}
+        className="flex items-center gap-1 group"
+      >
+        <span className={`text-[11px] font-black transition-colors ${isActive ? 'text-indigo-600' : 'text-slate-500 group-hover:text-slate-700'}`}>
+          {label}
+        </span>
+        {isActive ? (
+          sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-indigo-500" /> : <ArrowDown className="w-3 h-3 text-indigo-500" />
+        ) : (
+          <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-400 transition" />
+        )}
+      </button>
+    </th>
   );
 }

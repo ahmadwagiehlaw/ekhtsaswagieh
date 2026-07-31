@@ -6,12 +6,12 @@ import { useUI } from '../context/UIContext';
 const currentYear = new Date().getFullYear();
 
 export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
-  const { createNewCase, checkDuplicateCase, settings } = useAppContext();
+  const { createNewCase, checkDuplicateCase, settings, cases } = useAppContext();
   const { toast } = useUI();
 
   const [formData, setFormData] = useState({
     'رقم الدعوى': '',
-    'السنة': String(currentYear),
+    'السنة': '',
     'المدعي': '',
     'المدعى_عليه': '',
     'الصفة': '',
@@ -23,6 +23,24 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
 
   const roles = settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص'];
   const decisions = settings?.decisions || ['للحكم', 'تصريح', 'للإعلان', 'للاطلاع', 'آخر أجل'];
+
+  const plaintiffsList = React.useMemo(() => {
+    if (!cases) return [];
+    const set = new Set();
+    cases.forEach(c => {
+      if (c['المدعي']) set.add(c['المدعي']);
+    });
+    return Array.from(set);
+  }, [cases]);
+
+  const defendantsList = React.useMemo(() => {
+    if (!cases) return [];
+    const set = new Set();
+    cases.forEach(c => {
+      if (c['المدعى_عليه']) set.add(c['المدعى_عليه']);
+    });
+    return Array.from(set);
+  }, [cases]);
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -66,7 +84,7 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
       // Reset and close
       setFormData({
         'رقم الدعوى': '',
-        'السنة': String(currentYear),
+        'السنة': '',
         'المدعي': '',
         'المدعى_عليه': '',
         'الصفة': '',
@@ -149,21 +167,29 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
               <label className="text-[10px] font-black text-slate-500 block">المدعي / الطاعن</label>
               <input
                 type="text"
+                list="plaintiffs-list"
                 value={formData['المدعي']}
                 onChange={e => handleChange('المدعي', e.target.value)}
                 placeholder="اسم المدعي"
                 className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
               />
+              <datalist id="plaintiffs-list">
+                {plaintiffsList.map(name => <option key={name} value={name} />)}
+              </datalist>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 block">المدعى عليه / المطعون ضده</label>
               <input
                 type="text"
+                list="defendants-list"
                 value={formData['المدعى_عليه']}
                 onChange={e => handleChange('المدعى_عليه', e.target.value)}
                 placeholder="اسم المدعى عليه"
                 className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
               />
+              <datalist id="defendants-list">
+                {defendantsList.map(name => <option key={name} value={name} />)}
+              </datalist>
             </div>
           </div>
 

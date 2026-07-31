@@ -1129,16 +1129,16 @@ export default function CaseDetails() {
                         const j = session.judgment || {};
                         
                         const JudgmentEditor = () => {
-                          const initialCat = j.category || (session.decision?.includes('فحص') ? 'فحص' : '');
-                          const initialRes = j.result || session.judgmentClassification || '';
-                          const initialType = j.type || session.shortJudgment || '';
-                          const initialVerd = j.fullVerdict || session.verdict || '';
+                          const initialCat = j.category || j._category || (session.decision?.includes('فحص') ? 'فحص' : '');
+                          const initialRes = j.result || j._result || session.judgmentClassification || '';
+                          const initialType = j.type || j._type || session.shortJudgment || '';
+                          const initialVerd = j.fullVerdict || j._verdict || session.verdict || '';
 
                           const [cat, setCat]     = React.useState(initialCat);
                           const [res, setRes]     = React.useState(initialRes);
                           const [type, setType]   = React.useState(initialType);
                           const [verd, setVerd]   = React.useState(initialVerd);
-                          const [final, setFinal] = React.useState(j.isFinal || false);
+                          const [final, setFinal] = React.useState(j.isFinal !== undefined ? j.isFinal : (j._isFinal || false));
                           
                           React.useEffect(() => {
                             // 1. Dynamic Rules from Settings

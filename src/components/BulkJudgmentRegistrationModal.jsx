@@ -76,11 +76,12 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
       const sessionIndex = sessions.findIndex(s => s.date === sessionDate);
 
       const jData = {
-        _category: formData._category,
-        _result: formData._result,
-        _type: formData._type,
-        _verdict: formData._verdict,
-        _isFinal: formData._isFinal,
+        category: formData._category,
+        result: formData._result,
+        type: formData._type,
+        fullVerdict: formData._verdict,
+        isFinal: formData._isFinal,
+        recordedAt: new Date().toISOString().split('T')[0],
         timestamp: Date.now()
       };
 
@@ -88,16 +89,22 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
         sessions[sessionIndex] = {
           ...sessions[sessionIndex],
           judgment: jData,
+          shortJudgment: jData.type,
+          judgmentClassification: jData.result,
+          verdict: jData.fullVerdict,
           hasJudgment: true,
           hasSession: false,
-          decision: jData._verdict || sessions[sessionIndex].decision
+          decision: jData.fullVerdict || sessions[sessionIndex].decision
         };
       } else {
         sessions.push({
           id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
           date: sessionDate,
-          decision: jData._verdict,
+          decision: jData.fullVerdict,
           judgment: jData,
+          shortJudgment: jData.type,
+          judgmentClassification: jData.result,
+          verdict: jData.fullVerdict,
           hasJudgment: true,
           hasSession: false,
           createdAt: new Date().toISOString()

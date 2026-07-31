@@ -594,12 +594,12 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
                 <tr 
                   key={cObj.id} 
                   className={`group transition-colors border-b border-slate-100 even:bg-slate-50/50 odd:bg-white hover:bg-indigo-50/30 ${isSelected ? 'bg-indigo-50/50' : ''}`}
-                >  <td className="px-3 py-2.5 text-center align-middle no-print">
+                >
+                  <td className="px-3 py-2.5 text-center align-middle no-print">
                     <button onClick={() => toggleSelection(cObj.id)} className="text-slate-300 hover:text-indigo-600 transition">
                       {isSelected ? <CheckSquare className="w-4 h-4 text-indigo-600" /> : <Square className="w-4 h-4" />}
                     </button>
                   </td>
-                  
                   {visibleColumns['الرول'] && (
                     <td className="px-3 py-2.5 text-[11px] font-black text-navy-900 text-center bg-slate-50/50">
                       {isEditing ? (
