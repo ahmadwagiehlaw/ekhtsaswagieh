@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2, Bell, AlertTriangle, FileText, ExternalLink, BookOpen, Files, Hash, Paperclip, Scale, Loader2, Plus, Star } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
@@ -8,6 +8,7 @@ import CaseDocuments from '../components/CaseDocuments';
 import AlertsModal from '../components/AlertsModal';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 import { localizeNumber } from '../utils/numberUtils';
+import { calculateLitigationStage } from '../utils/caseUtils';
 import { uploadToR2 } from '../lib/r2';
 import imageCompression from 'browser-image-compression';
 import { useRef } from 'react';
@@ -23,6 +24,7 @@ export default function CaseDetails() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(caseData || {});
+  const [expandedGroups, setExpandedGroups] = useState(['📌 بيانات أساسية']);
   const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'documents' | 'sessions' | 'tasks'
@@ -232,6 +234,19 @@ export default function CaseDetails() {
     }
   };
 
+  const latestJudgmentSession = [...(caseData.sessions || [])]
+    .filter(s => s.hasJudgment && s.judgment)
+    .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+
+  const stampData = latestJudgmentSession ? latestJudgmentSession.judgment : null;
+  const stampColor = stampData ? 
+    (stampData.result === 'للصالح' ? 'emerald' : 
+     stampData.result === 'للضد' ? 'rose' :
+     stampData.result === 'مختلط' ? 'amber' :
+     stampData.result === 'إجرائي خطير' ? 'red' : 'indigo') : null;
+
+  const litigationStage = calculateLitigationStage(caseData);
+
   return (
     <div className="space-y-4 max-w-3xl mx-auto pb-6 animate-in fade-in zoom-in-95 duration-300">
       {/* Header */}
@@ -297,6 +312,19 @@ export default function CaseDetails() {
         ) : (
           <div className={`h-2 w-full ${accentLineClass}`}></div>
         )}
+
+        {stampData && (
+          <div className={`absolute top-4 left-4 z-10 opacity-90 transform -rotate-6 select-none pointer-events-none`}>
+            <div className={`border-[3px] border-${stampColor}-600 rounded-lg p-2 bg-white/90 backdrop-blur-sm shadow-xl flex flex-col items-center justify-center`}>
+              <span className={`text-[15px] font-black text-${stampColor}-700 uppercase tracking-widest leading-none`}>
+                {stampData.isFinal ? 'حكم نهائي' : stampData.category}
+              </span>
+              <span className={`text-[11px] font-black text-${stampColor}-600 mt-1 border-t-2 border-${stampColor}-600/30 pt-1 w-full text-center truncate max-w-[100px]`}>
+                {stampData.result}
+              </span>
+            </div>
+          </div>
+        )}
         
         <div className={`text-center space-y-4 ${coverImageUrl ? 'p-5 pt-2' : 'p-5'}`}>
           <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
@@ -317,6 +345,15 @@ export default function CaseDetails() {
                  إضافة صفة <span className="opacity-50 ml-1">▼</span>
                </button>
              )}
+             <div className={`px-2.5 py-1 rounded-lg text-[10px] font-black border shadow-sm flex items-center gap-1 ${
+                litigationStage === 'استعلام' ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                litigationStage.includes('موقوف جزائياً') ? 'bg-rose-100 text-rose-800 border-rose-300 animate-pulse' :
+                litigationStage === 'شعبة المحال' || litigationStage === 'شعبة الأحكام' || litigationStage === 'الشعبة' ? 'bg-slate-100 text-slate-700 border-slate-300' :
+                'bg-blue-50 text-blue-700 border-blue-200'
+             }`}>
+               <CheckCircle2 className="w-3 h-3" />
+               {litigationStage}
+             </div>
              {fileLocation ? (
                <button 
                   onClick={() => { setNewLocation(fileLocation); setIsChangeLocationModalOpen(true); }}
@@ -495,7 +532,7 @@ export default function CaseDetails() {
             {
               title: '📌 بيانات أساسية',
               colorClass: 'text-blue-700 bg-blue-50/50 border-blue-100',
-              keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'المحكمة', 'الدائرة', 'مرحلة التقاضي', 'الإجراءات الهامة والعاجلة']
+              keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'المحكمة', 'الدائرة']
             },
             {
               title: '👥 الأطراف والصفة',
@@ -533,15 +570,47 @@ export default function CaseDetails() {
              
              if (!hasContent) return null;
 
+             const isExpanded = expandedGroups.includes(group.title);
+             const toggleGroup = () => {
+               if (isExpanded) {
+                 setExpandedGroups(expandedGroups.filter(g => g !== group.title));
+               } else {
+                 setExpandedGroups([...expandedGroups, group.title]);
+               }
+             };
+
              return (
-               <div key={idx} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className={`px-4 py-2.5 border-b font-black text-xs flex items-center gap-2 ${group.colorClass}`}>
-                     {group.title}
-                  </div>
-                  <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 gap-y-5">
+               <div key={idx} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-200">
+                  <button 
+                    type="button"
+                    onClick={toggleGroup}
+                    className={`w-full px-4 py-3 font-black text-xs flex items-center justify-between gap-2 hover:opacity-90 transition-opacity ${group.colorClass} ${isExpanded ? 'border-b' : 'border-b-0'}`}
+                  >
+                     <div className="flex items-center gap-2">
+                        {group.title}
+                     </div>
+                     <span className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
+                  </button>
+                  {isExpanded && (
+                  <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 gap-y-5 animate-in fade-in slide-in-from-top-2 duration-200">
                      {groupFields.map(field => {
                         const val = editData[field.id] || '';
+                        
+                        // Smart conditional logic:
+                        if (isEditing) {
+                            const currentRole = editData['الصفة'] || '';
+                            const isPlaintiffRole = currentRole.includes('طاعن') || currentRole.includes('مستأنف') || currentRole.includes('مدعي');
+                            const isDefendantRole = currentRole.includes('مطعون') || currentRole.includes('مدعى عليه');
+                            
+                            if (field.id === 'المقر المختار' && !isPlaintiffRole) return null;
+                            if (field.id === 'عنوان المدعى عليه' && !isPlaintiffRole) return null;
+                            if (field.id === 'عنوان المدعي' && !isDefendantRole) return null;
+                        }
+                        
                         if (!isEditing && isEmptyValue(val)) return null;
+
+                        // Skip rendering 'السنة' alone because we will inline it with 'رقم الدعوى'
+                        if (['السنة', 'سنة', 'year'].includes(field.id)) return null;
 
                         const isDateField = field.type === 'date' || field.id.includes('تاريخ') || field.id.includes('جلسة');
                         const displayVal = localizeNumber(isDateField ? formatDateString(val) : val, settings?.numberFormat);
@@ -633,18 +702,72 @@ export default function CaseDetails() {
                                    </div>
                                    <input type="text" placeholder="أو اكتب مكان آخر..." value={!fileLocationOptions.includes(val) && val ? val : ''} onChange={(e) => setEditData({...editData, [field.id]: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
                                  </div>
+                               ) : field.id === 'تصنيف الدعوى' ? (
+                                  <div className="space-y-2">
+                                    <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-100 rounded-xl">
+                                       {[...(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']), 'أخرى'].map(opt => (
+                                         <button 
+                                           key={opt} type="button" onClick={() => setEditData({...editData, [field.id]: opt})} 
+                                           className={`px-3 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${val === opt || (!(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']).includes(val) && val && opt === 'أخرى') ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'}`}
+                                         >{opt}</button>
+                                       ))}
+                                    </div>
+                                    {(!(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']).includes(val) || val === 'أخرى') && (
+                                      <input 
+                                        type="text" 
+                                       placeholder="اكتب التصنيف هنا..." 
+                                       value={val === 'أخرى' ? '' : val} 
+                                       onChange={(e) => setEditData({...editData, [field.id]: e.target.value})} 
+                                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400 mt-2" 
+                                     />
+                                   )}
+                                 </div>
                               ) : field.type === 'textarea' ? (
                                  <textarea value={val} onChange={(e) => setEditData({...editData, [field.id]: e.target.value})} rows={3} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 resize-none transition" />
                               ) : field.type === 'date' || field.id.includes('تاريخ') || field.id.includes('جلسة') ? (
                                  <input type="date" value={val && getSafeDateObj(val) ? getSafeDateObj(val).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({...editData, [field.id]: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
+                              ) : ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى'].includes(field.id) ? (
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-[2]">
+                                      <input type={field.type === 'number' ? 'number' : 'text'} value={val} list={`list-${field.id}`} onChange={(e) => {
+                                          let v = e.target.value;
+                                          if (field.type === 'number') v = v.replace(/[^\d]/g, '');
+                                          setEditData({...editData, [field.id]: v});
+                                      }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
+                                      <datalist id={`list-${field.id}`}>
+                                        {getAutocompleteOptions(field.id).map((opt, i) => <option key={i} value={opt} />)}
+                                      </datalist>
+                                    </div>
+                                    <div className="flex-[1] relative">
+                                      <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">السنة</span>
+                                      <input type={schema.find(f => f.id === 'السنة' || f.id === 'سنة' || f.id === 'year')?.type === 'number' ? 'number' : 'text'} value={editData['السنة'] || editData['سنة'] || editData['year'] || ''} list={`list-السنة`} onChange={(e) => {
+                                          let v = e.target.value;
+                                          if (schema.find(f => f.id === 'السنة' || f.id === 'سنة' || f.id === 'year')?.type === 'number') v = v.replace(/[^\d]/g, '');
+                                          setEditData({...editData, ['السنة']: v});
+                                      }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
+                                      <datalist id={`list-السنة`}>
+                                        {getAutocompleteOptions('السنة').map((opt, i) => <option key={i} value={opt} />)}
+                                      </datalist>
+                                    </div>
+                                  </div>
                               ) : (
                                   <>
-                                    <input type="text" value={val} list={`list-${field.id}`} onChange={(e) => setEditData({...editData, [field.id]: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
+                                    <input type={field.type === 'number' ? 'number' : 'text'} value={val} list={`list-${field.id}`} onChange={(e) => {
+                                        let v = e.target.value;
+                                        if (field.type === 'number') v = v.replace(/[^\d]/g, '');
+                                        setEditData({...editData, [field.id]: v});
+                                    }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
                                     <datalist id={`list-${field.id}`}>
                                       {getAutocompleteOptions(field.id).map((opt, i) => <option key={i} value={opt} />)}
                                     </datalist>
                                   </>
                               )
+                            ) : ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى'].includes(field.id) ? (
+                                <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 flex items-center justify-center gap-1.5 min-h-[42px]" dir="ltr">
+                                  <span>{localizeNumber(editData['السنة'] || editData['سنة'] || editData['year'] || '', settings?.numberFormat)}</span>
+                                  <span className="text-slate-400">/</span>
+                                  <span>{displayVal}</span>
+                                </div>
                             ) : (
                               <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 whitespace-pre-wrap break-words min-h-[42px]" dir={isDateField ? "ltr" : "auto"}>
                                 {displayVal}
@@ -652,96 +775,102 @@ export default function CaseDetails() {
                             )}
                             {/* Inject Joined Cases directly below Case Number if applicable */}
                             {['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى'].includes(field.id) && (
-                               ((editData.joinedCasesList && editData.joinedCasesList.length > 0) || legacyJoinedStr || isEditing) && (
-                                 <div className="mt-3 bg-indigo-50/40 rounded-xl p-3 border border-indigo-100">
-                                    <h3 className="text-[10px] font-black text-indigo-800 mb-2 flex items-center gap-1.5"><Files className="w-3 h-3"/> الدعاوى المنضمة</h3>
-                                    <div className="flex flex-wrap gap-2">
-                                       {(editData.joinedCasesList || []).map((jc, idx) => (
-                                          <div key={idx} className="bg-white border border-indigo-200 shadow-sm text-indigo-700 px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1">
-                                             {localizeNumber(jc.no, settings?.numberFormat)} <span className="text-[9px] text-slate-400">لسنة</span> {localizeNumber(jc.year, settings?.numberFormat)}
-                                             {isEditing && (
-                                                <button onClick={() => {
-                                                   const list = [...(editData.joinedCasesList || [])];
-                                                   list.splice(idx, 1);
-                                                   setEditData({...editData, joinedCasesList: list});
-                                                }} className="text-rose-400 hover:text-rose-600 transition mr-1">
-                                                  <X className="w-3 h-3" />
-                                                </button>
-                                             )}
-                                          </div>
-                                       ))}
-                                       
-                                       {legacyJoinedStr && !isEditing && (
-                                          <div className="bg-white border border-indigo-200 shadow-sm text-indigo-700 px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1">
-                                             {legacyJoinedStr}
-                                          </div>
-                                       )}
-                                       
-                                       {(!editData.joinedCasesList || editData.joinedCasesList.length === 0) && !legacyJoinedStr && !isEditing && (
-                                         <span className="text-[10px] font-bold text-slate-400">لا توجد دعاوى منضمة.</span>
-                                       )}
-                                    </div>
-                                    
-                                    {isEditing && (
-                                       <div className="flex items-center gap-2 mt-2 pt-2 border-t border-indigo-100/50">
-                                          <input type="number" placeholder="رقم الدعوى" value={newJoinedNo} onChange={e => setNewJoinedNo(e.target.value)} className="w-20 bg-white border border-indigo-200 shadow-sm rounded-md px-1.5 py-1 text-[10px] font-bold text-navy-900 focus:outline-none focus:border-indigo-400" />
-                                          <input type="number" placeholder="السنة" value={newJoinedYear} onChange={e => setNewJoinedYear(e.target.value)} className="w-16 bg-white border border-indigo-200 shadow-sm rounded-md px-1.5 py-1 text-[10px] font-bold text-navy-900 focus:outline-none focus:border-indigo-400" />
-                                          <button onClick={() => {
-                                             if(!newJoinedNo || !newJoinedYear) return;
-                                             
-                                             const list = [...(editData.joinedCasesList || []), { no: newJoinedNo, year: newJoinedYear }];
-                                             setEditData({...editData, joinedCasesList: list});
-                                             
-                                             setNewJoinedNo('');
-                                             setNewJoinedYear('');
-                                          }} className="bg-indigo-600 hover:bg-indigo-700 shadow-sm text-white px-2 py-1 rounded-md text-[10px] font-black transition">
-                                             إضافة
-                                          </button>
-                                       </div>
-                                    )}
-                                 </div>
-                               )
+                               <div className="mt-2 space-y-2">
+                                 {((editData.joinedCasesList && editData.joinedCasesList.length > 0) || legacyJoinedStr || isEditing) && (
+                                   <div className="bg-indigo-50/40 rounded-xl p-2 border border-indigo-100">
+                                      <h3 className="text-[10px] font-black text-indigo-800 mb-2 flex items-center gap-1.5"><Files className="w-3 h-3"/> الدعاوى المنضمة</h3>
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                         {(editData.joinedCasesList || []).map((jc, idx) => (
+                                            <div key={idx} className="bg-white border border-indigo-200 shadow-sm text-indigo-700 px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1">
+                                               {localizeNumber(jc.no, settings?.numberFormat)} <span className="text-[9px] text-slate-400">/</span> {localizeNumber(jc.year, settings?.numberFormat)}
+                                               {isEditing && (
+                                                  <button onClick={() => {
+                                                     const list = [...(editData.joinedCasesList || [])];
+                                                     list.splice(idx, 1);
+                                                     setEditData({...editData, joinedCasesList: list});
+                                                  }} className="text-rose-400 hover:text-rose-600 transition ml-1">
+                                                    <X className="w-3 h-3" />
+                                                  </button>
+                                               )}
+                                            </div>
+                                         ))}
+                                         
+                                         {legacyJoinedStr && !isEditing && (
+                                            <div className="bg-white border border-indigo-200 shadow-sm text-indigo-700 px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1">
+                                               {legacyJoinedStr}
+                                            </div>
+                                         )}
+                                         
+                                         {(!editData.joinedCasesList || editData.joinedCasesList.length === 0) && !legacyJoinedStr && !isEditing && (
+                                           <span className="text-[10px] font-bold text-slate-400">لا توجد دعاوى منضمة.</span>
+                                         )}
+                                         
+                                         {isEditing && (
+                                            <div className="flex items-center gap-1 ml-auto">
+                                               <input type="number" placeholder="رقم" value={newJoinedNo} onChange={e => setNewJoinedNo(e.target.value)} className="w-14 bg-white border border-indigo-200 shadow-sm rounded-md px-1.5 py-1 text-[10px] font-bold text-navy-900 focus:outline-none focus:border-indigo-400" />
+                                               <input type="number" placeholder="سنة" value={newJoinedYear} onChange={e => setNewJoinedYear(e.target.value)} className="w-12 bg-white border border-indigo-200 shadow-sm rounded-md px-1.5 py-1 text-[10px] font-bold text-navy-900 focus:outline-none focus:border-indigo-400" />
+                                               <button onClick={() => {
+                                                  if(!newJoinedNo || !newJoinedYear) return;
+                                                  const list = [...(editData.joinedCasesList || []), { no: newJoinedNo, year: newJoinedYear }];
+                                                  setEditData({...editData, joinedCasesList: list});
+                                                  setNewJoinedNo('');
+                                                  setNewJoinedYear('');
+                                               }} className="bg-indigo-600 hover:bg-indigo-700 shadow-sm text-white px-2 py-1 rounded-md text-[10px] font-black transition">
+                                                  +
+                                               </button>
+                                            </div>
+                                         )}
+                                      </div>
+                                   </div>
+                                 )}
+                               </div>
                             )}
                           </div>
                         );
                      })}
                   </div>
+                  )}
                </div>
              );
           })}
         </div>
 
         {/* Custom fields not in schema (legacy/extra) */}
-        {isEditing && (
-          <div className="pt-6 border-t border-slate-100">
-            <h3 className="text-xs font-black text-slate-400 mb-3">حقول إضافية غير مسجلة في الهيكلة:</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {Object.keys(editData).filter(k => k !== 'id' && k !== 'sessions' && k !== 'documents' && k !== 'joinedCasesList' && !schema.find(s => s.id === k)).map(key => (
-                <div key={key} className="flex gap-2">
-                  <div className="flex-1 space-y-1">
-                     <span className="text-[10px] font-bold text-slate-400">{key}</span>
-                     <input 
-                        type="text"
-                        value={editData[key] || ''}
-                        onChange={(e) => setEditData({...editData, [key]: e.target.value})}
-                        className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-navy-900"
-                      />
-                  </div>
-                  <button 
-                    onClick={() => {
-                      const newData = {...editData};
-                      delete newData[key];
-                      setEditData(newData);
-                    }} 
-                    className="self-end pb-1 text-rose-400 hover:text-rose-600"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {(() => {
+           const extraKeys = Object.keys(editData).filter(k => k !== 'id' && k !== 'sessions' && k !== 'documents' && k !== 'joinedCasesList' && !schema.find(s => s.id === k) && !['الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي', 'isImportant', 'procedures', 'urgentReminderDate', 'createdAt', 'updatedAt', 'userId'].includes(k));
+           if (!isEditing || extraKeys.length === 0) return null;
+           
+           return (
+             <div className="pt-6 border-t border-slate-100">
+               <h3 className="text-xs font-black text-slate-400 mb-3">حقول إضافية غير مسجلة في الهيكلة:</h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                 {extraKeys.map(key => (
+                   <div key={key} className="flex gap-2">
+                     <div className="flex-1 space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400">{key}</span>
+                        <input 
+                           type="text"
+                           value={editData[key] || ''}
+                           onChange={(e) => setEditData({...editData, [key]: e.target.value})}
+                           className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-navy-900"
+                         />
+                     </div>
+                     <button 
+                       onClick={() => {
+                         const newData = {...editData};
+                         delete newData[key];
+                         setEditData(newData);
+                       }} 
+                       className="self-end pb-1 text-rose-400 hover:text-rose-600"
+                     >
+                       <Trash2 className="w-4 h-4" />
+                     </button>
+                   </div>
+                 ))}
+               </div>
+             </div>
+           );
+        })()}
       </div>
       )}
 

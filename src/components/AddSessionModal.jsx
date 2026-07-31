@@ -44,9 +44,10 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
     const sessionKey = Object.keys(caseData).find(k => k === 'آخر جلسة' || k === 'تاريخ الجلسة' || k === 'أخر جلسة') || 'آخر جلسة';
     const decisionKey = Object.keys(caseData).find(k => k === 'القرار' || k === 'قرار الجلسة' || k === 'المنطوق') || 'القرار';
 
-    updateData[sessionKey] = sessionDate;
-    if (decision) {
-      updateData[decisionKey] = decision;
+    if (updatedSessions.length > 0) {
+      const latestSession = updatedSessions[0];
+      updateData[sessionKey] = latestSession.date;
+      updateData[decisionKey] = latestSession.decision || '';
     }
 
     const success = await saveCaseToFirebase(caseData.id, updateData);

@@ -64,6 +64,7 @@ export default function CaseDocuments({ caseId }) {
             
             setSelectedFile(newFile);
             setDocTitle('');
+            setDocType('غلاف الملف');
             setShowUploadModal(true);
             e.preventDefault();
             break;

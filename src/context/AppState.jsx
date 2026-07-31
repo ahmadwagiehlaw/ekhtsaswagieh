@@ -34,11 +34,29 @@ export const AppProvider = ({ children }) => {
     // 2. Listen to dynamic schema
     const unsubSchema = onSnapshot(SCHEMA_DOC_REF, (docSnap) => {
       if (docSnap.exists() && docSnap.data().fields) {
-        setSchema(docSnap.data().fields);
+        const obsoleteFields = ['الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي'];
+        let cleanSchema = docSnap.data().fields.filter(f => !obsoleteFields.includes(f.id));
+        
+        // Ensure essential fields exist
+        const essentialFields = [
+          { id: 'تصنيف الدعوى', label: 'تصنيف الدعوى', type: 'text', visible: true },
+          { id: 'موضوع الدعوى', label: 'موضوع الدعوى', type: 'textarea', visible: true },
+          { id: 'المقر المختار', label: 'المقر المختار', type: 'text', visible: true },
+          { id: 'عنوان المدعي', label: 'عنوان المدعي / الطاعن', type: 'text', visible: true },
+          { id: 'عنوان المدعى عليه', label: 'عنوان المدعى عليه / المطعون ضده', type: 'text', visible: true },
+          { id: 'مكان الملف', label: 'مكان الملف', type: 'text', visible: true }
+        ];
+
+        essentialFields.forEach(ef => {
+           if (!cleanSchema.find(s => s.id === ef.id)) {
+              cleanSchema.push(ef);
+           }
+        });
+
+        setSchema(cleanSchema);
       } else {
         // Default schema if none exists
         setSchema([
-          { id: 'الرول', label: 'الرول', type: 'text', visible: true, primary: true },
           { id: 'رقم الدعوى', label: 'رقم الدعوى', type: 'text', visible: true, primary: true },
           { id: 'السنة', label: 'السنة', type: 'text', visible: true, primary: true },
           { id: 'المدعي', label: 'المدعي', type: 'text', visible: true },
@@ -46,6 +64,12 @@ export const AppProvider = ({ children }) => {
           { id: 'آخر جلسة', label: 'تاريخ آخر جلسة', type: 'date', visible: true, isDate: true },
           { id: 'القرار', label: 'القرار', type: 'text', visible: true },
           { id: 'الصفة', label: 'الصفة', type: 'text', visible: true },
+          { id: 'تصنيف الدعوى', label: 'تصنيف الدعوى', type: 'text', visible: true },
+          { id: 'موضوع الدعوى', label: 'موضوع الدعوى', type: 'textarea', visible: true },
+          { id: 'المقر المختار', label: 'المقر المختار', type: 'text', visible: true },
+          { id: 'عنوان المدعي', label: 'عنوان المدعي / الطاعن', type: 'text', visible: true },
+          { id: 'عنوان المدعى عليه', label: 'عنوان المدعى عليه / المطعون ضده', type: 'text', visible: true },
+          { id: 'مكان الملف', label: 'مكان الملف', type: 'text', visible: true },
           { id: 'دعاوى منضمة', label: 'دعاوى منضمة', type: 'text', visible: true }
         ]);
       }

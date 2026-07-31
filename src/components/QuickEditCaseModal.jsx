@@ -64,7 +64,7 @@ export default function QuickEditCaseModal({ isOpen, onClose, caseData }) {
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
           <form id="quick-edit-case-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {schema.filter(f => f.visible).map((field) => (
+            {schema.filter(f => f.visible && !['الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم'].includes(f.id)).map((field) => (
               <div key={field.id} className={`${field.type === 'textarea' ? 'md:col-span-2' : ''}`}>
                 <label className="text-[11px] font-black text-slate-500 block mb-1.5">{field.label}</label>
                 {field.type === 'textarea' ? (

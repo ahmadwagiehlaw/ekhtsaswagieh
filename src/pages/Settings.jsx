@@ -30,6 +30,7 @@ export default function Settings() {
   const [localSessionTypes, setLocalSessionTypes] = useState(settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة']);
   const [localFileLocations, setLocalFileLocations] = useState(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
   const [localCommonProcedures, setLocalCommonProcedures] = useState(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
+  const [localCaseClassifications, setLocalCaseClassifications] = useState(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
   const [deletePassword, setDeletePassword] = useState('');
   
   // Sync settings when loaded
@@ -43,6 +44,7 @@ export default function Settings() {
     setLocalSessionTypes(settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة']);
     setLocalFileLocations(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
     setLocalCommonProcedures(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
+    setLocalCaseClassifications(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
   }, [settings]);
 
   const handleSaveSettings = async () => {
@@ -57,7 +59,8 @@ export default function Settings() {
       roles: localRoles,
       sessionTypes: localSessionTypes,
       fileLocations: localFileLocations,
-      commonProcedures: localCommonProcedures
+      commonProcedures: localCommonProcedures,
+      caseClassifications: localCaseClassifications
     });
     setIsProcessing(false);
     toast('تم حفظ الإعدادات المتقدمة بنجاح', 'success');
@@ -372,6 +375,7 @@ export default function Settings() {
                     <label className="text-[9px] text-slate-500 font-bold block mb-1">النوع</label>
                     <select value={field.type} onChange={e => updateSchemaField(index, 'type', e.target.value)} className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300">
                       <option value="text">نص</option>
+                      <option value="number">رقم</option>
                       <option value="textarea">نص طويل</option>
                       <option value="date">تاريخ</option>
                     </select>
@@ -545,6 +549,33 @@ export default function Settings() {
                 className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
               >
                 <Plus className="w-3 h-3" /> إضافة إجراء
+              </button>
+            </div>
+          </div>
+
+          {/* Case Classifications Management */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <BookOpen className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-black text-sm text-navy-900">إدارة تصنيفات الدعوى</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {localCaseClassifications.map((cls, i) => (
+                <div key={i} className="flex items-center gap-1 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+                  <span>{cls}</span>
+                  <button onClick={() => setLocalCaseClassifications(localCaseClassifications.filter((_, idx) => idx !== i))} className="text-indigo-400 hover:text-rose-500 mr-2">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <button 
+                onClick={async () => {
+                  const newCls = await showPrompt('إضافة تصنيف', 'أدخل تصنيف الدعوى الجديد:');
+                  if (newCls?.trim()) setLocalCaseClassifications([...localCaseClassifications, newCls.trim()]);
+                }} 
+                className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
+              >
+                <Plus className="w-3 h-3" /> إضافة تصنيف
               </button>
             </div>
           </div>
