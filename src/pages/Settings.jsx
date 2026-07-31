@@ -36,7 +36,30 @@ export default function Settings() {
     'اعتبار': 'اعتبار الدعوى كأن لم تكن',
     'رفض': 'بقبول الدعوي شكلا ورفضها موضوعا وإلزام رافعها المصروفات'
   });
-  const [localJudgmentDefaults, setLocalJudgmentDefaults] = useState(settings?.judgmentDefaults || []);
+  const migrateJudgmentRule = (rule) => {
+    if (rule.triggerField) {
+      return {
+        conditions: {
+          role: '',
+          category: rule.triggerField === 'category' ? (rule.triggerValue || '') : '',
+          classification: rule.triggerField === 'classification' ? (rule.triggerValue || '') : '',
+          type: ''
+        },
+        actions: {
+          category: '',
+          classification: rule.setClassification || '',
+          type: rule.setType || '',
+          text: rule.setText || ''
+        }
+      };
+    }
+    return {
+      conditions: rule.conditions || { role: '', category: '', classification: '', type: '' },
+      actions: rule.actions || { category: '', classification: '', type: '', text: '' }
+    };
+  };
+
+  const [localJudgmentDefaults, setLocalJudgmentDefaults] = useState((settings?.judgmentDefaults || []).map(migrateJudgmentRule));
   const [localJudgmentCategories, setLocalJudgmentCategories] = useState(settings?.judgmentCategories || ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص']);
   const [localJudgmentClassifications, setLocalJudgmentClassifications] = useState(settings?.judgmentClassifications || ['صالح', 'ضد', 'حكم منه للخصومة', 'غير منه للخصومة', 'تمهيدي']);
   const [deletePassword, setDeletePassword] = useState('');
@@ -1025,7 +1048,7 @@ export default function Settings() {
                 <h3 className="font-black text-sm text-navy-900">قواعد التعبئة التلقائية للأحكام</h3>
               </div>
               <button 
-                onClick={() => setLocalJudgmentDefaults([...localJudgmentDefaults, { triggerField: 'category', triggerValue: '', setClassification: '', setType: '', setText: '' }])}
+                onClick={() => setLocalJudgmentDefaults([...localJudgmentDefaults, { conditions: { role: '', category: '', classification: '', type: '' }, actions: { category: '', classification: '', type: '', text: '' } }])}
                 className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-indigo-100"
               >
                 <Plus className="w-4 h-4"/> إضافة قاعدة
@@ -1033,104 +1056,154 @@ export default function Settings() {
             </div>
             
             <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
-              قم بإعداد قواعد ديناميكية لملء تفاصيل الحكم آلياً عند اختيار فئة أو تصنيف محدد (مثلاً: إذا تم اختيار فئة "فحص" {'->'} يتم التعيين كـ "رفض").
+              قم بإعداد قواعد ديناميكية متعددة الشروط لملء تفاصيل الحكم آلياً عند تسجيل حكم (مثلاً: إذا كانت الصفة "طاعنين" والفئة "نهائي" {'->'} يتم تعبئة التصنيف والمنطوق بـ "..." ). 
             </p>
 
             <div className="space-y-3">
               {localJudgmentDefaults.map((rule, idx) => (
                 <div key={idx} className="flex flex-col gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                  <div className="flex items-center gap-2 text-[10px] font-black text-indigo-800 bg-indigo-100 px-2 py-1 rounded w-max">
-                    قاعدة رقم {idx + 1}
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-indigo-800 bg-indigo-100 px-2 py-1 rounded w-max">
+                      قاعدة رقم {idx + 1}
+                    </div>
+                    <button onClick={() => setLocalJudgmentDefaults(localJudgmentDefaults.filter((_, i) => i !== idx))} className="text-rose-500 hover:bg-rose-100 px-2 py-1 rounded-lg flex items-center gap-1 text-[10px] font-bold transition">
+                      <Trash2 className="w-4 h-4"/> حذف القاعدة
+                    </button>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-2 border-r-[3px] border-indigo-400 pr-3">
-                      <p className="text-xs font-black text-slate-600">إذا تحقق الشرط التالي:</p>
-                      <div className="flex gap-2">
-                        <select 
-                          value={rule.triggerField} 
-                          onChange={(e) => {
-                            const newRules = [...localJudgmentDefaults];
-                            newRules[idx].triggerField = e.target.value;
-                            setLocalJudgmentDefaults(newRules);
-                          }}
-                          className="text-xs font-bold p-2 rounded-lg border border-slate-300 w-1/3"
-                        >
-                          <option value="category">فئة الحكم</option>
-                          <option value="classification">تصنيف الحكم</option>
-                        </select>
-                        {rule.triggerField === 'category' ? (
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Conditions */}
+                    <div className="space-y-2 border-r-[3px] border-indigo-400 pr-3 bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
+                      <p className="text-[11px] font-black text-slate-700 mb-2 border-b border-slate-100 pb-2">إذا تحققت الشروط التالية (اترك الحقل فارغاً لتجاهله):</p>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">الصفة</label>
                           <select 
-                            value={rule.triggerValue}
+                            value={rule.conditions.role}
                             onChange={(e) => {
                               const newRules = [...localJudgmentDefaults];
-                              newRules[idx].triggerValue = e.target.value;
+                              newRules[idx].conditions.role = e.target.value;
                               setLocalJudgmentDefaults(newRules);
                             }}
-                            className="text-xs font-bold p-2 rounded-lg border border-slate-300 w-2/3 bg-white"
+                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
                           >
-                            <option value="">- اختر الفئة -</option>
+                            <option value="">- أي صفة -</option>
+                            {localRoles.map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">فئة الحكم</label>
+                          <select 
+                            value={rule.conditions.category}
+                            onChange={(e) => {
+                              const newRules = [...localJudgmentDefaults];
+                              newRules[idx].conditions.category = e.target.value;
+                              setLocalJudgmentDefaults(newRules);
+                            }}
+                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                          >
+                            <option value="">- أي فئة -</option>
                             {localJudgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
-                        ) : (
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تصنيف الحكم</label>
                           <select 
-                            value={rule.triggerValue}
+                            value={rule.conditions.classification}
                             onChange={(e) => {
                               const newRules = [...localJudgmentDefaults];
-                              newRules[idx].triggerValue = e.target.value;
+                              newRules[idx].conditions.classification = e.target.value;
                               setLocalJudgmentDefaults(newRules);
                             }}
-                            className="text-xs font-bold p-2 rounded-lg border border-slate-300 w-2/3 bg-white"
+                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
                           >
-                            <option value="">- اختر التصنيف -</option>
+                            <option value="">- أي تصنيف -</option>
                             {localJudgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
-                        )}
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
+                          <input 
+                            type="text"
+                            value={rule.conditions.type}
+                            onChange={(e) => {
+                              const newRules = [...localJudgmentDefaults];
+                              newRules[idx].conditions.type = e.target.value;
+                              setLocalJudgmentDefaults(newRules);
+                            }}
+                            placeholder="- أي نوع -"
+                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                          />
+                        </div>
                       </div>
                     </div>
                     
-                    <div className="space-y-2 border-r-[3px] border-emerald-400 pr-3">
-                      <p className="text-xs font-black text-slate-600">يتم التعبئة التلقائية بـ:</p>
+                    {/* Actions */}
+                    <div className="space-y-2 border-r-[3px] border-emerald-400 pr-3 bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
+                      <p className="text-[11px] font-black text-slate-700 mb-2 border-b border-slate-100 pb-2">يتم التعبئة التلقائية للبيانات بـ:</p>
+                      
                       <div className="grid grid-cols-2 gap-2">
-                        <select 
-                          value={rule.setClassification}
-                          onChange={(e) => {
-                            const newRules = [...localJudgmentDefaults];
-                            newRules[idx].setClassification = e.target.value;
-                            setLocalJudgmentDefaults(newRules);
-                          }}
-                          className="text-xs font-bold p-2 rounded-lg border border-slate-300 bg-white"
-                        >
-                          <option value="">-- تصنيف (اختياري) --</option>
-                          {localJudgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تغيير فئة الحكم إلى</label>
+                          <select 
+                            value={rule.actions.category}
+                            onChange={(e) => {
+                              const newRules = [...localJudgmentDefaults];
+                              newRules[idx].actions.category = e.target.value;
+                              setLocalJudgmentDefaults(newRules);
+                            }}
+                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
+                          >
+                            <option value="">-- بدون تغيير --</option>
+                            {localJudgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تغيير تصنيف الحكم إلى</label>
+                          <select 
+                            value={rule.actions.classification}
+                            onChange={(e) => {
+                              const newRules = [...localJudgmentDefaults];
+                              newRules[idx].actions.classification = e.target.value;
+                              setLocalJudgmentDefaults(newRules);
+                            }}
+                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
+                          >
+                            <option value="">-- بدون تغيير --</option>
+                            {localJudgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تعبئة نوع الحكم بـ</label>
                         <input 
                           type="text" 
                           placeholder="النوع (اختياري)" 
-                          value={rule.setType}
+                          value={rule.actions.type}
                           onChange={(e) => {
                             const newRules = [...localJudgmentDefaults];
-                            newRules[idx].setType = e.target.value;
+                            newRules[idx].actions.type = e.target.value;
                             setLocalJudgmentDefaults(newRules);
                           }}
-                          className="text-xs font-bold p-2 rounded-lg border border-slate-300"
+                          className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
                         />
                       </div>
-                      <input 
-                        type="text" 
-                        placeholder="المنطوق الافتراضي (اختياري)" 
-                        value={rule.setText}
-                        onChange={(e) => {
-                          const newRules = [...localJudgmentDefaults];
-                          newRules[idx].setText = e.target.value;
-                          setLocalJudgmentDefaults(newRules);
-                        }}
-                        className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 mt-2"
-                      />
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تعبئة المنطوق بـ</label>
+                        <textarea 
+                          placeholder="المنطوق الافتراضي (اختياري)" 
+                          value={rule.actions.text}
+                          onChange={(e) => {
+                            const newRules = [...localJudgmentDefaults];
+                            newRules[idx].actions.text = e.target.value;
+                            setLocalJudgmentDefaults(newRules);
+                          }}
+                          className="w-full text-xs font-bold p-2 rounded-lg border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 min-h-[40px] resize-none"
+                        />
+                      </div>
                     </div>
                   </div>
-                  <button onClick={() => setLocalJudgmentDefaults(localJudgmentDefaults.filter((_, i) => i !== idx))} className="self-end text-rose-500 hover:bg-rose-100 p-2 rounded-lg flex items-center gap-1 text-[10px] font-bold">
-                    <Trash2 className="w-4 h-4"/> مسح القاعدة
-                  </button>
                 </div>
               ))}
             </div>

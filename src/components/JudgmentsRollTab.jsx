@@ -184,7 +184,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
   const [sortConfig, setSortConfig] = useState({ key: 'الرول', direction: 'asc' });
   const [visibleCols, setVisibleCols] = useState({
     roll: true, caseName: true, plaintiff: true, defendant: true,
-    sessionType: true, judgmentCategory: true, judgmentType: true, verdict: true, image: true
+    sessionType: true, judgmentCategory: true, judgmentClassification: true, judgmentType: true, verdict: true, image: true
   });
 
   const handleSort = (key) => {
@@ -267,15 +267,21 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
   const applyDefaultRules = useCallback((field, value, currentData) => {
     if (!settings?.judgmentDefaults?.length) return currentData;
     const newData = { ...currentData };
+    
     for (const rule of settings.judgmentDefaults) {
-      if (
-        (rule.triggerField === 'category' && field === '_category' && value === rule.triggerValue) ||
-        (rule.triggerField === 'classification' && field === '_result' && value === rule.triggerValue)
-      ) {
-        if (rule.setClassification && !newData._result) newData._result = rule.setClassification;
-        if (rule.setType && !newData._type) newData._type = rule.setType;
-        if (rule.setText && !newData._verdict) newData._verdict = rule.setText;
-        break;
+      const conds = rule.conditions || {};
+      const roleMatch = !conds.role || currentData._role.includes(conds.role) || conds.role === currentData._role;
+      const catMatch = !conds.category || newData._category === conds.category;
+      const classMatch = !conds.classification || newData._result === conds.classification;
+      const typeMatch = !conds.type || newData._type === conds.type;
+      
+      if (roleMatch && catMatch && classMatch && typeMatch && (conds.role || conds.category || conds.classification || conds.type)) {
+        const acts = rule.actions || {};
+        if (acts.category && !newData._category) newData._category = acts.category;
+        if (acts.classification && !newData._result) newData._result = acts.classification;
+        if (acts.type && !newData._type) newData._type = acts.type;
+        if (acts.text && !newData._verdict) newData._verdict = acts.text;
+        break; // apply only the first fully matching rule
       }
     }
     return newData;
@@ -549,12 +555,13 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                         : <Square className="w-4 h-4" />}
                     </button>
                   </th>
+                  {visibleCols.roll && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="الرول" label="الرول" width="w-16" />}
                   {visibleCols.caseName && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="رقم الدعوى" label="الدعوى" />}
                   {visibleCols.plaintiff && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="المدعي" label="المدعي" />}
                   {visibleCols.defendant && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="المدعى_عليه" label="ضد" />}
                   {visibleCols.sessionType && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="الصفة" label="الصفة" width="w-24" />}
-                  {visibleCols.roll && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="الرول" label="الرول" width="w-16" />}
                   {visibleCols.judgmentCategory && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="_category" label="فئة الحكم" width="w-24" />}
+                  {visibleCols.judgmentClassification && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="_result" label="التصنيف" width="w-24" />}
                   {visibleCols.judgmentType && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="_type" label="نوع الحكم" width="w-24" />}
                   {visibleCols.verdict && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="_verdict" label="المنطوق" />}
                   {visibleCols.image && <th className="px-2 py-2.5 text-[10px] font-black text-rose-600 w-20 text-center">📸 صورة</th>}
@@ -584,6 +591,23 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                           {isSelected ? <CheckSquare className="w-4 h-4 text-rose-500" /> : <Square className="w-4 h-4" />}
                         </button>
                       </td>
+
+                      {/* Roll Number */}
+                      {visibleCols.roll && (
+                        <td className="px-2 py-2 text-center">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={editData._rollNumber}
+                              onChange={e => setEditData(d => ({ ...d, _rollNumber: e.target.value }))}
+                              placeholder="الرول"
+                              className="w-full text-center text-[10px] font-bold p-1 rounded border border-rose-200 bg-white"
+                            />
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-700">{session?.rollNumber || j.rollNumber || '-'}</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Case */}
                       {visibleCols.caseName && (
@@ -641,23 +665,6 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                         </td>
                       )}
 
-                      {/* Roll Number */}
-                      {visibleCols.roll && (
-                        <td className="px-2 py-2 text-center">
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              value={editData._rollNumber}
-                              onChange={e => setEditData(d => ({ ...d, _rollNumber: e.target.value }))}
-                              placeholder="الرول"
-                              className="w-full text-center text-[10px] font-bold p-1 rounded border border-rose-200 bg-white"
-                            />
-                          ) : (
-                            <span className="text-[10px] font-bold text-slate-700">{session?.rollNumber || j.rollNumber || '-'}</span>
-                          )}
-                        </td>
-                      )}
-
                       {/* Category */}
                       {visibleCols.judgmentCategory && (
                         <td className="px-2 py-2">
@@ -671,7 +678,25 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                               {judgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
                           ) : (
-                            <span className="text-[10px] font-bold text-slate-700">{j.category || '-'}</span>
+                            <span className="text-[10px] font-bold text-slate-700">{j.category || j._category || '-'}</span>
+                          )}
+                        </td>
+                      )}
+
+                      {/* Classification */}
+                      {visibleCols.judgmentClassification && (
+                        <td className="px-2 py-2">
+                          {isEditing ? (
+                            <select
+                              value={editData._result}
+                              onChange={e => setEditData(d => applyDefaultRules('_result', e.target.value, { ...d, _result: e.target.value }))}
+                              className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white"
+                            >
+                              <option value="">- اختر -</option>
+                              {judgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-700">{j.result || j._result || session?.judgmentClassification || '-'}</span>
                           )}
                         </td>
                       )}
@@ -697,7 +722,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                               </datalist>
                             </div>
                           ) : (
-                            <span className="text-[10px] font-bold text-slate-600">{j.type || '-'}</span>
+                            <span className="text-[10px] font-bold text-slate-600">{j.type || j._type || session?.shortJudgment || '-'}</span>
                           )}
                         </td>
                       )}
@@ -714,7 +739,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                               className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 resize-none min-w-[140px]"
                             />
                           ) : (
-                            <span className="text-[10px] text-slate-500 line-clamp-2">{j.fullVerdict || session?.verdict || '-'}</span>
+                            <span className="text-[10px] text-slate-500 line-clamp-2">{j.fullVerdict || j._verdict || session?.verdict || session?.decision || '-'}</span>
                           )}
                         </td>
                       )}
@@ -752,9 +777,9 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                         ) : (
                           <button
                             onClick={() => startEdit(cObj)}
-                            className="w-full flex items-center justify-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-black py-1.5 rounded-lg transition border border-rose-200"
+                            className={`w-full flex items-center justify-center gap-1 text-[10px] font-black py-1.5 rounded-lg transition border ${hasJudgment ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'}`}
                           >
-                            <Edit3 className="w-3 h-3" /> تسجيل
+                            <Edit3 className="w-3 h-3" /> {hasJudgment ? 'تعديل الحكم' : 'تسجيل'}
                           </button>
                         )}
                       </td>

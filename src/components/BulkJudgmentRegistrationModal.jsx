@@ -36,15 +36,21 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
   const applyDefaultRules = (field, value, currentData) => {
     if (!settings?.judgmentDefaults?.length) return currentData;
     const newData = { ...currentData };
+    
     for (const rule of settings.judgmentDefaults) {
-      if (
-        (rule.triggerField === 'category' && field === '_category' && value === rule.triggerValue) ||
-        (rule.triggerField === 'classification' && field === '_result' && value === rule.triggerValue)
-      ) {
-        if (rule.setClassification && !newData._result) newData._result = rule.setClassification;
-        if (rule.setType && !newData._type) newData._type = rule.setType;
-        if (rule.setText && !newData._verdict) newData._verdict = rule.setText;
-        break;
+      const conds = rule.conditions || {};
+      const roleMatch = !conds.role || (currentData._role && currentData._role.includes(conds.role)) || conds.role === currentData._role;
+      const catMatch = !conds.category || newData._category === conds.category;
+      const classMatch = !conds.classification || newData._result === conds.classification;
+      const typeMatch = !conds.type || newData._type === conds.type;
+      
+      if (roleMatch && catMatch && classMatch && typeMatch && (conds.role || conds.category || conds.classification || conds.type)) {
+        const acts = rule.actions || {};
+        if (acts.category && !newData._category) newData._category = acts.category;
+        if (acts.classification && !newData._result) newData._result = acts.classification;
+        if (acts.type && !newData._type) newData._type = acts.type;
+        if (acts.text && !newData._verdict) newData._verdict = acts.text;
+        break; // apply only the first fully matching rule
       }
     }
     return newData;

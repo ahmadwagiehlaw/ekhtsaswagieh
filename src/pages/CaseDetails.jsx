@@ -1140,44 +1140,33 @@ export default function CaseDetails() {
                           const [verd, setVerd]   = React.useState(initialVerd);
                           const [final, setFinal] = React.useState(j.isFinal !== undefined ? j.isFinal : (j._isFinal || false));
                           
+                          const [isEditing, setIsEditing] = React.useState(!session.hasJudgment);
+
                           React.useEffect(() => {
                             // 1. Dynamic Rules from Settings
                             if (settings?.judgmentDefaults?.length > 0) {
                                let matched = false;
+                               const currentRole = String(caseData['الصفة'] || caseData['صفة'] || '');
+                               
                                for (const rule of settings.judgmentDefaults) {
-                                 if (rule.triggerField === 'category' && rule.triggerValue && cat === rule.triggerValue) {
-                                   if (rule.setClassification && !res) setRes(rule.setClassification);
-                                   if (rule.setType && !type) setType(rule.setType);
-                                   if (rule.setText && !verd) setVerd(rule.setText);
-                                   matched = true; break;
-                                 }
-                                 if (rule.triggerField === 'classification' && rule.triggerValue && res === rule.triggerValue) {
-                                   if (rule.setType && !type) setType(rule.setType);
-                                   if (rule.setText && !verd) setVerd(rule.setText);
-                                   matched = true; break;
+                                 const conds = rule.conditions || {};
+                                 const roleMatch = !conds.role || currentRole.includes(conds.role) || conds.role === currentRole;
+                                 const catMatch = !conds.category || cat === conds.category;
+                                 const classMatch = !conds.classification || res === conds.classification;
+                                 const typeMatch = !conds.type || type === conds.type;
+                                 
+                                 if (roleMatch && catMatch && classMatch && typeMatch && (conds.role || conds.category || conds.classification || conds.type)) {
+                                    const acts = rule.actions || {};
+                                    if (acts.category && !cat) setCat(acts.category);
+                                    if (acts.classification && !res) setRes(acts.classification);
+                                    if (acts.type && !type) setType(acts.type);
+                                    if (acts.text && !verd) setVerd(acts.text);
+                                    matched = true;
+                                    break;
                                  }
                                }
-                               if (matched) return;
                             }
-                            
-                            // 2. Legacy Fallback
-                            if (cat === 'فحص' && !j.result && !res) {
-                              const role = String(caseData['الصفة'] || '');
-                              if (role.includes('مطعون ضد')) {
-                                setRes('صالح');
-                                setType('رفض');
-                                setVerd('رفض الدعوى بإجماع الأراء مع إلزام رافعها المصروفات');
-                              } else if (role.includes('طاعن')) {
-                                setRes('ضد');
-                              }
-                            }
-                          }, [cat, res, settings?.judgmentDefaults]);
-
-                          React.useEffect(() => {
-                            if (res === 'تمهيدي' && !type && !j.type) {
-                              setType('ندب خبير');
-                            }
-                          }, [res]);
+                          }, [cat, res, type, settings?.judgmentDefaults, caseData]);
 
                           const handleTypeChange = (newType) => {
                             setType(newType);
@@ -1211,7 +1200,38 @@ export default function CaseDetails() {
                             
                             await saveCaseToFirebase(caseData.id, payload);
                             setSaving(false);
+                            setIsEditing(false); // Switch back to view mode after saving
                           };
+
+                          if (!isEditing) {
+                            return (
+                              <div className="flex flex-col gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 mt-1 shadow-sm relative group transition-all hover:border-indigo-200">
+                                <button onClick={() => setIsEditing(true)} className="absolute left-2 top-2 p-1.5 bg-white text-slate-400 hover:text-indigo-600 rounded-lg shadow-sm border border-slate-200 transition opacity-0 group-hover:opacity-100" title="تعديل بيانات الحكم">
+                                  <Edit3 className="w-3 h-3" />
+                                </button>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-[10px] font-black text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">⚖️ حكم مسجل</span>
+                                  {final && <span className="text-[9px] font-black px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">نهائي</span>}
+                                  {res && <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border bg-${rc}-50 text-${rc}-700 border-${rc}-200 mr-auto`}>{res}</span>}
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 text-xs mb-1">
+                                  <div>
+                                    <span className="text-[9px] font-bold text-slate-400 block">فئة الحكم</span>
+                                    <span className="font-bold text-slate-700">{cat || '-'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[9px] font-bold text-slate-400 block">نوع الحكم</span>
+                                    <span className="font-bold text-slate-700">{type || '-'}</span>
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-[9px] font-bold text-slate-400 block">المنطوق</span>
+                                  <span className="font-bold text-slate-800 text-xs leading-relaxed">{verd || '-'}</span>
+                                </div>
+                              </div>
+                            );
+                          }
+
                           return (
                             <div className="flex flex-col gap-2 bg-rose-50/60 p-3 rounded-xl border border-rose-100 mt-1 shadow-sm">
                               <div className="flex items-center justify-between mb-0.5">
@@ -1250,9 +1270,16 @@ export default function CaseDetails() {
                                   <input type="checkbox" checked={final} onChange={e => setFinal(e.target.checked)} className="rounded accent-rose-600" />
                                   حكم نهائي في الدعوى
                                 </label>
-                                <button onClick={handleSave} disabled={saving} className="text-[10px] font-black px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition disabled:opacity-50">
-                                  {saving ? '...' : '💾 حفظ الحكم'}
-                                </button>
+                                <div className="flex gap-2">
+                                  {session.hasJudgment && (
+                                    <button onClick={() => setIsEditing(false)} disabled={saving} className="text-[10px] font-bold px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition disabled:opacity-50">
+                                      إلغاء
+                                    </button>
+                                  )}
+                                  <button onClick={handleSave} disabled={saving} className="text-[10px] font-black px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition disabled:opacity-50">
+                                    {saving ? '...' : '💾 حفظ الحكم'}
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           );
