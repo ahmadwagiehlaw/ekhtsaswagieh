@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useAppContext } from '../context/AppState';
-import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList } from 'lucide-react';
+import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList, Scale } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useUI } from '../context/UIContext';
 
@@ -31,6 +31,11 @@ export default function Settings() {
   const [localFileLocations, setLocalFileLocations] = useState(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
   const [localCommonProcedures, setLocalCommonProcedures] = useState(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
   const [localCaseClassifications, setLocalCaseClassifications] = useState(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
+  const [localJudgmentTextMap, setLocalJudgmentTextMap] = useState(settings?.judgmentTextMap || {
+    'وقف جزائي': 'وقف الدعوى جزائيا لمدة شهر',
+    'اعتبار': 'اعتبار الدعوى كأن لم تكن',
+    'رفض': 'بقبول الدعوي شكلا ورفضها موضوعا وإلزام رافعها المصروفات'
+  });
   const [deletePassword, setDeletePassword] = useState('');
   
   // Sync settings when loaded
@@ -45,6 +50,11 @@ export default function Settings() {
     setLocalFileLocations(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
     setLocalCommonProcedures(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
     setLocalCaseClassifications(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
+    setLocalJudgmentTextMap(settings?.judgmentTextMap || {
+      'وقف جزائي': 'وقف الدعوى جزائيا لمدة شهر',
+      'اعتبار': 'اعتبار الدعوى كأن لم تكن',
+      'رفض': 'بقبول الدعوي شكلا ورفضها موضوعا وإلزام رافعها المصروفات'
+    });
   }, [settings]);
 
   const handleSaveSettings = async () => {
@@ -60,7 +70,8 @@ export default function Settings() {
       sessionTypes: localSessionTypes,
       fileLocations: localFileLocations,
       commonProcedures: localCommonProcedures,
-      caseClassifications: localCaseClassifications
+      caseClassifications: localCaseClassifications,
+      judgmentTextMap: localJudgmentTextMap
     });
     setIsProcessing(false);
     toast('تم حفظ الإعدادات المتقدمة بنجاح', 'success');
@@ -286,10 +297,12 @@ export default function Settings() {
       </div>
 
       {/* Tabs */}
-      <div className="flex bg-slate-200/50 p-1 rounded-xl">
-        <button onClick={() => setActiveTab('sync')} className={`flex-1 text-xs font-bold py-2 rounded-lg transition ${activeTab === 'sync' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>مزامنة الداتا</button>
-        <button onClick={() => setActiveTab('schema')} className={`flex-1 text-xs font-bold py-2 rounded-lg transition ${activeTab === 'schema' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>هيكلة الحقول (No-Code)</button>
-        <button onClick={() => setActiveTab('advanced')} className={`flex-1 text-xs font-bold py-2 rounded-lg transition ${activeTab === 'advanced' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>متقدم</button>
+      <div className="flex bg-slate-200/50 p-1 rounded-xl flex-wrap">
+        <button onClick={() => setActiveTab('sync')} className={`flex-1 min-w-[100px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'sync' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>💾 مزامنة الداتا</button>
+        <button onClick={() => setActiveTab('schema')} className={`flex-1 min-w-[100px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'schema' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🧩 هيكلة الحقول</button>
+        <button onClick={() => setActiveTab('judgments')} className={`flex-1 min-w-[100px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'judgments' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚖️ الجلسات والأحكام</button>
+        <button onClick={() => setActiveTab('lists')} className={`flex-1 min-w-[100px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'lists' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>📁 قوائم النظام</button>
+        <button onClick={() => setActiveTab('other')} className={`flex-1 min-w-[100px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'other' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚙️ إعدادات أخرى</button>
       </div>
 
       {/* SYNC TAB */}
@@ -402,8 +415,8 @@ export default function Settings() {
         </div>
       )}
 
-      {/* ADVANCED TAB */}
-      {activeTab === 'advanced' && (
+      {/* OTHER TAB */}
+      {activeTab === 'other' && (
         <div className="space-y-6 animate-in fade-in zoom-in duration-300">
           
           {/* Global Preferences */}
@@ -446,6 +459,114 @@ export default function Settings() {
             </div>
           </div>
 
+          {/* Review Tasks Management */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <ClipboardList className="w-5 h-5 text-emerald-600" />
+              <h3 className="font-black text-sm text-navy-900">إدارة مهام الإطلاع السريعة</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {localReviewTasks.map((task, i) => (
+                <div key={i} className="flex items-center gap-1 bg-emerald-50 border border-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+                  <span>{task}</span>
+                  <button onClick={() => setLocalReviewTasks(localReviewTasks.filter((_, idx) => idx !== i))} className="text-emerald-400 hover:text-rose-500 mr-2">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <button 
+                onClick={async () => {
+                  const newTask = await showPrompt('إضافة مهمة إطلاع', 'أدخل اسم المهمة الجديدة:');
+                  if (newTask?.trim()) setLocalReviewTasks([...localReviewTasks, newTask.trim()]);
+                }} 
+                className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
+              >
+                <Plus className="w-3 h-3" /> إضافة مهمة
+              </button>
+            </div>
+          </div>
+
+          {/* Employees Management */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <Users className="w-5 h-5 text-emerald-600" />
+              <h3 className="font-black text-sm text-navy-900">إدارة الموظفين والصلاحيات</h3>
+            </div>
+            
+            <div className="space-y-3">
+              {localEmployees.map((emp, index) => (
+                <div key={index} className="flex flex-col sm:flex-row gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 items-start sm:items-center">
+                  <input type="text" placeholder="الاسم" value={emp.name} onChange={e => {
+                    const newEmp = [...localEmployees];
+                    newEmp[index].name = e.target.value;
+                    setLocalEmployees(newEmp);
+                  }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
+                  
+                  <select 
+                    value={emp.jobTitle || 'السكرتارية'} 
+                    onChange={e => {
+                      const newEmp = [...localEmployees];
+                      newEmp[index].jobTitle = e.target.value;
+                      setLocalEmployees(newEmp);
+                    }} 
+                    className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto bg-white"
+                  >
+                    <option value="السكرتارية">السكرتارية</option>
+                    <option value="إطلاع">إطلاع</option>
+                    <option value="صادر">صادر</option>
+                    <option value="محامي">محامي</option>
+                  </select>
+
+                  <input type="text" placeholder="كلمة المرور" value={emp.password} onChange={e => {
+                    const newEmp = [...localEmployees];
+                    newEmp[index].password = e.target.value;
+                    setLocalEmployees(newEmp);
+                  }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
+                  
+                  <button onClick={() => setLocalEmployees(localEmployees.filter((_, idx) => idx !== index))} className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg shrink-0 self-end sm:self-auto mt-2 sm:mt-0">
+                    <Trash2 className="w-4 h-4"/>
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={() => setLocalEmployees([...localEmployees, { name: '', jobTitle: 'السكرتارية', password: '' }])} className="w-full border-2 border-dashed border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-2">
+              <Plus className="w-4 h-4"/> إضافة موظف جديد
+            </button>
+          </div>
+
+          {/* Save Settings Button */}
+          <button onClick={handleSaveSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">
+            {isProcessing ? 'جاري الحفظ...' : 'حفظ الإعدادات المتقدمة'}
+          </button>
+
+          {/* Factory Reset */}
+          <div className="bg-rose-50 rounded-2xl p-5 border border-rose-200 shadow-sm space-y-4 mt-8">
+            <div className="flex items-center gap-2 pb-3 border-b border-rose-200/50">
+              <ShieldAlert className="w-5 h-5 text-rose-600" />
+              <h3 className="font-black text-sm text-rose-900">منطقة الخطر: مسح البيانات</h3>
+            </div>
+            <p className="text-[11px] font-bold text-rose-700">تحذير: سيتم حذف جميع القضايا والملفات بشكل نهائي. تأكد من عمل نسخة احتياطية (Excel) قبل القيام بهذه الخطوة.</p>
+            
+            <div className="flex gap-2">
+              <input 
+                type="password" 
+                placeholder="أدخل باسوورد المدير للتأكيد" 
+                value={deletePassword}
+                onChange={e => setDeletePassword(e.target.value)}
+                className="flex-1 text-xs font-bold p-2 rounded-lg border border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-500" 
+              />
+              <button onClick={handleDeleteAll} disabled={isProcessing || !deletePassword} className="bg-rose-600 text-white font-bold px-4 py-2 rounded-lg text-xs hover:bg-rose-700 disabled:opacity-50 shadow-sm">
+                مسح جميع البيانات
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LISTS TAB */}
+      {activeTab === 'lists' && (
+        <div className="space-y-6 animate-in fade-in zoom-in duration-300">
           {/* Core Field Options Management */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
@@ -580,6 +701,16 @@ export default function Settings() {
             </div>
           </div>
 
+          {/* Save Settings Button */}
+          <button onClick={handleSaveSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">
+            {isProcessing ? 'جاري الحفظ...' : 'حفظ الإعدادات المتقدمة'}
+          </button>
+        </div>
+      )}
+
+      {/* JUDGMENTS TAB */}
+      {activeTab === 'judgments' && (
+        <div className="space-y-6 animate-in fade-in zoom-in duration-300">
           {/* Decisions Management */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
@@ -634,108 +765,10 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Review Tasks Management */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-              <ClipboardList className="w-5 h-5 text-emerald-600" />
-              <h3 className="font-black text-sm text-navy-900">إدارة مهام الإطلاع السريعة</h3>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {localReviewTasks.map((task, i) => (
-                <div key={i} className="flex items-center gap-1 bg-emerald-50 border border-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-bold">
-                  <span>{task}</span>
-                  <button onClick={() => setLocalReviewTasks(localReviewTasks.filter((_, idx) => idx !== i))} className="text-emerald-400 hover:text-rose-500 mr-2">
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-              <button 
-                onClick={async () => {
-                  const newTask = await showPrompt('إضافة مهمة إطلاع', 'أدخل اسم المهمة الجديدة:');
-                  if (newTask?.trim()) setLocalReviewTasks([...localReviewTasks, newTask.trim()]);
-                }} 
-                className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
-              >
-                <Plus className="w-3 h-3" /> إضافة مهمة
-              </button>
-            </div>
-          </div>
-
-          {/* Employees Management */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-              <Users className="w-5 h-5 text-emerald-600" />
-              <h3 className="font-black text-sm text-navy-900">إدارة الموظفين والصلاحيات</h3>
-            </div>
-            
-            <div className="space-y-3">
-              {localEmployees.map((emp, index) => (
-                <div key={index} className="flex flex-col sm:flex-row gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 items-start sm:items-center">
-                  <input type="text" placeholder="الاسم" value={emp.name} onChange={e => {
-                    const newEmp = [...localEmployees];
-                    newEmp[index].name = e.target.value;
-                    setLocalEmployees(newEmp);
-                  }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
-                  
-                  <select 
-                    value={emp.jobTitle || 'السكرتارية'} 
-                    onChange={e => {
-                      const newEmp = [...localEmployees];
-                      newEmp[index].jobTitle = e.target.value;
-                      setLocalEmployees(newEmp);
-                    }} 
-                    className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto bg-white"
-                  >
-                    <option value="السكرتارية">السكرتارية</option>
-                    <option value="إطلاع">إطلاع</option>
-                    <option value="صادر">صادر</option>
-                    <option value="محامي">محامي</option>
-                  </select>
-
-                  <input type="text" placeholder="كلمة المرور" value={emp.password} onChange={e => {
-                    const newEmp = [...localEmployees];
-                    newEmp[index].password = e.target.value;
-                    setLocalEmployees(newEmp);
-                  }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
-                  
-                  <button onClick={() => setLocalEmployees(localEmployees.filter((_, idx) => idx !== index))} className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg shrink-0 self-end sm:self-auto mt-2 sm:mt-0">
-                    <Trash2 className="w-4 h-4"/>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <button onClick={() => setLocalEmployees([...localEmployees, { name: '', jobTitle: 'السكرتارية', password: '' }])} className="w-full border-2 border-dashed border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-2">
-              <Plus className="w-4 h-4"/> إضافة موظف جديد
-            </button>
-          </div>
-
           {/* Save Settings Button */}
           <button onClick={handleSaveSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">
             {isProcessing ? 'جاري الحفظ...' : 'حفظ الإعدادات المتقدمة'}
           </button>
-
-          {/* Factory Reset */}
-          <div className="bg-rose-50 rounded-2xl p-5 border border-rose-200 shadow-sm space-y-4 mt-8">
-            <div className="flex items-center gap-2 pb-3 border-b border-rose-200/50">
-              <ShieldAlert className="w-5 h-5 text-rose-600" />
-              <h3 className="font-black text-sm text-rose-900">منطقة الخطر: مسح البيانات</h3>
-            </div>
-            <p className="text-[11px] font-bold text-rose-700">تحذير: سيتم حذف جميع القضايا والملفات بشكل نهائي. تأكد من عمل نسخة احتياطية (Excel) قبل القيام بهذه الخطوة.</p>
-            
-            <div className="flex gap-2">
-              <input 
-                type="password" 
-                placeholder="أدخل باسوورد المدير للتأكيد" 
-                value={deletePassword}
-                onChange={e => setDeletePassword(e.target.value)}
-                className="flex-1 text-xs font-bold p-2 rounded-lg border border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-500" 
-              />
-              <button onClick={handleDeleteAll} disabled={isProcessing || !deletePassword} className="bg-rose-600 text-white font-bold px-4 py-2 rounded-lg text-xs hover:bg-rose-700 disabled:opacity-50 shadow-sm">
-                مسح جميع البيانات
-              </button>
-            </div>
-          </div>
         </div>
       )}
 

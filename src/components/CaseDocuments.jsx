@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, FileText, Image as ImageIcon, Trash2, Download, ExternalLink, FileBox, X, Plus, Camera } from 'lucide-react';
+import { Upload, FileText, Image as ImageIcon, Trash2, Download, ExternalLink, FileBox, X, Plus, Camera, Edit3, Gavel, User, File as FileIcon } from 'lucide-react';
 import { uploadToR2, deleteFromR2 } from '../lib/r2';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
@@ -19,7 +19,16 @@ const DOCUMENT_TYPES = [
   'حافظة مستندات'
 ];
 
-export default function CaseDocuments({ caseId }) {
+const getDocTypeStyle = (type) => {
+  if (!type) return { color: 'text-slate-600', bg: 'bg-slate-100', icon: FileIcon };
+  if (type.includes('مذكرة') || type.includes('دفاع')) return { color: 'text-amber-600', bg: 'bg-amber-100', icon: FileText };
+  if (type.includes('حكم') || type.includes('منطوق')) return { color: 'text-rose-600', bg: 'bg-rose-100', icon: Gavel };
+  if (type.includes('مفوضين') || type.includes('خبراء') || type.includes('تقرير')) return { color: 'text-emerald-600', bg: 'bg-emerald-100', icon: FileBox };
+  if (type.includes('إعلان')) return { color: 'text-blue-600', bg: 'bg-blue-100', icon: User };
+  return { color: 'text-indigo-600', bg: 'bg-indigo-100', icon: FileText };
+};
+
+export default function CaseDocuments({ caseId, pastedFile, setPastedFile }) {
   const { cases, saveCaseToFirebase, currentUser, isAdmin } = useAppContext();
   const { toast, showConfirm } = useUI();
 
@@ -32,6 +41,15 @@ export default function CaseDocuments({ caseId }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [docType, setDocType] = useState('ملف الدعوى');
   const [docTitle, setDocTitle] = useState('');
+  const [editingDoc, setEditingDoc] = useState(null);
+
+  const closeModal = () => {
+    setShowUploadModal(false);
+    setEditingDoc(null);
+    setSelectedFile(null);
+    setDocTitle('');
+    setDocType('ملف الدعوى');
+  };
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -44,40 +62,31 @@ export default function CaseDocuments({ caseId }) {
     }
   };
 
-  // Handle Ctrl+V Paste
+  // Handle Ctrl+V Paste from Parent (CaseDetails)
   useEffect(() => {
-    const handlePaste = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        if (e.target.type === 'text' || e.target.type === 'textarea') return;
-      }
-      
-      const items = e.clipboardData?.items;
-      if (!items) return;
-
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf('image') !== -1) {
-          const file = items[i].getAsFile();
-          if (file) {
-            // Check if file has a proper name, otherwise assign a default
-            const fileName = file.name === 'image.png' ? `pasted-image-${Date.now()}.png` : file.name;
-            const newFile = new File([file], fileName, { type: file.type });
-            
-            setSelectedFile(newFile);
-            setDocTitle('');
-            setDocType('غلاف الملف');
-            setShowUploadModal(true);
-            e.preventDefault();
-            break;
-          }
-        }
-      }
-    };
-
-    window.addEventListener('paste', handlePaste);
-    return () => window.removeEventListener('paste', handlePaste);
-  }, []);
+    if (pastedFile) {
+      setEditingDoc(null);
+      setSelectedFile(pastedFile);
+      setDocTitle('');
+      setDocType('غلاف الملف');
+      setShowUploadModal(true);
+      setPastedFile(null); // Clear after handling
+    }
+  }, [pastedFile, setPastedFile]);
 
   const handleUpload = async () => {
+    if (editingDoc) {
+      try {
+        const updatedDocs = documents.map(d => d.id === editingDoc.id ? { ...d, type: docType, title: docTitle.trim() !== '' ? docTitle.trim() : docType } : d);
+        await saveCaseToFirebase(caseId, { documents: updatedDocs });
+        toast('تم تحديث بيانات المستند بنجاح', 'success');
+        closeModal();
+      } catch (error) {
+        toast('حدث خطأ أثناء تحديث المستند', 'error');
+      }
+      return;
+    }
+
     if (!selectedFile) {
       toast('يرجى اختيار ملف أولاً', 'error');
       return;
@@ -97,16 +106,27 @@ export default function CaseDocuments({ caseId }) {
         fileToUpload = await imageCompression(fileToUpload, options);
       }
 
+      const caseNum = caseData['رقم الدعوى'] || caseData['رقم القضية'] || '';
+      const finalType = fileToUpload.type || selectedFile.type || '';
+      const originalName = fileToUpload.name || selectedFile.name || 'document';
+      const lastDotIndex = originalName.lastIndexOf('.');
+      let extension = lastDotIndex !== -1 ? originalName.substring(lastDotIndex) : '';
+      if (!extension || extension.length > 5) extension = finalType.startsWith('image/') ? '.jpg' : '.pdf';
+      
+      const safeDocType = docType.replace(/[\/\\?%*:|"<>\s]/g, '_');
+      const newFileName = `${caseNum ? caseNum + '-' : ''}${safeDocType}_${Date.now()}${extension}`;
+      fileToUpload = new File([fileToUpload], newFileName, { type: finalType });
+
       const url = await uploadToR2(fileToUpload, 'ekhtsasi-light-files');
 
       const newDoc = {
         id: Date.now().toString(),
         url,
-        type: docType,
-        title: docTitle.trim() !== '' ? docTitle.trim() : docType,
+        type: docType || 'مستند إضافي',
+        title: docTitle.trim() !== '' ? docTitle.trim() : (docType || 'مستند إضافي'),
         uploadedAt: new Date().toISOString(),
         uploadedBy: currentUser || 'مجهول',
-        fileType: fileToUpload.type.startsWith('image/') ? 'image' : 'pdf'
+        fileType: finalType.startsWith('image/') ? 'image' : 'pdf'
       };
 
       const updatedDocs = [...documents, newDoc];
@@ -122,8 +142,7 @@ export default function CaseDocuments({ caseId }) {
       toast(`حدث خطأ أثناء رفع الملف: ${error.message || 'خطأ غير معروف'}`, 'error');
     } finally {
       setIsUploading(false);
-      setShowUploadModal(false);
-      setSelectedFile(null);
+      closeModal();
     }
   };
 
@@ -185,23 +204,33 @@ export default function CaseDocuments({ caseId }) {
                   {doc.type}
                 </div>
 
-                {/* Delete Button */}
+                {/* Delete and Edit Buttons */}
                 {isAdmin && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(doc); }}
-                    className="absolute top-2 left-2 bg-rose-500 text-white p-1.5 rounded-lg transition z-10 hover:bg-rose-600 shadow-sm backdrop-blur-md opacity-90 hover:opacity-100"
-                    title="حذف الملف"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="absolute top-2 left-2 z-10 flex gap-1.5 opacity-90 hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingDoc(doc); setDocType(doc.type || 'ملف الدعوى'); setDocTitle(doc.title || doc.type || ''); setShowUploadModal(true); }}
+                      className="bg-blue-500 text-white p-1.5 rounded-lg transition hover:bg-blue-600 shadow-sm backdrop-blur-md"
+                      title="تعديل بيانات الملف"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(doc); }}
+                      className="bg-rose-500 text-white p-1.5 rounded-lg transition hover:bg-rose-600 shadow-sm backdrop-blur-md"
+                      title="حذف الملف"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 )}
 
                 <a href={doc.url} target="_blank" rel="noreferrer" className="flex-1 bg-slate-200 relative block overflow-hidden aspect-[4/5]">
                   {doc.fileType === 'image' ? (
                     <img src={doc.url} alt={doc.title} className="w-full h-full object-cover group-hover:scale-110 transition duration-500 ease-out" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-400 group-hover:scale-110 transition duration-500 ease-out bg-slate-100">
-                      <FileText className="w-16 h-16 opacity-50" />
+                    <div className={`w-full h-full flex flex-col items-center justify-center group-hover:scale-110 transition duration-500 ease-out ${getDocTypeStyle(doc.type).bg} ${getDocTypeStyle(doc.type).color}`}>
+                      {React.createElement(getDocTypeStyle(doc.type).icon, { className: "w-16 h-16 opacity-70 mb-2" })}
+                      <span className="text-xs font-black opacity-80 px-2 text-center truncate w-full">{doc.type}</span>
                     </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition duration-300 flex items-center justify-center">
@@ -223,68 +252,97 @@ export default function CaseDocuments({ caseId }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col">
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-100 bg-slate-50">
-              <h2 className="font-black text-lg text-navy-900">رفع مستند جديد</h2>
-              <button onClick={() => setShowUploadModal(false)} className="p-2 text-slate-400 hover:text-rose-500 rounded-xl transition bg-white border border-slate-200 shadow-sm">
+              <h2 className="font-black text-lg text-navy-900">{editingDoc ? 'تعديل بيانات المستند' : 'رفع مستند جديد'}</h2>
+              <button onClick={closeModal} className="p-2 text-slate-400 hover:text-rose-500 rounded-xl transition bg-white border border-slate-200 shadow-sm">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="p-4 sm:p-6 space-y-4">
-              <div className="space-y-2">
-                <label className="text-xs font-black text-navy-900">الملف (صورة أو PDF)</label>
-                
-                {/* Hidden inputs */}
-                <input
-                  type="file"
-                  ref={cameraInputRef}
-                  onChange={handleFileSelect}
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                />
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileSelect}
-                  accept="image/*,.pdf"
-                  className="hidden"
-                />
+              {!editingDoc && (
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-navy-900">الملف (صورة أو PDF)</label>
+                  
+                  {/* Hidden inputs */}
+                  <input
+                    type="file"
+                    ref={cameraInputRef}
+                    onChange={handleFileSelect}
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                  />
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileSelect}
+                    accept="image/*,.pdf"
+                    className="hidden"
+                  />
 
-                {!selectedFile ? (
-                  <div className="flex gap-3">
-                    <button onClick={() => cameraInputRef.current?.click()} className="flex-1 bg-white hover:bg-slate-50 text-slate-700 py-4 rounded-xl font-bold flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 transition">
-                      <Camera className="w-6 h-6 text-indigo-500" />
-                      <span className="text-xs">تصوير ورقة</span>
-                    </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-white hover:bg-slate-50 text-slate-700 py-4 rounded-xl font-bold flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 transition">
-                      <Upload className="w-6 h-6 text-indigo-500" />
-                      <span className="text-xs">رفع ملف</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <FileBox className="w-5 h-5 text-emerald-600 shrink-0" />
-                      <span className="text-xs font-bold text-emerald-700 truncate">{selectedFile.name}</span>
+                  {!selectedFile ? (
+                    <div className="flex gap-3">
+                      <button onClick={() => cameraInputRef.current?.click()} className="flex-1 bg-white hover:bg-slate-50 text-slate-700 py-4 rounded-xl font-bold flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 transition">
+                        <Camera className="w-6 h-6 text-indigo-500" />
+                        <span className="text-xs">تصوير ورقة</span>
+                      </button>
+                      <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-white hover:bg-slate-50 text-slate-700 py-4 rounded-xl font-bold flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 transition">
+                        <Upload className="w-6 h-6 text-indigo-500" />
+                        <span className="text-xs">رفع ملف</span>
+                      </button>
                     </div>
-                    <button onClick={() => setSelectedFile(null)} className="text-slate-400 hover:text-rose-500">
+                  ) : (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <FileBox className="w-5 h-5 text-emerald-600 shrink-0" />
+                        <span className="text-xs font-bold text-emerald-700 truncate">{selectedFile.name}</span>
+                      </div>
+                      <button onClick={() => setSelectedFile(null)} className="text-slate-400 hover:text-rose-500">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-xs font-black text-navy-900">تصنيف المستند</label>
+                {DOCUMENT_TYPES.includes(docType) || docType === 'ملف الدعوى' ? (
+                  <select
+                    value={docType}
+                    onChange={e => {
+                      if (e.target.value === 'أخرى...') {
+                        setDocType('');
+                      } else {
+                        setDocType(e.target.value);
+                      }
+                    }}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                  >
+                    {DOCUMENT_TYPES.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                    <option value="أخرى...">أخرى... (إضافة تصنيف جديد)</option>
+                  </select>
+                ) : (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={docType}
+                      onChange={e => setDocType(e.target.value)}
+                      placeholder="اكتب اسم التصنيف الجديد هنا..."
+                      className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:ring-2 focus:ring-indigo-500 outline-none transition pr-10"
+                    />
+                    <button 
+                      onClick={() => setDocType('ملف الدعوى')}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md transition"
+                      title="إلغاء والعودة للقائمة"
+                    >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
                 )}
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black text-navy-900">تصنيف المستند</label>
-                <select
-                  value={docType}
-                  onChange={e => setDocType(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:ring-2 focus:ring-indigo-500 outline-none transition"
-                >
-                  {DOCUMENT_TYPES.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
               </div>
 
               <div className="space-y-2">
@@ -301,17 +359,17 @@ export default function CaseDocuments({ caseId }) {
 
             <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 flex gap-3">
               <button
-                onClick={() => setShowUploadModal(false)}
+                onClick={closeModal}
                 className="flex-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold py-3 rounded-xl transition text-sm"
               >
                 إلغاء
               </button>
               <button
                 onClick={handleUpload}
-                disabled={isUploading || !selectedFile}
+                disabled={isUploading || (!editingDoc && !selectedFile)}
                 className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition text-sm flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                {isUploading ? 'جاري الرفع...' : 'رفع المستند'}
+                {isUploading ? (editingDoc ? 'جاري الحفظ...' : 'جاري الرفع...') : (editingDoc ? 'حفظ التعديلات' : 'رفع المستند')}
               </button>
             </div>
           </div>

@@ -15,6 +15,7 @@ const RollsLibrary  = lazy(() => import('./pages/RollsLibrary'));
 const Reports       = lazy(() => import('./pages/Reports'));
 const DayRoll       = lazy(() => import('./pages/DayRoll'));
 const Tasks         = lazy(() => import('./pages/Tasks'));
+const Trash         = lazy(() => import('./pages/Trash'));
 
 const PageLoader = () => (
   <div className="min-h-[50vh] flex items-center justify-center">
@@ -45,6 +46,7 @@ function AppContent() {
               <Route path="agenda" element={<Agenda />} />
               <Route path="settings" element={<Settings />} />
               <Route path="tasks" element={<Tasks />} />
+              <Route path="trash" element={<Trash />} />
               <Route path="case/:id" element={<CaseDetails />} />
               <Route path="reports" element={<Reports />} />
             </Route>

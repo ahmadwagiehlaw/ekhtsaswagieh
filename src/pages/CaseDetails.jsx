@@ -6,6 +6,7 @@ import { useUI } from '../context/UIContext';
 import AddSessionModal from '../components/AddSessionModal';
 import CaseDocuments from '../components/CaseDocuments';
 import AlertsModal from '../components/AlertsModal';
+import ProceduresModal from '../components/ProceduresModal';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 import { localizeNumber } from '../utils/numberUtils';
 import { calculateLitigationStage } from '../utils/caseUtils';
@@ -16,7 +17,7 @@ import { useRef } from 'react';
 export default function CaseDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { cases, schema, isAdmin, saveCaseToFirebase, settings, rolls, checkDuplicateCase, deleteCaseFromFirebase, saveSettingsToFirebase, saveGlobalTask, currentUser } = useAppContext();
+  const { cases, schema, isAdmin, saveCaseToFirebase, settings, rolls, checkDuplicateCase, deleteCaseFromFirebase, restoreCaseFromFirebase, saveSettingsToFirebase, saveGlobalTask, currentUser } = useAppContext();
   const { toast, showConfirm, openRollViewer, showPrompt } = useUI();
 
   // In the new architecture, id is the document id, not the array index.
@@ -27,6 +28,7 @@ export default function CaseDetails() {
   const [expandedGroups, setExpandedGroups] = useState(['📌 بيانات أساسية']);
   const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [isProceduresModalOpen, setIsProceduresModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'documents' | 'sessions' | 'tasks'
   const [isChangeRoleModalOpen, setIsChangeRoleModalOpen] = useState(false);
   const [isChangeLocationModalOpen, setIsChangeLocationModalOpen] = useState(false);
@@ -37,6 +39,39 @@ export default function CaseDetails() {
   const fileInputRef = useRef(null);
   const [activeSessionIdx, setActiveSessionIdx] = useState(null);
   const [isUploadingSessionFile, setIsUploadingSessionFile] = useState(false);
+  const [pastedFile, setPastedFile] = useState(null);
+
+  // Global Paste Handler for the Case
+  React.useEffect(() => {
+    const handlePaste = (e) => {
+      // Ignore paste if user is typing in an input or textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+      
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            const originalName = file?.name || 'image.png';
+            const fileName = originalName === 'image.png' ? `pasted-image-${Date.now()}.png` : originalName;
+            const newFile = new File([file], fileName, { type: file.type });
+            
+            setPastedFile(newFile);
+            setActiveTab('documents'); // Switch to documents tab
+            e.preventDefault();
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, []);
   
   // Procedure state
   const procedureFileInputRef = useRef(null);
@@ -211,9 +246,16 @@ export default function CaseDetails() {
     }
     
     try {
+      const previousData = { ...caseData };
       await saveCaseToFirebase(caseData.id, editData);
       setIsEditing(false);
-      toast("تم حفظ التعديلات بنجاح!", "success");
+      toast("تم حفظ التعديلات بنجاح!", "success", {
+        actionLabel: "تراجع",
+        onAction: async () => {
+          await saveCaseToFirebase(caseData.id, previousData);
+          setEditData(previousData);
+        }
+      });
     } catch (error) {
       console.error(error);
       toast("حدث خطأ أثناء الحفظ.", "error");
@@ -222,11 +264,16 @@ export default function CaseDetails() {
 
   const handleDeleteCase = async () => {
     if (!isAdmin) return;
-    const confirmed = await showConfirm("حذف الملف", "هل أنت متأكد من رغبتك في حذف هذا الملف بالكامل؟ لا يمكن التراجع عن هذا الإجراء.");
+    const confirmed = await showConfirm("نقل إلى سلة المحذوفات", "هل أنت متأكد من نقل هذه الدعوى إلى سلة المحذوفات؟");
     if (confirmed) {
        const success = await deleteCaseFromFirebase(caseData.id);
        if (success) {
-          toast("تم حذف الملف بنجاح.", "success");
+          toast("تم نقل الدعوى إلى سلة المحذوفات", "success", {
+            actionLabel: "تراجع",
+            onAction: async () => {
+              await restoreCaseFromFirebase(caseData.id);
+            }
+          });
           navigate('/', { replace: true });
        } else {
           toast("حدث خطأ أثناء حذف الملف.", "error");
@@ -425,6 +472,15 @@ export default function CaseDetails() {
               <ClipboardList className="w-5 h-5" />
             </button>
 
+            {/* Procedures Modal Button */}
+            <button 
+              onClick={() => setIsProceduresModalOpen(true)}
+              className="relative p-2 rounded-xl transition bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-indigo-600"
+              title="سجل الإجراءات"
+            >
+              <FileText className="w-5 h-5" />
+            </button>
+
             {/* Alerts Button in Header */}
             <button 
               onClick={() => setIsAlertsOpen(true)}
@@ -513,12 +569,6 @@ export default function CaseDetails() {
             className={`flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-lg whitespace-nowrap transition-all flex items-center justify-center gap-1.5 ${activeTab === 'sessions' ? 'bg-navy-900 text-amber-300 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
           >
             <CalendarPlus className="w-4 h-4" /> الجلسات
-          </button>
-          <button 
-            onClick={() => setActiveTab('procedures')}
-            className={`flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-lg whitespace-nowrap transition-all flex items-center justify-center gap-1.5 ${activeTab === 'procedures' ? 'bg-navy-900 text-amber-300 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
-          >
-            <ClipboardList className="w-4 h-4" /> الإجراءات
           </button>
         </div>
       </div>
@@ -1002,6 +1052,19 @@ export default function CaseDetails() {
                               {(isUploadingSessionFile && activeSessionIdx === idx) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
                            </button>
 
+                           {/* Notes Toggle */}
+                           <button 
+                               onClick={async () => {
+                                  const newSessions = [...caseData.sessions];
+                                  newSessions[idx] = { ...newSessions[idx], _showNotes: !session._showNotes };
+                                  await saveCaseToFirebase(caseData.id, { sessions: newSessions });
+                               }}
+                               className={`p-1 rounded border transition flex items-center justify-center h-7 w-7 shadow-sm ${session._showNotes || session.notes ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200 hover:text-navy-900'}`}
+                               title={(session._showNotes || session.notes) ? "إخفاء الملاحظات" : "إضافة/عرض الملاحظات"}
+                           >
+                               <FileText className="w-3.5 h-3.5" />
+                           </button>
+
                            {/* Judgment Toggle */}
                            <button 
                               onClick={async () => {
@@ -1053,21 +1116,54 @@ export default function CaseDetails() {
 
                      {/* Judgment Fields Block */}
                      {session.hasJudgment && (() => {
-                        const JCAT = ['نهائي', 'تمهيدي', 'إجرائي'];
+                        const JCAT = ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
                         const JTYPES = {
-                          'إجرائي': ['وقف جزائي','وقف تعليقي','شطب','اعتبار كأن لم تكن','إحالة للموضوع','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)'],
+                          'غير منه للخصومة': ['وقف جزائي','وقف تعليقي','شطب','اعتبار كأن لم تكن','إحالة للموضوع'],
                           'تمهيدي': ['ندب خبير','تكليف خبير','إعادة للمحكمة المختصة','إحالة للنيابة','تعجيل من الوقف'],
-                          'نهائي':  ['رفض الدعوى','عدم القبول شكلاً','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه'],
+                          'صالح': ['رفض الدعوى','عدم القبول شكلاً','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)','وقف تنفيذي','رفض الشق العاجل', 'رفض'],
+                          'ضد': ['رفض الدعوى','عدم القبول شكلاً','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)','وقف تنفيذي','رفض الشق العاجل', 'رفض'],
                         };
-                        const JRESULTS = ['للصالح','للضد','جزئي','إجرائي'];
-                        const resColorMap = { 'للصالح':'emerald', 'للضد':'rose', 'جزئي':'amber', 'إجرائي':'indigo' };
+                        const JRESULTS = ['صالح','ضد','غير منه للخصومة','تمهيدي'];
+                        const resColorMap = { 'صالح':'emerald', 'ضد':'rose', 'غير منه للخصومة':'amber', 'تمهيدي':'indigo' };
                         const j = session.judgment || {};
+                        
                         const JudgmentEditor = () => {
-                          const [cat, setCat]     = React.useState(j.category || '');
-                          const [type, setType]   = React.useState(j.type || session.shortJudgment || '');
-                          const [res, setRes]     = React.useState(j.result || session.judgmentClassification || '');
-                          const [verd, setVerd]   = React.useState(j.fullVerdict || session.verdict || '');
+                          const initialCat = j.category || (session.decision?.includes('فحص') ? 'فحص' : '');
+                          const initialRes = j.result || session.judgmentClassification || '';
+                          const initialType = j.type || session.shortJudgment || '';
+                          const initialVerd = j.fullVerdict || session.verdict || '';
+
+                          const [cat, setCat]     = React.useState(initialCat);
+                          const [res, setRes]     = React.useState(initialRes);
+                          const [type, setType]   = React.useState(initialType);
+                          const [verd, setVerd]   = React.useState(initialVerd);
                           const [final, setFinal] = React.useState(j.isFinal || false);
+                          
+                          React.useEffect(() => {
+                            if (cat === 'فحص' && !j.result && !res) {
+                              const role = String(caseData['الصفة'] || '');
+                              if (role.includes('مطعون ضد')) {
+                                setRes('صالح');
+                                setType('رفض');
+                                setVerd('رفض الدعوى بإجماع الأراء مع إلزام رافعها المصروفات');
+                              } else if (role.includes('طاعن')) {
+                                setRes('ضد');
+                              }
+                            }
+                          }, [cat]);
+
+                          React.useEffect(() => {
+                            if (res === 'تمهيدي' && !type && !j.type) {
+                              setType('ندب خبير');
+                            }
+                          }, [res]);
+
+                          const handleTypeChange = (newType) => {
+                            setType(newType);
+                            if (newType && settings?.judgmentTextMap?.[newType]) {
+                               setVerd(settings.judgmentTextMap[newType]);
+                            }
+                          };
                           const [saving, setSaving] = React.useState(false);
                           const rc = resColorMap[res] || 'slate';
                           const handleSave = async () => {
@@ -1093,8 +1189,8 @@ export default function CaseDetails() {
                                   </select>
                                 </div>
                                 <div>
-                                  <label className="text-[9px] font-bold text-slate-500 block mb-0.5">النتيجة</label>
-                                  <select value={res} onChange={e => setRes(e.target.value)} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
+                                  <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تصنيف الحكم</label>
+                                  <select value={res} onChange={e => { setRes(e.target.value); setType(''); }} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
                                     <option value="">-- اختر --</option>
                                     {JRESULTS.map(r => <option key={r} value={r}>{r}</option>)}
                                   </select>
@@ -1102,9 +1198,9 @@ export default function CaseDetails() {
                               </div>
                               <div>
                                 <label className="text-[9px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
-                                <select value={type} onChange={e => setType(e.target.value)} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
+                                <select value={type} onChange={e => handleTypeChange(e.target.value)} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
                                   <option value="">-- اختر --</option>
-                                  {(JTYPES[cat] || []).map(t => <option key={t} value={t}>{t}</option>)}
+                                  {(JTYPES[res] || []).map(t => <option key={t} value={t}>{t}</option>)}
                                 </select>
                               </div>
                               <div>
@@ -1126,279 +1222,32 @@ export default function CaseDetails() {
                         return <JudgmentEditor />;
                      })()}
 
-                     <textarea 
-                        placeholder="ملاحظات الجلسة..."
-                        className="w-full text-[10px] font-bold text-slate-600 bg-white p-2 rounded-lg border border-slate-200 whitespace-pre-wrap focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 resize-none min-h-[40px]"
-                        defaultValue={session.notes}
-                        onBlur={async (e) => {
-                           if (e.target.value !== session.notes) {
-                              const newSessions = [...caseData.sessions];
-                              newSessions[idx] = { ...newSessions[idx], notes: e.target.value };
-                              await saveCaseToFirebase(caseData.id, { sessions: newSessions });
-                           }
-                        }}
-                     />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-      )}
-
-      {/* Tab Content: Procedures */}
-      {activeTab === 'procedures' && (
-      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mx-4 sm:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-300">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 shrink-0">
-               <ClipboardList className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="font-black text-lg text-navy-900">سجل الإجراءات</h2>
-              <p className="text-[11px] text-slate-500 font-bold">تسجيل ومتابعة الإجراءات المتخذة في الملف</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-2 space-y-4">
-          {(() => {
-            const proceduresList = Array.isArray(caseData.procedures) ? caseData.procedures : Object.values(caseData.procedures || {});
-            
-            if (proceduresList.length === 0) {
-              return (
-                <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
-                   <p className="text-xs font-bold text-slate-500">لا توجد إجراءات مسجلة في هذا الملف.</p>
-                </div>
-              );
-            }
-            
-            return (
-              <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
-                {proceduresList.sort((a, b) => new Date(b.date) - new Date(a.date)).map((proc, idx) => (
-                  <div key={proc.id || idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                  {/* Icon */}
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-slate-100 text-slate-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                    <CheckCircle2 className="w-5 h-5 text-indigo-500" />
-                  </div>
-                  {/* Card */}
-                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex flex-wrap gap-1.5 items-center mb-2">
-                        <div className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">
-                          {formatDateString(proc.date)}
-                        </div>
-                        {proc.sessionDate && (
-                          <div className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-1 rounded-md border border-amber-250">
-                            مرتبط بجلسة: {formatDateString(proc.sessionDate)}
-                          </div>
-                        )}
-                      </div>
-                      {isAdmin && (
-                        <button 
-                          onClick={async () => {
-                            const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذا الإجراء؟', 'delete_procedure');
-                            if (confirmed) {
-                              const newProcs = proceduresList.filter(p => p.id !== proc.id);
-                              await saveCaseToFirebase(caseData.id, { procedures: newProcs });
-                            }
-                          }}
-                          className="text-slate-400 hover:text-rose-600 p-1"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                    <h4 className="text-sm font-black text-navy-900 mb-2">{proc.title}</h4>
-                    {proc.notes && (
-                      <p className="text-xs font-bold text-slate-600 mb-3">{proc.notes}</p>
-                    )}
-                    {proc.attachmentUrl && (
-                      <a href={proc.attachmentUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-100 transition">
-                        <FileText className="w-4 h-4 text-indigo-500" /> {proc.attachmentName || 'مرفق'}
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-            );
-          })()}
-
-          {isAdmin && (
-            <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 mt-6">
-              <h4 className="text-sm font-black text-navy-900 mb-4 flex items-center gap-2">
-                <Plus className="w-4 h-4 text-indigo-600" /> تسجيل إجراء جديد
-              </h4>
-              <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="flex-1 flex gap-2">
-                    <input 
-                      type="date" 
-                      value={newProcedure.date}
-                      onChange={e => setNewProcedure({...newProcedure, date: e.target.value})}
-                      className="bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400 flex-[1]"
-                    />
-                    <select
-                      value={newProcedure.sessionDate || ''}
-                      onChange={e => setNewProcedure({...newProcedure, sessionDate: e.target.value})}
-                      className="bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400 flex-[1]"
-                    >
-                      <option value="">تاريخ الجلسة المرتبطة (اختياري)</option>
-                      {caseData.sessions?.map(s => (
-                        <option key={s.date} value={s.date}>{formatDateString(s.date)}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <input 
-                    type="text" 
-                    placeholder="اسم الإجراء (مثال: إيداع مذكرة دفاع، تقديم حافظة...)" 
-                    value={newProcedure.title}
-                    onChange={e => setNewProcedure({...newProcedure, title: e.target.value})}
-                    className="bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400 flex-[2]"
-                  />
-                </div>
-                {/* Quick selection procedures list */}
-                <div className="flex flex-wrap gap-1 mt-2 items-center">
-                  <span className="text-[10px] font-bold text-slate-400">إدخال سريع:</span>
-                  {(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']).map(p => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setNewProcedure({...newProcedure, title: p})}
-                      className={`px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-bold transition-all ${newProcedure.title === p ? 'bg-indigo-600 text-white' : ''}`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const newProcName = await showPrompt('إضافة إجراء جديد', 'أدخل اسم الإجراء الشائع الجديد:');
-                      if (newProcName?.trim()) {
-                        const currentProcs = settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة'];
-                        if (!currentProcs.includes(newProcName.trim())) {
-                          await saveSettingsToFirebase({
-                            ...settings,
-                            commonProcedures: [...currentProcs, newProcName.trim()]
-                          });
-                          toast('تمت إضافة الإجراء الشائع بنجاح!', 'success');
-                        }
-                      }
-                    }}
-                    className="text-indigo-600 hover:text-indigo-800 text-[10px] font-black underline cursor-pointer select-none ml-2"
-                  >
-                    + إضافة خيار
-                  </button>
-                </div>
-                <textarea 
-                  placeholder="ملاحظات تفصيلية (اختياري)..."
-                  value={newProcedure.notes}
-                  onChange={e => setNewProcedure({...newProcedure, notes: e.target.value})}
-                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400 min-h-[60px] resize-none"
-                />
-                
-                {/* File Upload Section */}
-                <div className="flex flex-col sm:flex-row gap-3 items-center pt-2">
-                  <input 
-                    type="file" 
-                    ref={procedureFileInputRef} 
-                    className="hidden" 
-                    accept="image/*,application/pdf"
-                    onChange={async (e) => {
-                       const file = e.target.files[0];
-                       if (!file) return;
-                       setIsUploadingProcedureFile(true);
-                       try {
-                          let fileToUpload = file;
-                          if (file.type.startsWith('image/')) {
-                             fileToUpload = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true });
-                          }
-                          const url = await uploadToR2(fileToUpload, 'ekhtsasi-light-files');
-                          setProcedureAttachment({ url, name: file.name });
-                          toast("تم رفع المرفق مؤقتاً، اضغط حفظ لتأكيد الإجراء", "success");
-                       } catch (err) {
-                          toast("فشل رفع المرفق", "error");
-                       } finally {
-                          setIsUploadingProcedureFile(false);
-                       }
-                    }}
-                  />
-                  
-                  <div className="flex-1 flex items-center gap-2 w-full">
-                     <button 
-                       onClick={() => procedureFileInputRef.current?.click()}
-                       disabled={isUploadingProcedureFile}
-                       className="bg-white border border-slate-300 text-slate-600 hover:text-navy-900 hover:bg-slate-50 px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 disabled:opacity-50"
-                     >
-                       {isUploadingProcedureFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
-                       {procedureAttachment ? 'تغيير المرفق' : 'إضافة مرفق'}
-                     </button>
-                     {procedureAttachment && (
-                       <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-2 rounded-xl text-xs font-bold border border-emerald-200 overflow-hidden">
-                          <CheckCircle2 className="w-4 h-4 shrink-0" />
-                          <span className="truncate max-w-[150px]">{procedureAttachment.name}</span>
-                          <button onClick={() => setProcedureAttachment(null)} className="ml-2 hover:text-rose-600"><X className="w-3 h-3" /></button>
-                       </div>
+                     {(session.notes || session._showNotes) && (
+                        <textarea 
+                           placeholder="ملاحظات الجلسة..."
+                           className="w-full text-[10px] font-bold text-slate-600 bg-white p-2 rounded-lg border border-slate-200 whitespace-pre-wrap focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 resize-none min-h-[40px]"
+                           defaultValue={session.notes}
+                           onBlur={async (e) => {
+                              if (e.target.value !== session.notes) {
+                                 const newSessions = [...caseData.sessions];
+                                 newSessions[idx] = { ...newSessions[idx], notes: e.target.value };
+                                 await saveCaseToFirebase(caseData.id, { sessions: newSessions });
+                              }
+                           }}
+                        />
                      )}
                   </div>
-                  
-                  <button 
-                    onClick={async () => {
-                      if(!newProcedure.title || !newProcedure.date) {
-                        toast('يرجى إدخال اسم وتاريخ الإجراء.', 'error');
-                        return;
-                      }
-                      setIsAddingProcedure(true);
-                      
-                      const newProcObj = {
-                        id: Date.now().toString(),
-                        title: newProcedure.title,
-                        date: newProcedure.date,
-                        notes: newProcedure.notes,
-                        sessionDate: newProcedure.sessionDate || null,
-                        attachmentUrl: procedureAttachment?.url || null,
-                        attachmentName: procedureAttachment?.name || null,
-                        createdAt: new Date().toISOString()
-                      };
-                      
-                      const currentProceduresList = Array.isArray(caseData.procedures) ? caseData.procedures : Object.values(caseData.procedures || {});
-                      const updatedProcedures = [...currentProceduresList, newProcObj];
-                      
-                      // Also add to documents if there is an attachment
-                      let updatedDocuments = caseData.documents || [];
-                      if (procedureAttachment) {
-                         updatedDocuments = [...updatedDocuments, {
-                            id: Date.now().toString() + '_doc',
-                            title: `مرفق إجراء: ${newProcedure.title}`,
-                            url: procedureAttachment.url,
-                            type: 'other',
-                            createdAt: new Date().toISOString()
-                         }];
-                      }
-                      
-                      await saveCaseToFirebase(caseData.id, { procedures: updatedProcedures, documents: updatedDocuments });
-                       setNewProcedure({ date: new Date().toISOString().split('T')[0], title: '', notes: '', sessionDate: '' });
-                      setProcedureAttachment(null);
-                      setIsAddingProcedure(false);
-                      toast('تم حفظ الإجراء بنجاح', 'success');
-                    }}
-                    disabled={isAddingProcedure || isUploadingProcedureFile}
-                    className="w-full sm:w-auto bg-indigo-600 text-white shadow-sm font-black px-8 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 hover:bg-indigo-700 transition disabled:opacity-50"
-                  >
-                    {isAddingProcedure ? <Loader2 className="w-4 h-4 animate-spin" /> : 'حفظ الإجراء'}
-                  </button>
                 </div>
-              </div>
+              ))}
             </div>
           )}
         </div>
       </div>
       )}
+
       {/* Tab Content: Documents */}
       {activeTab === 'documents' && (
-        <CaseDocuments caseId={caseData.id} />
+        <CaseDocuments caseId={caseData.id} pastedFile={pastedFile} setPastedFile={setPastedFile} />
       )}
       
       {/* Add Session Modal */}
@@ -1419,6 +1268,13 @@ export default function CaseDetails() {
         isOpen={isAlertsOpen}
         onClose={() => setIsAlertsOpen(false)}
         caseData={caseData}
+      />
+
+      <ProceduresModal 
+        isOpen={isProceduresModalOpen}
+        onClose={() => setIsProceduresModalOpen(false)}
+        caseData={caseData}
+        setCaseData={setEditData}
       />
 
       {/* Change Role Modal */}

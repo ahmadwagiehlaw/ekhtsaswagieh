@@ -40,12 +40,12 @@ export function UIProvider({ children }) {
   }, []);
 
   // Toast Function
-  const toast = useCallback((message, type = 'success') => {
+  const toast = useCallback((message, type = 'success', options = null) => {
     const id = Date.now().toString();
-    setToasts(prev => [...prev, { id, message, type }]);
+    setToasts(prev => [...prev, { id, message, type, options }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 4000);
+    }, options?.actionLabel ? 6000 : 4000);
   }, []);
 
   // Alert Function
@@ -127,7 +127,18 @@ export function UIProvider({ children }) {
             {t.type === 'success' && <CheckCircle2 className="w-5 h-5 opacity-80" />}
             {t.type === 'error' && <AlertTriangle className="w-5 h-5 opacity-80" />}
             {t.type === 'info' && <Info className="w-5 h-5 opacity-80" />}
-            <p className="text-sm font-bold">{t.message}</p>
+            <p className="text-sm font-bold flex-1">{t.message}</p>
+            {t.options?.actionLabel && (
+              <button 
+                onClick={() => {
+                  if (t.options.onAction) t.options.onAction();
+                  setToasts(prev => prev.filter(toast => toast.id !== t.id));
+                }}
+                className="mr-3 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-black transition whitespace-nowrap shadow-sm border border-white/10"
+              >
+                {t.options.actionLabel}
+              </button>
+            )}
           </div>
         ))}
       </div>

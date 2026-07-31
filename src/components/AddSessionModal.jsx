@@ -1,14 +1,25 @@
-import React, { useState } from 'react';
-import { X, Save, CalendarPlus } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, Save, CalendarPlus, Paperclip, Loader2, CheckCircle2, Plus } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
+import { uploadToR2 } from '../lib/r2';
+import imageCompression from 'browser-image-compression';
 
 export default function AddSessionModal({ isOpen, onClose, caseData }) {
-  const { saveCaseToFirebase } = useAppContext();
-  const { toast } = useUI();
+  const { saveCaseToFirebase, settings, isAdmin } = useAppContext();
+  const { toast, showPrompt } = useUI();
   const [sessionDate, setSessionDate] = useState('');
   const [decision, setDecision] = useState('');
   const [notes, setNotes] = useState('');
+  
+  // Procedure States
+  const [showProcedureForm, setShowProcedureForm] = useState(false);
+  const [procedureTitle, setProcedureTitle] = useState('');
+  const [procedureNotes, setProcedureNotes] = useState('');
+  const [procedureAttachment, setProcedureAttachment] = useState(null);
+  const [isUploadingProcedureFile, setIsUploadingProcedureFile] = useState(false);
+  const procedureFileInputRef = useRef(null);
+
   const [isSaving, setIsSaving] = useState(false);
 
   if (!isOpen || !caseData) return null;
@@ -39,6 +50,34 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
       sessions: updatedSessions,
     };
 
+    if (procedureTitle.trim()) {
+      const newProcObj = {
+        id: Date.now().toString() + '_proc',
+        title: procedureTitle.trim(),
+        date: sessionDate, // Sync date with session
+        notes: procedureNotes,
+        sessionDate: sessionDate,
+        attachmentUrl: procedureAttachment?.url || null,
+        attachmentName: procedureAttachment?.name || null,
+        createdAt: new Date().toISOString()
+      };
+      
+      const currentProceduresList = Array.isArray(caseData.procedures) ? caseData.procedures : Object.values(caseData.procedures || {});
+      updateData.procedures = [...currentProceduresList, newProcObj];
+      
+      if (procedureAttachment) {
+         const updatedDocuments = caseData.documents || [];
+         updateData.documents = [...updatedDocuments, {
+            id: Date.now().toString() + '_doc',
+            title: `مرفق إجراء الجلسة: ${procedureTitle.trim()}`,
+            url: procedureAttachment.url,
+            type: 'مستندات',
+            fileType: procedureAttachment.name?.match(/\.(jpg|jpeg|png|webp)$/i) ? 'image' : 'pdf',
+            date: sessionDate
+         }];
+      }
+    }
+
     // Also update main fields to reflect the latest session for stats and list view
     // Find the schema keys used for lastSession and decision
     const sessionKey = Object.keys(caseData).find(k => k === 'آخر جلسة' || k === 'تاريخ الجلسة' || k === 'أخر جلسة') || 'آخر جلسة';
@@ -57,6 +96,10 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
       setSessionDate('');
       setDecision('');
       setNotes('');
+      setProcedureTitle('');
+      setProcedureNotes('');
+      setProcedureAttachment(null);
+      setShowProcedureForm(false);
       toast("تمت إضافة الجلسة بنجاح", "success");
       onClose();
     } else {
@@ -110,10 +153,101 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
               <textarea 
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                rows={3}
+                rows={2}
                 placeholder="أي ملاحظات حول الجلسة..."
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none transition"
               />
+            </div>
+
+            {/* Optional Procedure Form */}
+            <div className="pt-2 border-t border-slate-100">
+               {!showProcedureForm ? (
+                 <button 
+                   type="button" 
+                   onClick={() => setShowProcedureForm(true)}
+                   className="w-full py-2 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl text-[11px] font-black hover:bg-indigo-100 transition flex justify-center items-center gap-1.5"
+                 >
+                   <Plus className="w-3.5 h-3.5" /> إضافة إجراء متزامن مع هذه الجلسة
+                 </button>
+               ) : (
+                 <div className="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100 space-y-3 relative">
+                   <button type="button" onClick={() => setShowProcedureForm(false)} className="absolute top-2 right-2 text-indigo-400 hover:text-rose-500 transition"><X className="w-4 h-4" /></button>
+                   <h4 className="text-[11px] font-black text-indigo-700">تسجيل إجراء متزامن:</h4>
+                   
+                   <div>
+                     <input 
+                       type="text" 
+                       placeholder="اسم الإجراء (مثال: تقديم حافظة...)" 
+                       value={procedureTitle}
+                       onChange={e => setProcedureTitle(e.target.value)}
+                       className="w-full bg-white border border-indigo-200 rounded-lg px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400 transition"
+                     />
+                     {/* Quick selection procedures list */}
+                     <div className="flex flex-wrap gap-1 mt-1.5 items-center">
+                       {(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'حضور الجلسة']).slice(0,4).map(p => (
+                         <button
+                           key={p}
+                           type="button"
+                           onClick={() => setProcedureTitle(p)}
+                           className={`px-2 py-1 bg-white border border-indigo-100 text-indigo-600 hover:bg-indigo-50 rounded text-[9px] font-bold transition-all ${procedureTitle === p ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : ''}`}
+                         >
+                           {p}
+                         </button>
+                       ))}
+                     </div>
+                   </div>
+
+                   <textarea 
+                     placeholder="ملاحظات تفصيلية حول الإجراء..."
+                     value={procedureNotes}
+                     onChange={e => setProcedureNotes(e.target.value)}
+                     className="w-full bg-white border border-indigo-200 rounded-lg px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400 min-h-[50px] resize-none transition"
+                   />
+                   
+                   <div className="flex items-center gap-2">
+                     <input 
+                       type="file" 
+                       ref={procedureFileInputRef} 
+                       className="hidden" 
+                       accept="image/*,application/pdf"
+                       onChange={async (e) => {
+                          const file = e.target.files[0];
+                          if (!file) return;
+                          setIsUploadingProcedureFile(true);
+                          try {
+                             let fileToUpload = file;
+                             if (file.type.startsWith('image/')) {
+                                fileToUpload = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true });
+                             }
+                             const url = await uploadToR2(fileToUpload, 'ekhtsasi-light-files');
+                             setProcedureAttachment({ url, name: file.name });
+                             toast("تم رفع المرفق للإجراء مؤقتاً", "success");
+                          } catch (err) {
+                             toast("فشل رفع المرفق", "error");
+                          } finally {
+                             setIsUploadingProcedureFile(false);
+                          }
+                       }}
+                     />
+                     <button 
+                       type="button"
+                       onClick={() => procedureFileInputRef.current?.click()}
+                       disabled={isUploadingProcedureFile}
+                       className="bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                     >
+                       {isUploadingProcedureFile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
+                       {procedureAttachment ? 'تغيير المرفق' : 'مرفق الإجراء'}
+                     </button>
+                     {procedureAttachment && (
+                       <div className="flex-1 flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2 py-1.5 rounded-lg text-[10px] font-bold border border-emerald-200 overflow-hidden">
+                          <CheckCircle2 className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{procedureAttachment.name}</span>
+                          <button type="button" onClick={() => setProcedureAttachment(null)} className="ml-auto hover:text-rose-600"><X className="w-3 h-3" /></button>
+                       </div>
+                     )}
+                   </div>
+                 </div>
+               )}
             </div>
 
           </form>

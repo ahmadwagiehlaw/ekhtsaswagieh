@@ -6,6 +6,7 @@ const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
   const [cases, setCases] = useState([]);
+  const [deletedCases, setDeletedCases] = useState([]);
   const [rolls, setRolls] = useState([]);
   const [globalTasks, setGlobalTasks] = useState([]);
   const [schema, setSchema] = useState([]);
@@ -13,7 +14,12 @@ export const AppProvider = ({ children }) => {
     consultantName: "أحمد وجيه", 
     adminPassword: "444",
     employees: [],
-    decisions: ['للحكم', 'تصريح', 'للإطلاع', 'للإعلان', 'آخر أجل', 'للمستندات', 'للمذكرات', 'لورود التقرير', 'استبعاد', 'لتنفيذ قرار الإعادة']
+    decisions: ['للحكم', 'تصريح', 'للإطلاع', 'للإعلان', 'آخر أجل', 'للمستندات', 'للمذكرات', 'لورود التقرير', 'استبعاد', 'لتنفيذ قرار الإعادة'],
+    judgmentTextMap: {
+      'وقف جزائي': 'وقف الدعوى جزائيا لمدة شهر',
+      'اعتبار': 'اعتبار الدعوى كأن لم تكن',
+      'رفض': 'بقبول الدعوي شكلا ورفضها موضوعا وإلزام رافعها المصروفات'
+    }
   });
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('isAdmin') === 'true');
   const [isEmployee, setIsEmployee] = useState(() => localStorage.getItem('isEmployee') === 'true');
@@ -21,13 +27,19 @@ export const AppProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Listen to cases collection
     const unsubCases = onSnapshot(CASES_COLLECTION_REF, (snapshot) => {
       const casesData = [];
+      const deletedData = [];
       snapshot.forEach(doc => {
-        casesData.push({ id: doc.id, ...doc.data() });
+        const data = { id: doc.id, ...doc.data() };
+        if (data.isDeleted) {
+          deletedData.push(data);
+        } else {
+          casesData.push(data);
+        }
       });
       setCases(casesData);
+      setDeletedCases(deletedData);
       setLoading(false);
     });
 
@@ -205,14 +217,34 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const deleteCaseFromFirebase = async (caseId) => {
+  const deleteCaseFromFirebase = async (caseId, permanent = false) => {
     try {
       const safeId = sanitizeId(caseId);
-      const { deleteDoc } = await import('firebase/firestore');
-      await deleteDoc(doc(CASES_COLLECTION_REF, safeId));
+      if (permanent) {
+        await deleteDoc(doc(CASES_COLLECTION_REF, safeId));
+      } else {
+        await setDoc(doc(CASES_COLLECTION_REF, safeId), { 
+          isDeleted: true, 
+          deletedAt: new Date().toISOString() 
+        }, { merge: true });
+      }
       return true;
     } catch (error) {
       console.error("Error deleting case:", error);
+      return false;
+    }
+  };
+
+  const restoreCaseFromFirebase = async (caseId) => {
+    try {
+      const safeId = sanitizeId(caseId);
+      await setDoc(doc(CASES_COLLECTION_REF, safeId), { 
+        isDeleted: false,
+        deletedAt: null
+      }, { merge: true });
+      return true;
+    } catch (error) {
+      console.error("Error restoring case:", error);
       return false;
     }
   };
@@ -320,6 +352,7 @@ export const AppProvider = ({ children }) => {
   return (
     <AppContext.Provider value={{
       cases,
+      deletedCases,
       rolls,
       schema,
       settings,
@@ -337,6 +370,7 @@ export const AppProvider = ({ children }) => {
       saveSettingsToFirebase,
       deleteAllCases,
       deleteCaseFromFirebase,
+      restoreCaseFromFirebase,
       saveRollToFirebase,
       deleteRollFromFirebase,
       globalTasks,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { FolderOpen, CalendarDays, Settings, Plus, LayoutDashboard, Scale, Bell, Search, BookOpen, Download, ClipboardList, BarChart2 } from 'lucide-react';
+import { FolderOpen, CalendarDays, Settings, Plus, LayoutDashboard, Scale, Bell, Search, BookOpen, Download, ClipboardList, BarChart2, Trash2 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import AddCaseModal from './AddCaseModal';
 
@@ -67,6 +67,15 @@ export default function Layout() {
           >
             <BarChart2 className="w-5 h-5" />
           </button>
+          {isAdmin && (
+            <button 
+              onClick={() => navigate('/trash')}
+              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-slate-300 hover:text-rose-400"
+              title="سلة المحذوفات"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          )}
           <button 
             onClick={() => navigate('/rolls')}
             className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-slate-300 hover:text-white"
