@@ -48,6 +48,22 @@ export default function CaseDetails() {
   const [activeNoteSessionIdx, setActiveNoteSessionIdx] = useState(null);
   const [activeJudgmentSessionIdx, setActiveJudgmentSessionIdx] = useState(null);
 
+  // Track Recently Viewed Cases
+  React.useEffect(() => {
+    if (caseData?.id) {
+      try {
+        const stored = localStorage.getItem('recentlyViewedCases');
+        let viewed = stored ? JSON.parse(stored) : [];
+        viewed = viewed.filter(id => id !== caseData.id);
+        viewed.unshift(caseData.id);
+        if (viewed.length > 50) viewed = viewed.slice(0, 50);
+        localStorage.setItem('recentlyViewedCases', JSON.stringify(viewed));
+      } catch (e) {
+        console.error('Error saving recently viewed case', e);
+      }
+    }
+  }, [caseData?.id]);
+
   // Global Paste Handler for the Case
   React.useEffect(() => {
     const handlePaste = (e) => {

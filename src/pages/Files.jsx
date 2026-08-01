@@ -33,6 +33,8 @@ export default function Files() {
   const [showImportantOnly, setShowImportantOnly] = useState(false);
   const [showSessionlessOnly, setShowSessionlessOnly] = useState(false);
   const [showPastSessionsOnly, setShowPastSessionsOnly] = useState(false);
+  const [showRecentlyModifiedOnly, setShowRecentlyModifiedOnly] = useState(false);
+  const [showRecentlyViewedOnly, setShowRecentlyViewedOnly] = useState(false);
   const [isSelectionReportModalOpen, setIsSelectionReportModalOpen] = useState(false);
 
   // Sorting and collapsible states
@@ -54,6 +56,8 @@ export default function Files() {
         setShowImportantOnly(pinned.showImportantOnly ?? false);
         setShowSessionlessOnly(pinned.showSessionlessOnly ?? false);
         setShowPastSessionsOnly(pinned.showPastSessionsOnly ?? false);
+        setShowRecentlyModifiedOnly(pinned.showRecentlyModifiedOnly ?? false);
+        setShowRecentlyViewedOnly(pinned.showRecentlyViewedOnly ?? false);
         setSortBy(pinned.sortBy ?? 'none');
       }
     } catch (e) {}
@@ -68,7 +72,8 @@ export default function Files() {
       // Pin current filters
       const toSave = {
         roleFilter, showOngoingOnly, showWithAttachmentsOnly,
-        showImportantOnly, showSessionlessOnly, showPastSessionsOnly, sortBy
+        showImportantOnly, showSessionlessOnly, showPastSessionsOnly, 
+        showRecentlyModifiedOnly, showRecentlyViewedOnly, sortBy
       };
       localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
       setIsPinned(true);
@@ -156,6 +161,21 @@ export default function Files() {
       result = result.filter(c => c.documents && c.documents.length > 0);
     }
 
+    if (showRecentlyViewedOnly) {
+      const viewedStr = localStorage.getItem('recentlyViewedCases');
+      const viewed = viewedStr ? JSON.parse(viewedStr) : [];
+      result = result.filter(c => viewed.includes(c.id));
+    }
+    
+    if (showRecentlyModifiedOnly) {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      result = result.filter(c => {
+         if (!c.updatedAt) return false;
+         return new Date(c.updatedAt) >= sevenDaysAgo;
+      });
+    }
+
     if (advancedParams) {
       const { caseNo, year, opponentName, opponentRole, decision, sessionDateStart, sessionDateEnd, court, location } = advancedParams;
 
@@ -220,11 +240,11 @@ export default function Files() {
     }
 
     return result;
-  }, [cases, searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly]);
+  }, [cases, searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, sortBy]);
+  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, sortBy]);
 
   const getPrimaryValue = (cObj, possibleKeys) => {
     for (let k of possibleKeys) {
@@ -302,6 +322,7 @@ export default function Files() {
         if (!dB) return -1;
         return dA.getTime() - dB.getTime();
       }
+
       return 0;
     });
 
@@ -463,9 +484,11 @@ export default function Files() {
                       setShowWithAttachmentsOnly(false);
                       setShowImportantOnly(false);
                       setShowSessionlessOnly(false);
+                      setShowRecentlyModifiedOnly(false);
+                      setShowRecentlyViewedOnly(false);
                       if (isPinned) {
                         // Update pin to reflect cleared state
-                        const toSave = { roleFilter: 'all', showOngoingOnly: false, showWithAttachmentsOnly: false, showImportantOnly: false, showSessionlessOnly: false, showPastSessionsOnly: false, sortBy };
+                        const toSave = { roleFilter: 'all', showOngoingOnly: false, showWithAttachmentsOnly: false, showImportantOnly: false, showSessionlessOnly: false, showPastSessionsOnly: false, showRecentlyModifiedOnly: false, showRecentlyViewedOnly: false, sortBy };
                         localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
                       }
                     }}
@@ -515,6 +538,22 @@ export default function Files() {
               >
                 <Sparkles className={`w-3.5 h-3.5 ${showImportantOnly ? 'fill-amber-700' : ''}`} />
                 <span>قضايا هامة</span>
+              </button>
+
+              <button
+                onClick={() => setShowRecentlyViewedOnly(!showRecentlyViewedOnly)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showRecentlyViewedOnly ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>استعرضتها مؤخراً</span>
+              </button>
+
+              <button
+                onClick={() => setShowRecentlyModifiedOnly(!showRecentlyModifiedOnly)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showRecentlyModifiedOnly ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>عدلتها مؤخراً</span>
               </button>
 
               <button

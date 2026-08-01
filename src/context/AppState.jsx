@@ -218,7 +218,7 @@ export const AppProvider = ({ children }) => {
     try {
       const safeId = sanitizeId(caseId);
       const caseRef = doc(CASES_COLLECTION_REF, safeId);
-      const dataToSave = cleanUndefined({ ...caseData });
+      const dataToSave = cleanUndefined({ ...caseData, updatedAt: new Date().toISOString() });
       delete dataToSave.id; 
       await setDoc(caseRef, dataToSave, { merge: true });
       return true;
