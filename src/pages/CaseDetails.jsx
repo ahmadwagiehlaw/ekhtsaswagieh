@@ -1592,6 +1592,16 @@ export default function CaseDetails() {
                      }
                      
                      try {
+                        const archiveLocs = settings?.archiveLocations || ['شعبة الحفظ', 'الحفظ', 'حفظ'];
+                        if (archiveLocs.includes(newLocation)) {
+                          // Verify if case has judgment
+                          const decision = String(caseData['القرار'] || caseData['قرار الجلسة'] || caseData['المنطوق'] || '');
+                          const hasJudgment = decision.includes('حكم') || decision.includes('للحكم') || (caseData.sessions && caseData.sessions.some(s => s.judgment));
+                          if (!hasJudgment) {
+                            toast("لا يمكن حفظ قضية لم يصدر فيها حكم!", "error");
+                            return;
+                          }
+                        }
                         const locField = schema.find(f => f.id === 'مكان الملف') ? 'مكان الملف' : 'مكان الملف';
                         await saveCaseToFirebase(caseData.id, { [locField]: newLocation });
                         setEditData(prev => ({ ...prev, [locField]: newLocation }));

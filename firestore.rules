@@ -16,7 +16,7 @@ service cloud.firestore {
     }
 
     function isSuperAdmin() {
-      return hasUserDoc() && getUserData().role == 'super_admin';
+      return isAuthenticated() && request.auth.token.email == 'ahmad.wagieh@gmail.com';
     }
 
     function isConsultant() {
@@ -34,6 +34,9 @@ service cloud.firestore {
 
     // 2. Users Directory
     match /users_directory/{userId} {
+      // Super Admin can read all users
+      allow read: if isSuperAdmin();
+
       // Anyone can read their own data
       allow read: if isAuthenticated() && request.auth.uid == userId;
       
@@ -48,8 +51,8 @@ service cloud.firestore {
       // They won't have a role yet in the directory, so we check if they are writing to their own uid
       allow create: if isAuthenticated() && request.auth.uid == userId;
 
-      // Allow updating own record (or admin)
-      allow update: if isAuthenticated() && request.auth.uid == userId;
+      // Allow updating own record (or super admin)
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
     }
 
     // 3. Invites Collection

@@ -8,6 +8,7 @@ import BulkAssignTaskModal from '../components/BulkAssignTaskModal';
 import BulkEditCasesModal from '../components/BulkEditCasesModal';
 import AdvancedSearchModal from '../components/AdvancedSearchModal';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
+import useSessionState from '../hooks/useSessionState';
 
 export default function Files() {
   const { cases, schema, settings, deleteCaseFromFirebase, saveCaseToFirebase } = useAppContext();
@@ -15,34 +16,34 @@ export default function Files() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useSessionState('files_searchQuery', '');
+  const [roleFilter, setRoleFilter] = useSessionState('files_roleFilter', 'all');
+  const [currentPage, setCurrentPage] = useSessionState('files_currentPage', 1);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const [selectedCaseIds, setSelectedCaseIds] = useState([]);
-  const [activeShoba, setActiveShoba] = useState('متداول'); // 'all', 'متداول', 'حفظ'
+  const [activeShoba, setActiveShoba] = useSessionState('files_activeShoba', 'متداول'); // 'all', 'متداول', 'حفظ'
   const [quickLocationEditId, setQuickLocationEditId] = useState(null);
 
   // Advanced Search Params
-  const [advancedParams, setAdvancedParams] = useState(null);
+  const [advancedParams, setAdvancedParams] = useSessionState('files_advancedParams', null);
 
   // Quick Filters
-  const [showOngoingOnly, setShowOngoingOnly] = useState(false);
-  const [showWithAttachmentsOnly, setShowWithAttachmentsOnly] = useState(false);
-  const [showImportantOnly, setShowImportantOnly] = useState(false);
-  const [showSessionlessOnly, setShowSessionlessOnly] = useState(false);
-  const [showPastSessionsOnly, setShowPastSessionsOnly] = useState(false);
-  const [showRecentlyModifiedOnly, setShowRecentlyModifiedOnly] = useState(false);
-  const [showRecentlyViewedOnly, setShowRecentlyViewedOnly] = useState(false);
+  const [showOngoingOnly, setShowOngoingOnly] = useSessionState('files_showOngoingOnly', false);
+  const [showWithAttachmentsOnly, setShowWithAttachmentsOnly] = useSessionState('files_showWithAttachmentsOnly', false);
+  const [showImportantOnly, setShowImportantOnly] = useSessionState('files_showImportantOnly', false);
+  const [showSessionlessOnly, setShowSessionlessOnly] = useSessionState('files_showSessionlessOnly', false);
+  const [showPastSessionsOnly, setShowPastSessionsOnly] = useSessionState('files_showPastSessionsOnly', false);
+  const [showRecentlyModifiedOnly, setShowRecentlyModifiedOnly] = useSessionState('files_showRecentlyModifiedOnly', false);
+  const [showRecentlyViewedOnly, setShowRecentlyViewedOnly] = useSessionState('files_showRecentlyViewedOnly', false);
   const [isSelectionReportModalOpen, setIsSelectionReportModalOpen] = useState(false);
 
   // Sorting and collapsible states
-  const [sortBy, setSortBy] = useState('none');
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-  const [isSortPanelOpen, setIsSortPanelOpen] = useState(false);
+  const [sortBy, setSortBy] = useSessionState('files_sortBy', 'none');
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useSessionState('files_isFilterPanelOpen', false);
+  const [isSortPanelOpen, setIsSortPanelOpen] = useSessionState('files_isSortPanelOpen', false);
   const [isPinned, setIsPinned] = useState(false);
 
   // Load pinned filters from localStorage on mount
@@ -110,30 +111,27 @@ export default function Files() {
 
     // 1. Shoba Filter
     const archiveLocations = settings?.archiveLocations || ['شعبة الحفظ', 'الحفظ', 'حفظ'];
-    const specialLocations = ['شعبة تحت التحديد', 'تحت التحديد', 'شعبة خاصة', 'خاصة']; // Can be configured later
     
+    const isSpecialLocation = (loc) => {
+       if (!loc) return false;
+       if (archiveLocations.includes(loc)) return false;
+       return loc.includes('شعبة') || loc.includes('تحت التحديد') || loc.includes('القسم');
+    };
+
     if (activeShoba === 'متداول') {
       result = result.filter(c => {
          const loc = String(c['مكان الملف'] || '').trim();
-         const decision = String(c['القرار'] || c['قرار الجلسة'] || c['المنطوق'] || '');
-         const hasJudgment = decision.includes('حكم') || decision.includes('للحكم') || (c.sessions && c.sessions.some(s => s.judgment));
-         
-         // المتداول: ليس مسجلاً كشعبة حفظ ولا شعبة خاصة، وليس به حكم نهائي مسجل
-         return !archiveLocations.includes(loc) && !specialLocations.includes(loc) && !hasJudgment;
+         return !archiveLocations.includes(loc) && !isSpecialLocation(loc);
       });
     } else if (activeShoba === 'تحت_التحديد') {
       result = result.filter(c => {
          const loc = String(c['مكان الملف'] || '').trim();
-         return specialLocations.includes(loc);
+         return isSpecialLocation(loc);
       });
     } else if (activeShoba === 'حفظ') {
       result = result.filter(c => {
          const loc = String(c['مكان الملف'] || '').trim();
-         const decision = String(c['القرار'] || c['قرار الجلسة'] || c['المنطوق'] || '');
-         const hasJudgment = decision.includes('حكم') || decision.includes('للحكم') || (c.sessions && c.sessions.some(s => s.judgment));
-         
-         // شعبة الحفظ: مسجل في مكان الملف كحفظ، والأهم أن يكون له حكم
-         return archiveLocations.includes(loc) && hasJudgment;
+         return archiveLocations.includes(loc);
       });
     }
 
@@ -829,10 +827,10 @@ export default function Files() {
                             </span>
                             <button 
                               onClick={(e) => { e.stopPropagation(); setQuickLocationEditId(c.id); }}
-                              className={`flex items-center gap-1.5 text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-lg border transition hover:bg-slate-100 ${fileLocation ? 'text-slate-500 bg-slate-50 border-slate-100' : 'text-amber-600 bg-amber-50 border-amber-200'}`}
+                              className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border transition hover:bg-slate-100 ${fileLocation ? 'text-slate-500 bg-slate-50 border-slate-200' : 'text-amber-600 bg-amber-50 border-amber-200'}`}
                               title="تغيير مكان الملف"
                             >
-                              <MapPin className="w-3.5 h-3.5" /> {fileLocation || 'حدد المكان'} <span className="opacity-50 ml-0.5">▼</span>
+                              <MapPin className="w-3 h-3" /> {fileLocation || 'حدد المكان'} <span className="opacity-50 ml-0.5">▼</span>
                             </button>
                           </div>
                         )}
@@ -843,13 +841,13 @@ export default function Files() {
 
                 {/* Opponents & Details */}
                 <div className="mt-auto space-y-3 pt-3 border-t border-slate-100">
-                  <div className="flex flex-col gap-1 text-[11px] sm:text-xs bg-slate-50 p-2 rounded-xl border border-slate-100">
-                    <div className="flex items-start gap-2">
-                      <span className="text-emerald-600 font-bold shrink-0 w-8">الطاعن:</span>
+                  <div className="flex flex-col gap-1.5 text-[11px] sm:text-xs bg-slate-50 p-2 rounded-xl border border-slate-100">
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-emerald-600 font-bold shrink-0 whitespace-nowrap">الطاعن:</span>
                       <span className="font-black text-navy-900 line-clamp-1 leading-relaxed" title={appellant}>{appellant || '---'}</span>
                     </div>
-                    <div className="flex items-start gap-2 border-t border-slate-200/60 pt-1">
-                      <span className="text-rose-500 font-bold shrink-0 w-8">ضد:</span>
+                    <div className="flex items-start gap-1.5 border-t border-slate-200/60 pt-1.5">
+                      <span className="text-rose-500 font-bold shrink-0 whitespace-nowrap">ضد:</span>
                       <span className="font-bold text-slate-700 line-clamp-1 leading-relaxed" title={appellee}>{appellee || '---'}</span>
                     </div>
                   </div>
@@ -959,6 +957,60 @@ export default function Files() {
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {/* Quick Location Edit Modal */}
+      {quickLocationEditId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setQuickLocationEditId(null)}>
+          <div className="bg-white rounded-3xl w-full max-w-sm flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-navy-900 px-5 py-4 flex items-center justify-between">
+              <h3 className="font-black text-amber-300 text-sm">تغيير مكان الملف</h3>
+              <button onClick={() => setQuickLocationEditId(null)} className="text-white/60 hover:text-white transition"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="p-5 space-y-3">
+               <div className="flex flex-wrap gap-2">
+                 {['غير موجود', 'أصلي', 'مؤقت', 'شعبة الحفظ', 'شعبة تحت التحديد', 'شعبة خاصة', 'شعبة الشغل', 'الأحكام', 'في البيت'].map(loc => {
+                   const cData = cases.find(c => c.id === quickLocationEditId);
+                   const isSelected = cData && (cData['مكان الملف'] === loc);
+                   return (
+                     <button 
+                       key={loc}
+                       onClick={async () => {
+                         try {
+                            const archiveLocs = settings?.archiveLocations || ['شعبة الحفظ', 'الحفظ', 'حفظ'];
+                            if (archiveLocs.includes(loc)) {
+                              const decision = String(cData['القرار'] || cData['قرار الجلسة'] || cData['المنطوق'] || '');
+                              const hasJudgment = decision.includes('حكم') || decision.includes('للحكم') || (cData.sessions && cData.sessions.some(s => s.judgment));
+                              if (!hasJudgment) {
+                                toast("لا يمكن حفظ قضية لم يصدر فيها حكم!", "error");
+                                return;
+                              }
+                            }
+                            const locField = schema.find(f => f.id === 'مكان الملف') ? 'مكان الملف' : 'مكان الملف';
+                            const success = await saveCaseToFirebase(quickLocationEditId, { [locField]: loc });
+                            if (success) {
+                              toast("تم تحديث مكان الملف بنجاح", "success");
+                              setQuickLocationEditId(null);
+                            } else {
+                              toast("حدث خطأ أثناء حفظ مكان الملف", "error");
+                            }
+                         } catch(e) {
+                            toast("حدث خطأ غير متوقع", "error");
+                         }
+                       }}
+                       className={`px-3 py-2 rounded-lg text-xs font-bold transition flex-1 ${isSelected ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                     >
+                       {loc}
+                     </button>
+                   );
+                 })}
+               </div>
+               <div className="pt-2 text-center text-[10px] text-slate-400 font-bold">
+                 سيتم حفظ التغيير فور النقر على المكان المطلوب
+               </div>
+            </div>
+          </div>
         </div>
       )}
 

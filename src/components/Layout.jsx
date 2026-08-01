@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { FolderOpen, CalendarDays, Settings, Plus, LayoutDashboard, Scale, Bell, Search, BookOpen, Download, ClipboardList, BarChart2, Trash2 } from 'lucide-react';
+import { FolderOpen, CalendarDays, Settings, Plus, LayoutDashboard, Scale, Bell, Search, BookOpen, Download, ClipboardList, BarChart2, Trash2, ShieldAlert } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
+import { useAuth } from '../context/AuthContext';
 import AddCaseModal from './AddCaseModal';
 
 export default function Layout() {
   const { settings, isAdmin, currentUserPermissions } = useAppContext();
+  const { userData } = useAuth();
+  const isSuperAdmin = userData?.role === 'super_admin';
   const canDeleteData = isAdmin || currentUserPermissions?.canDeleteData;
   const canEditData = isAdmin || currentUserPermissions?.canEditData;
   const location = useLocation();
@@ -48,11 +51,20 @@ export default function Layout() {
             <h1 className="text-base sm:text-xl font-black text-white tracking-tight leading-none pb-1">اختصاص</h1>
             <div className="h-[1px] w-full bg-gradient-to-l from-amber-400/70 to-transparent rounded-full"></div>
             <span className="text-[11px] sm:text-[13px] font-bold text-amber-400 leading-none mt-1">
-              م. أحمد وجيه
+              {userData?.canCustomizeLogo && settings?.officeName ? settings.officeName : 'م. أحمد وجيه'}
             </span>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <button 
+              onClick={() => navigate('/super-admin')}
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-indigo-800/50 hover:bg-indigo-700 transition-colors text-amber-400"
+              title="لوحة التحكم العليا"
+            >
+              <ShieldAlert className="w-5 h-5" />
+            </button>
+          )}
           {deferredPrompt && (
             <button 
               onClick={handleInstallClick}

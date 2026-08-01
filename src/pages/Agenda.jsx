@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CalendarDays, Filter, ChevronRight, ChevronLeft, Gavel, Printer, Zap, CheckCircle2, CalendarX2, CopyPlus, ClipboardList } from 'lucide-react';
 import { format, addMonths, subMonths, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isPast, isToday, startOfWeek, endOfWeek, parseISO } from 'date-fns';
@@ -9,6 +9,7 @@ import SessionTable from '../components/SessionTable';
 import SessionsRollTab from '../components/SessionsRollTab';
 import JudgmentsRollTab from '../components/JudgmentsRollTab';
 import { getSafeDateObj } from '../utils/dateUtils';
+import useSessionState from '../hooks/useSessionState';
 
 const ARABIC_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 const ARABIC_DAYS_LONG = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
@@ -17,17 +18,30 @@ export default function Agenda() {
   const { cases } = useAppContext();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState('calendar');
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDateKey, setSelectedDateKey] = useState(null);
-  const [filterMode, setFilterMode] = useState('none');
-  const [dateRange, setDateRange] = useState({ from: '', to: '' });
+  const [activeTab, setActiveTab] = useSessionState('agenda_activeTab', 'calendar');
+  
+  // currentDate must be a Date object, so we handle it manually or just use useState for now
+  // but if selectedDateKey is present, it's fine.
+  const [currentDate, setCurrentDate] = useState(() => {
+    try {
+      const storedKey = window.sessionStorage.getItem('agenda_selectedDateKey');
+      if (storedKey) {
+        const parsed = JSON.parse(storedKey);
+        if (parsed) return new Date(parsed);
+      }
+    } catch (e) {}
+    return new Date();
+  });
+  
+  const [selectedDateKey, setSelectedDateKey] = useSessionState('agenda_selectedDateKey', null);
+  const [filterMode, setFilterMode] = useSessionState('agenda_filterMode', 'none');
+  const [dateRange, setDateRange] = useSessionState('agenda_dateRange', { from: '', to: '' });
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isRolloverModalOpen, setIsRolloverModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'list'
-  const [calendarView, setCalendarView] = useState('month'); // 'month' or 'week'
-  const [singleDateSearch, setSingleDateSearch] = useState('');
-  const [sessionTypeSearch, setSessionTypeSearch] = useState('');
+  const [viewMode, setViewMode] = useSessionState('agenda_viewMode', 'table');
+  const [calendarView, setCalendarView] = useSessionState('agenda_calendarView', 'month');
+  const [singleDateSearch, setSingleDateSearch] = useSessionState('agenda_singleDateSearch', '');
+  const [sessionTypeSearch, setSessionTypeSearch] = useSessionState('agenda_sessionTypeSearch', '');
 
   const getFieldValue = (obj, keys) => {
     for (let key of keys) {

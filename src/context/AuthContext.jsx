@@ -19,7 +19,15 @@ export const AuthProvider = ({ children }) => {
           const userDocRef = doc(USERS_DIRECTORY_REF, user.uid);
           const userDocSnap = await getDoc(userDocRef);
           if (userDocSnap.exists()) {
-            setUserData(userDocSnap.data());
+            const data = userDocSnap.data();
+            if (data.banned) {
+              await signOut(auth);
+              setCurrentUser(null);
+              setUserData(null);
+              setLoading(false);
+              return;
+            }
+            setUserData({ ...data, uid: user.uid });
           } else {
             // Fallback: If no directory entry, but email matches Super Admin
             if (user.email === 'ahmad.wagieh@gmail.com') {
