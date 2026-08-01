@@ -4,7 +4,7 @@ import {
   Edit3, Check, X, ChevronRight, ChevronLeft, AlertCircle,
   CheckSquare, Square, Camera, ExternalLink, Printer, Search, Image,
   ClipboardList, Bell, Eye, CopyPlus, Scale, Plus, Trash2,
-  ArrowUpDown, ArrowUp, ArrowDown, Columns, Filter
+  ArrowUpDown, ArrowUp, ArrowDown, Columns, Filter, FileText
 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
@@ -16,6 +16,7 @@ import BulkSessionRolloverModal from './BulkSessionRolloverModal';
 import BulkJudgmentRegistrationModal from './BulkJudgmentRegistrationModal';
 import QuickAddCaseModal from './QuickAddCaseModal';
 import GlobalRollSearchModal from './GlobalRollSearchModal';
+import GlobalTemplatePrintModal from './GlobalTemplatePrintModal';
 
 const getFieldVal = (obj, keys) => {
   for (const k of keys) {
@@ -189,6 +190,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [showColPicker, setShowColPicker] = useState(false);
+  const [isPrintViewOpen, setIsPrintViewOpen] = useState(false);
 
   const [sortConfig, setSortConfig] = useState({ key: 'الرول', direction: 'asc' });
   const [visibleCols, setVisibleCols] = useState({
@@ -543,6 +545,12 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
               <Scale className="w-3.5 h-3.5" /> تسجيل أحكام
             </button>
             <button
+              onClick={() => setIsPrintViewOpen(true)}
+              className="flex items-center gap-1 bg-slate-800 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-slate-900 transition"
+            >
+              <FileText className="w-3.5 h-3.5" /> استخراج شهادات
+            </button>
+            <button
               onClick={() => setIsBulkProcedureOpen(true)}
               className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-indigo-700 transition"
             >
@@ -889,6 +897,14 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
         sessionDate={date}
         isJudgmentRoll={true}
       />
+
+      {isPrintViewOpen && (
+        <GlobalTemplatePrintModal
+          cases={filteredCases.filter(c => selectedIds.has(c.id))}
+          sessionDate={date}
+          onClose={() => setIsPrintViewOpen(false)}
+        />
+      )}
     </div>
   );
 }

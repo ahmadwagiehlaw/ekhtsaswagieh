@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { BarChart2, Printer, Search, FileText, Calendar, Filter, Download } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { formatDateString } from '../utils/dateUtils';
+import SmartDocumentsTab from '../components/SmartDocumentsTab';
 
 export default function Reports() {
   const { cases, settings } = useAppContext();
   
+  const [activeTab, setActiveTab] = useState('documents');
   const [reportType, setReportType] = useState('memos'); // 'memos', 'judgments', 'prep'
   const [targetMonth, setTargetMonth] = useState(new Date().getMonth() + 1);
   const [targetYear, setTargetYear] = useState(new Date().getFullYear());
@@ -142,8 +144,23 @@ export default function Reports() {
   return (
     <div className="space-y-4 animate-fade-in pb-20">
       
+      <div className="flex bg-slate-200/50 p-1 rounded-xl mb-2 no-print w-fit border border-slate-200">
+        <button onClick={() => setActiveTab('documents')} className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 ${activeTab === 'documents' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+          <FileText className="w-4 h-4" /> محرك الوثائق الذكي
+        </button>
+        <button onClick={() => setActiveTab('stats')} className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 ${activeTab === 'stats' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+          <BarChart2 className="w-4 h-4" /> التقارير والإحصائيات
+        </button>
+      </div>
+
+      {activeTab === 'documents' ? (
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <SmartDocumentsTab />
+        </div>
+      ) : (
+      <>
       {/* Controls Section (Hidden in Print) */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200 no-print">
+      <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200 no-print animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div className="flex items-center gap-4 mb-6">
            <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center">
               <BarChart2 className="w-6 h-6 text-indigo-600" />
@@ -347,6 +364,8 @@ export default function Reports() {
            </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

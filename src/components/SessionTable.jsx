@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, X, Upload, Edit3, Gavel, Settings2, Copy, Maximize2, CheckSquare, Square, Save, CopyPlus, RefreshCcw, Search, Settings, Plus, Trash2 } from 'lucide-react';
+import { Check, X, Upload, Edit3, Gavel, Settings2, Copy, Maximize2, CheckSquare, Square, Save, CopyPlus, RefreshCcw, Search, Settings, Plus, Trash2, FileText } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { uploadToR2 } from '../lib/r2';
 import QuickEditCaseModal from './QuickEditCaseModal';
+import GlobalTemplatePrintModal from './GlobalTemplatePrintModal';
 
 const ALL_COLUMNS = [
   { id: 'الرول', label: 'الرول', defaultVisible: true },
@@ -56,6 +57,7 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
   const defaultDecisions = settings?.decisions || PREDEFINED_DECISIONS;
   const [isManageDecisionsOpen, setIsManageDecisionsOpen] = useState(false);
   const [newDecisionOption, setNewDecisionOption] = useState('');
+  const [isPrintViewOpen, setIsPrintViewOpen] = useState(false);
 
   // View state
   const [filterDecision, setFilterDecision] = useState(null); // 'للحكم' or null
@@ -515,6 +517,13 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
               >
                 {isBulkSaving ? 'جاري الحفظ...' : <><Save className="w-4 h-4" /> تطبيق التحديث</>}
               </button>
+              <div className="w-px h-6 bg-indigo-200 mx-1"></div>
+              <button
+                onClick={() => setIsPrintViewOpen(true)}
+                className="flex items-center gap-1 bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition"
+              >
+                <FileText className="w-3.5 h-3.5" /> استخراج شهادات
+              </button>
             </div>
           </div>
           
@@ -834,6 +843,14 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
           isOpen={!!quickEditCaseId} 
           onClose={() => setQuickEditCaseId(null)} 
           caseData={dayCases.find(c => c.id === quickEditCaseId)} 
+        />
+      )}
+
+      {isPrintViewOpen && (
+        <GlobalTemplatePrintModal
+          cases={filteredCases.filter(c => selectedCaseIds.has(c.id))}
+          sessionDate={date}
+          onClose={() => setIsPrintViewOpen(false)}
         />
       )}
 
