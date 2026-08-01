@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, TrendingUp, Users, CalendarDays, AlertTriangle, Building2, Scale, Info, PieChart, ClipboardList, CheckCircle2, ChevronLeft, CalendarPlus, Activity, Sparkles } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { getSafeDateObj } from '../utils/dateUtils';
+import { calculateDashboardStats } from '../utils/statsUtils';
 import { useUI } from '../context/UIContext';
 import AdvancedSearchModal from '../components/AdvancedSearchModal';
 import BulkAssignTaskModal from '../components/BulkAssignTaskModal';
@@ -16,149 +17,7 @@ export default function Dashboard() {
   const [isGlobalTaskModalOpen, setIsGlobalTaskModalOpen] = useState(false);
   const [adminTasksTab, setAdminTasksTab] = useState('pending'); // 'pending' or 'completed'
 
-  const stats = useMemo(() => {
-    let appellantCount = 0;
-    let appelleeCount = 0;
-
-    let judgedCount = 0; // المحكوم فيه
-    let reservedCount = 0; // محجوز للحكم
-    let ongoingCount = 0; // متداول
-
-    let noInterestCount = 0; // لا شأن
-    let outOfJurisdictionCount = 0; // خارج الاختصاص
-
-    let activeThisMonth = 0;
-    let alerts = [];
-
-    const opponentsCount = {}; // For Appellant cases only
-    const yearCount = {};
-    const judgmentsCount = {}; // For Judgment Classification
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
-
-    cases.forEach(c => {
-      const role = String(c['الصفة'] || c['صفة'] || '').trim();
-      
-      if (role === 'لا شأن') noInterestCount++;
-      if (role === 'خارج الاختصاص') outOfJurisdictionCount++;
-      
-      // Ignore these two types from all dashboard statistics
-      if (role === 'لا شأن' || role === 'خارج الاختصاص') return;
-
-      const appRole = settings?.roles?.[0] || 'طاعن';
-      const isAppellant = role.includes(appRole) || role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
-      const apeRole = settings?.roles?.[1] || 'مطعون ضدنا';
-      const isAppellee = role.includes(apeRole) || role.includes('مطعون ضده') || role.includes('مطعون ضدنا') || role.includes('مستأنف ضده') || role.includes('مدعى عليه') || role.includes('مدعى علينا');
-
-      const lastSessionStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'] || '';
-      const lastSessionDate = getSafeDateObj(lastSessionStr);
-
-      let isOngoingForEntity = false;
-      if (lastSessionDate) {
-        if (lastSessionDate >= today || (lastSessionDate.getMonth() === currentMonth && lastSessionDate.getFullYear() === currentYear)) {
-          isOngoingForEntity = true;
-        }
-      }
-
-      if (isOngoingForEntity) {
-        if (isAppellant) appellantCount++;
-        if (isAppellee) appelleeCount++;
-      }
-
-      const year = c['السنة'] || c['سنة'] || c['year'] || 'غير محدد';
-      yearCount[year] = (yearCount[year] || 0) + 1;
-
-      const decision = String(c['القرار'] || c['قرار الجلسة'] || c['المنطوق'] || '');
-
-      // Status Logic
-      const hasHukm = decision.includes('حكم') || decision.includes('للحكم');
-      if (hasHukm && lastSessionDate) {
-        if (lastSessionDate < today) {
-          judgedCount++;
-        } else {
-          reservedCount++;
-        }
-      } else {
-        ongoingCount++;
-      }
-
-      // Active this month
-      if (lastSessionDate) {
-        if (lastSessionDate.getMonth() === currentMonth && lastSessionDate.getFullYear() === currentYear) {
-          if (!hasHukm || (hasHukm && lastSessionDate >= today)) {
-            activeThisMonth++;
-          }
-        }
-
-        // Alerts Engine
-        if (decision.includes('وقف جزائي') && lastSessionDate) {
-          const diffTime = Math.abs(today - lastSessionDate);
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-          if (diffDays >= 30 && diffDays <= 45) {
-            alerts.push({
-              type: 'critical_suspension',
-              case: c,
-              daysPassed: diffDays,
-              daysLeft: 45 - diffDays
-            });
-          }
-        }
-      }
-
-      // Entities
-      if (isAppellant) {
-        let entity = String(c['المدعي'] || c['الطاعن'] || c['المستأنف'] || 'غير محدد').trim();
-        if (entity) {
-          opponentsCount[entity] = (opponentsCount[entity] || 0) + 1;
-        }
-      }
-
-      // Judgments
-      const decisionText = decision.toLowerCase();
-      if (decisionText) {
-        if (decisionText.includes('وقف')) {
-          judgmentsCount['وقف'] = (judgmentsCount['وقف'] || 0) + 1;
-        } else if (decisionText.includes('كأن لم') || decisionText.includes('اعتبار') || decisionText.includes('شطب') || decisionText.includes('ترك')) {
-          judgmentsCount['شطب وكأن لم يكن'] = (judgmentsCount['شطب وكأن لم يكن'] || 0) + 1;
-        } else if (decisionText.includes('عدم قبول')) {
-          judgmentsCount['عدم قبول'] = (judgmentsCount['عدم قبول'] || 0) + 1;
-        } else if (decisionText.includes('رفض')) {
-          judgmentsCount['رفض'] = (judgmentsCount['رفض'] || 0) + 1;
-        } else if (decisionText.includes('إلغاء') || decisionText.includes('قبول')) {
-          judgmentsCount['قبول / إلغاء'] = (judgmentsCount['قبول / إلغاء'] || 0) + 1;
-        } else if (decisionText.includes('إحالة')) {
-          judgmentsCount['إحالة'] = (judgmentsCount['إحالة'] || 0) + 1;
-        } else {
-          judgmentsCount['أخرى'] = (judgmentsCount['أخرى'] || 0) + 1;
-        }
-      }
-    });
-
-    const topYears = Object.entries(yearCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
-    const topOpponents = Object.entries(opponentsCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
-    const topJudgments = Object.entries(judgmentsCount).sort((a, b) => b[1] - a[1]);
-
-    return {
-      all: cases.length,
-      netTotal: cases.length - noInterestCount - outOfJurisdictionCount,
-      noInterest: noInterestCount,
-      outOfJurisdiction: outOfJurisdictionCount,
-      appellant: appellantCount,
-      appellee: appelleeCount,
-      judged: judgedCount,
-      reserved: reservedCount,
-      ongoing: ongoingCount,
-      activeThisMonth,
-      topOpponents,
-      topYears,
-      topJudgments,
-      alerts
-    };
-  }, [cases]);
+  const stats = useMemo(() => calculateDashboardStats(cases, settings), [cases, settings]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -351,37 +210,59 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 pb-20">
 
-      {/* Search Header Hero */}
-      <div className="bg-navy-900 rounded-3xl p-6 sm:p-10 text-center shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl translate-x-10 -translate-y-10"></div>
-        <div className="absolute bottom-0 left-0 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl -translate-x-10 translate-y-10"></div>
+      {/* Compact Search Header */}
+      <div className="bg-navy-900 rounded-3xl p-4 sm:p-6 text-center shadow-lg relative overflow-hidden flex flex-col items-center justify-center">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl translate-x-10 -translate-y-10 pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl -translate-x-10 translate-y-10 pointer-events-none"></div>
 
-        <div className="relative z-10 space-y-6 max-w-xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl font-black text-white"> البحث العام</h2>
-          <p className="text-sm font-bold text-slate-300">ابحث برقم الدعوى، الخصم، أو السنة للوصول السريع</p>
-
+        <div className="relative z-10 w-full max-w-2xl mx-auto space-y-4">
           <form onSubmit={handleSearch} className="relative">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ابحث هنا..."
-              className="w-full bg-white/10 text-white placeholder-slate-400 border-2 border-white/20 rounded-2xl py-4 pl-14 pr-24 text-lg font-bold focus:outline-none focus:border-amber-400 focus:bg-white/20 transition-all backdrop-blur-sm"
+              placeholder="ابحث برقم الدعوى أو الخصم..."
+              className="w-full bg-white/10 text-white placeholder-slate-400 border-2 border-white/20 rounded-2xl py-3 pl-14 pr-14 text-sm font-bold focus:outline-none focus:border-amber-400 focus:bg-white/20 transition-all backdrop-blur-sm"
             />
             
-            <button 
-              type="button" 
-              onClick={() => setIsAdvancedSearchOpen(true)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-amber-300 hover:bg-white/20 transition"
-              title="بحث متقدم (ذكي)"
-            >
-              <Sparkles className="w-5 h-5" />
-            </button>
-
-            <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white hover:bg-amber-600 transition">
+            <button type="submit" className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white hover:bg-amber-600 transition">
               <Search className="w-5 h-5" />
             </button>
           </form>
+
+          {/* Quick Filters */}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button 
+              onClick={() => setIsAdvancedSearchOpen(true)}
+              className="bg-white/10 hover:bg-white/20 text-amber-300 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-white/10"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> بحث ذكي
+            </button>
+            <button 
+              onClick={() => {
+                navigate(`/files?q=${new Date().getFullYear()}`);
+              }}
+              className="bg-white/5 hover:bg-white/10 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-bold transition border border-white/5"
+            >
+              سنة {new Date().getFullYear()}
+            </button>
+            <button 
+              onClick={() => {
+                navigate(`/files?role=appellant`);
+              }}
+              className="bg-white/5 hover:bg-white/10 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-bold transition border border-white/5"
+            >
+              قضايا {settings?.roles?.[0] || 'الطاعنين'}
+            </button>
+            <button 
+              onClick={() => {
+                navigate(`/files?q=وقف`);
+              }}
+              className="bg-white/5 hover:bg-white/10 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-bold transition border border-white/5"
+            >
+              موقوفة
+            </button>
+          </div>
         </div>
       </div>
 
@@ -396,18 +277,18 @@ export default function Dashboard() {
               <div>
                 <h3 className="font-black text-rose-900 mb-1">تنبيهات هامة!</h3>
                 <p className="text-xs font-bold text-rose-700 leading-relaxed mb-3">
-                  تنبيه عاجل: قضايا صدر فيها قرار "وقف جزائي" ومر عليها أكثر من 30 يوماً! يرجى التعجيل فوراً قبل انقضاء مهلة الـ 45 يوماً.
+                  توجد مواعيد إجرائية هامة اقتربت أو انتهت يرجى الانتباه لها:
                 </p>
                 <div className="flex flex-col gap-2">
-                  {stats.alerts.map(a => (
+                  {stats.alerts.map((a, i) => (
                     <button
-                      key={a.case.id}
+                      key={`${a.case.id}-${i}`}
                       onClick={() => navigate(`/case/${a.case.id}`)}
-                      className="bg-white border border-rose-200 text-rose-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-rose-100 transition shadow-sm text-right flex justify-between items-center"
+                      className="bg-white border border-rose-200 text-rose-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-rose-100 transition shadow-sm text-right flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2"
                     >
-                      <span>رقم {a.case['رقم الدعوى'] || a.case.id}</span>
-                      <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full">
-                        مر {a.daysPassed} يوم (باقي {a.daysLeft} أيام)
+                      <span>رقم {a.case['رقم الدعوى'] || a.case.id} <span className="opacity-70 mx-1">|</span> {a.ruleName || 'تنبيه'}</span>
+                      <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full whitespace-nowrap">
+                        مر {a.daysPassed} يوم (باقي {a.daysLeft} يوم)
                       </span>
                     </button>
                   ))}

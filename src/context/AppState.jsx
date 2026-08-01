@@ -1,19 +1,21 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onSnapshot, setDoc, doc, writeBatch, getDocs, deleteDoc } from 'firebase/firestore';
-import { db, SETTINGS_DOC_REF, SCHEMA_DOC_REF, CASES_COLLECTION_REF, ROLLS_COLLECTION_REF, LEGACY_MAIN_DOC_REF, TASKS_COLLECTION_REF } from '../lib/firebase';
+import { db, getSettingsRef, getSchemaRef, getCasesRef, getRollsRef, getTasksRef } from '../lib/firebase';
+import { useAuth } from './AuthContext';
 
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
+  const { userData, currentUser, logout } = useAuth();
+  
   const [cases, setCases] = useState([]);
   const [deletedCases, setDeletedCases] = useState([]);
   const [rolls, setRolls] = useState([]);
   const [globalTasks, setGlobalTasks] = useState([]);
   const [schema, setSchema] = useState([]);
-  const [settings, setSettings] = useState({ 
+  
+  const defaultSettings = { 
     consultantName: "أحمد وجيه", 
-    adminPassword: "444",
-    employees: [],
     decisions: ['للحكم', 'تصريح', 'للإطلاع', 'للإعلان', 'آخر أجل', 'للمستندات', 'للمذكرات', 'لورود التقرير', 'استبعاد', 'لتنفيذ قرار الإعادة'],
     judgmentCategories: ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي'],
     judgmentClassifications: ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء'],
@@ -22,15 +24,36 @@ export const AppProvider = ({ children }) => {
       'اعتبار': 'اعتبار الدعوى كأن لم تكن',
       'رفض': 'بقبول الدعوي شكلا ورفضها موضوعا وإلزام رافعها المصروفات'
     }
-  });
-  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('isAdmin') === 'true');
-  const [isEmployee, setIsEmployee] = useState(() => localStorage.getItem('isEmployee') === 'true');
-  const [currentUser, setCurrentUser] = useState(() => localStorage.getItem('currentUser') || '');
-  const [currentUserPermissions, setCurrentPermissions] = useState(null);
+  };
+  
+  const [settings, setSettings] = useState(defaultSettings);
   const [loading, setLoading] = useState(true);
 
+  const tenantId = userData?.tenantId;
+  const isAdmin = userData?.role === 'super_admin' || userData?.role === 'consultant';
+  const isEmployee = userData?.role === 'employee';
+
+  const currentUserPermissions = {
+    canEditData: isAdmin || isEmployee,
+    canDeleteData: isAdmin || isEmployee,
+    canManageRolls: isAdmin || isEmployee,
+    canManageTasks: isAdmin || isEmployee
+  };
+
   useEffect(() => {
-    const unsubCases = onSnapshot(CASES_COLLECTION_REF, (snapshot) => {
+    if (!tenantId) {
+      setCases([]);
+      setDeletedCases([]);
+      setRolls([]);
+      setGlobalTasks([]);
+      setSchema([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
+    const unsubCases = onSnapshot(getCasesRef(tenantId), (snapshot) => {
       const casesData = [];
       const deletedData = [];
       snapshot.forEach(doc => {
@@ -46,13 +69,11 @@ export const AppProvider = ({ children }) => {
       setLoading(false);
     });
 
-    // 2. Listen to dynamic schema
-    const unsubSchema = onSnapshot(SCHEMA_DOC_REF, (docSnap) => {
+    const unsubSchema = onSnapshot(getSchemaRef(tenantId), (docSnap) => {
       if (docSnap.exists() && docSnap.data().fields) {
         const obsoleteFields = ['الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي'];
         let cleanSchema = docSnap.data().fields.filter(f => !obsoleteFields.includes(f.id));
         
-        // Ensure essential fields exist
         const essentialFields = [
           { id: 'تصنيف الدعوى', label: 'تصنيف الدعوى', type: 'text', visible: true },
           { id: 'موضوع الدعوى', label: 'موضوع الدعوى', type: 'textarea', visible: true },
@@ -70,7 +91,6 @@ export const AppProvider = ({ children }) => {
 
         setSchema(cleanSchema);
       } else {
-        // Default schema if none exists
         setSchema([
           { id: 'رقم الدعوى', label: 'رقم الدعوى', type: 'text', visible: true, primary: true },
           { id: 'السنة', label: 'السنة', type: 'text', visible: true, primary: true },
@@ -90,8 +110,7 @@ export const AppProvider = ({ children }) => {
       }
     });
 
-    // 3. Listen to settings
-    const unsubSettings = onSnapshot(SETTINGS_DOC_REF, (docSnap) => {
+    const unsubSettings = onSnapshot(getSettingsRef(tenantId), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setSettings(prev => ({ ...prev, ...data }));
@@ -101,19 +120,16 @@ export const AppProvider = ({ children }) => {
       }
     });
 
-    // 4. Listen to rolls
-    const unsubRolls = onSnapshot(ROLLS_COLLECTION_REF, (snapshot) => {
+    const unsubRolls = onSnapshot(getRollsRef(tenantId), (snapshot) => {
       const rollsData = [];
       snapshot.forEach(doc => {
         rollsData.push({ id: doc.id, ...doc.data() });
       });
-      // Sort rolls by date descending
       rollsData.sort((a, b) => new Date(b.date) - new Date(a.date));
       setRolls(rollsData);
     });
 
-    // 5. Listen to global tasks
-    const unsubTasks = onSnapshot(TASKS_COLLECTION_REF, (snapshot) => {
+    const unsubTasks = onSnapshot(getTasksRef(tenantId), (snapshot) => {
       const tasksData = [];
       snapshot.forEach(doc => {
         tasksData.push({ id: doc.id, ...doc.data() });
@@ -129,77 +145,10 @@ export const AppProvider = ({ children }) => {
       unsubRolls();
       unsubTasks();
     };
-  }, []);
-
-  // Validate employee session and set permissions
-  useEffect(() => {
-    if (isAdmin) {
-      setCurrentPermissions({
-        canEditData: true,
-        canDeleteData: true,
-        canManageRolls: true,
-        canManageTasks: true
-      });
-      return;
-    }
-
-    if (isEmployee && settings?.employees) {
-      const storedPassword = localStorage.getItem('employeePassword');
-      const storedName = localStorage.getItem('currentUser');
-      
-      const employee = settings.employees.find(emp => emp.name === storedName && emp.password === storedPassword);
-      
-      if (!employee && storedName) {
-        // Password changed or employee deleted, force logout
-        logoutAdmin();
-      } else if (employee) {
-        // Set permissions based on employee settings
-        setCurrentPermissions(employee.permissions || {
-          canEditData: true,
-          canDeleteData: true,
-          canManageRolls: true,
-          canManageTasks: true
-        });
-      }
-    }
-  }, [settings?.employees, isEmployee, isAdmin]);
-
-  const loginAdmin = (password) => {
-    if (password === 'a4450422') {
-      setIsAdmin(true);
-      setIsEmployee(false);
-      setCurrentUser('المدير');
-      localStorage.setItem('isAdmin', 'true');
-      localStorage.setItem('isEmployee', 'false');
-      localStorage.setItem('currentUser', 'المدير');
-      return true;
-    }
-
-    // Check employee
-    const employee = settings.employees?.find(emp => emp.password === password);
-    if (employee) {
-      setIsAdmin(false);
-      setIsEmployee(true);
-      setCurrentUser(employee.name);
-      localStorage.setItem('isAdmin', 'false');
-      localStorage.setItem('isEmployee', 'true');
-      localStorage.setItem('currentUser', employee.name);
-      localStorage.setItem('employeePassword', password);
-      return true;
-    }
-    
-    return false;
-  };
+  }, [tenantId]);
 
   const logoutAdmin = () => {
-    setIsAdmin(false);
-    setIsEmployee(false);
-    setCurrentUser('');
-    localStorage.removeItem('isAdmin');
-    localStorage.removeItem('isEmployee');
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('employeePassword');
-    setCurrentPermissions(null);
+    logout();
   };
 
   const sanitizeId = (str) => String(str).replace(/[\/\\?%*:|"<>\s]/g, '_');
@@ -215,9 +164,10 @@ export const AppProvider = ({ children }) => {
   };
 
   const saveCaseToFirebase = async (caseId, caseData) => {
+    if (!tenantId) return false;
     try {
       const safeId = sanitizeId(caseId);
-      const caseRef = doc(CASES_COLLECTION_REF, safeId);
+      const caseRef = doc(getCasesRef(tenantId), safeId);
       const dataToSave = cleanUndefined({ ...caseData, updatedAt: new Date().toISOString() });
       delete dataToSave.id; 
       await setDoc(caseRef, dataToSave, { merge: true });
@@ -261,12 +211,13 @@ export const AppProvider = ({ children }) => {
   };
 
   const deleteCaseFromFirebase = async (caseId, permanent = false) => {
+    if (!tenantId) return false;
     try {
       const safeId = sanitizeId(caseId);
       if (permanent) {
-        await deleteDoc(doc(CASES_COLLECTION_REF, safeId));
+        await deleteDoc(doc(getCasesRef(tenantId), safeId));
       } else {
-        await setDoc(doc(CASES_COLLECTION_REF, safeId), { 
+        await setDoc(doc(getCasesRef(tenantId), safeId), { 
           isDeleted: true, 
           deletedAt: new Date().toISOString() 
         }, { merge: true });
@@ -279,9 +230,10 @@ export const AppProvider = ({ children }) => {
   };
 
   const restoreCaseFromFirebase = async (caseId) => {
+    if (!tenantId) return false;
     try {
       const safeId = sanitizeId(caseId);
-      await setDoc(doc(CASES_COLLECTION_REF, safeId), { 
+      await setDoc(doc(getCasesRef(tenantId), safeId), { 
         isDeleted: false,
         deletedAt: null
       }, { merge: true });
@@ -292,8 +244,8 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Helper for excel sync
   const saveBatchCasesToFirebase = async (casesArray) => {
+    if (!tenantId) return false;
     try {
       const chunkArray = (arr, size) => arr.length ? [arr.slice(0, size), ...chunkArray(arr.slice(size), size)] : [];
       const batches = chunkArray(casesArray, 490);
@@ -303,7 +255,7 @@ export const AppProvider = ({ children }) => {
         batchCases.forEach(c => {
           const rawId = c.id || `${c['رقم الدعوى'] || 'unk'}-${c['السنة'] || 'unk'}`;
           const safeId = sanitizeId(rawId);
-          const caseRef = doc(CASES_COLLECTION_REF, safeId);
+          const caseRef = doc(getCasesRef(tenantId), safeId);
           const dataToSave = cleanUndefined({ ...c });
           delete dataToSave.id;
           batch.set(caseRef, dataToSave, { merge: true });
@@ -318,8 +270,9 @@ export const AppProvider = ({ children }) => {
   };
 
   const saveSchemaToFirebase = async (newSchema) => {
+    if (!tenantId) return false;
     try {
-      await setDoc(SCHEMA_DOC_REF, { fields: newSchema }, { merge: true });
+      await setDoc(getSchemaRef(tenantId), { fields: newSchema }, { merge: true });
       return true;
     } catch (error) {
       console.error("Schema save error:", error);
@@ -328,8 +281,9 @@ export const AppProvider = ({ children }) => {
   };
 
   const saveSettingsToFirebase = async (newSettings) => {
+    if (!tenantId) return false;
     try {
-      await setDoc(SETTINGS_DOC_REF, newSettings, { merge: true });
+      await setDoc(getSettingsRef(tenantId), newSettings, { merge: true });
       return true;
     } catch (error) {
       console.error("Settings save error:", error);
@@ -337,11 +291,10 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Factory Reset (Admin only)
   const deleteAllCases = async () => {
+    if (!tenantId) return false;
     try {
-      const { deleteDoc } = await import('firebase/firestore');
-      const snapshot = await getDocs(CASES_COLLECTION_REF);
+      const snapshot = await getDocs(getCasesRef(tenantId));
       const batch = writeBatch(db);
       
       snapshot.docs.forEach((docSnap) => {
@@ -357,8 +310,9 @@ export const AppProvider = ({ children }) => {
   };
 
   const saveRollToFirebase = async (id, data) => {
+    if (!tenantId) return false;
     try {
-      await setDoc(doc(ROLLS_COLLECTION_REF, id), data, { merge: true });
+      await setDoc(doc(getRollsRef(tenantId), id), data, { merge: true });
     } catch (e) {
       console.error(e);
       throw e;
@@ -366,8 +320,9 @@ export const AppProvider = ({ children }) => {
   };
 
   const deleteRollFromFirebase = async (id) => {
+    if (!tenantId) return false;
     try {
-      await deleteDoc(doc(ROLLS_COLLECTION_REF, id));
+      await deleteDoc(doc(getRollsRef(tenantId), id));
     } catch (e) {
       console.error(e);
       throw e;
@@ -375,8 +330,9 @@ export const AppProvider = ({ children }) => {
   };
 
   const saveGlobalTask = async (id, data) => {
+    if (!tenantId) return false;
     try {
-      await setDoc(doc(TASKS_COLLECTION_REF, id), data, { merge: true });
+      await setDoc(doc(getTasksRef(tenantId), id), data, { merge: true });
     } catch (e) {
       console.error(e);
       throw e;
@@ -384,8 +340,9 @@ export const AppProvider = ({ children }) => {
   };
 
   const deleteGlobalTask = async (id) => {
+    if (!tenantId) return false;
     try {
-      await deleteDoc(doc(TASKS_COLLECTION_REF, id));
+      await deleteDoc(doc(getTasksRef(tenantId), id));
     } catch (e) {
       console.error(e);
       throw e;
@@ -401,10 +358,9 @@ export const AppProvider = ({ children }) => {
       settings,
       isAdmin,
       isEmployee,
-      currentUser,
+      currentUser: currentUser?.email || '',
       currentUserPermissions,
       loading,
-      loginAdmin,
       logoutAdmin,
       saveCaseToFirebase,
       createNewCase,

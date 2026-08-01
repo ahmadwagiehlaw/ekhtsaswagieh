@@ -1,5 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import { AppProvider, useAppContext } from './context/AppState';
 import { UIProvider } from './context/UIContext';
 import Layout from './components/Layout';
@@ -11,11 +12,14 @@ const Files         = lazy(() => import('./pages/Files'));
 const Agenda        = lazy(() => import('./pages/Agenda'));
 const Settings      = lazy(() => import('./pages/Settings'));
 const CaseDetails   = lazy(() => import('./pages/CaseDetails'));
+const CaseReport    = lazy(() => import('./pages/CaseReport'));
 const RollsLibrary  = lazy(() => import('./pages/RollsLibrary'));
 const Reports       = lazy(() => import('./pages/Reports'));
 const DayRoll       = lazy(() => import('./pages/DayRoll'));
 const Tasks         = lazy(() => import('./pages/Tasks'));
 const Trash         = lazy(() => import('./pages/Trash'));
+const Login         = lazy(() => import('./pages/Login'));
+const SuperAdmin    = lazy(() => import('./pages/SuperAdmin'));
 
 const PageLoader = () => (
   <div className="min-h-[50vh] flex items-center justify-center">
@@ -39,6 +43,7 @@ function AppContent() {
     <BrowserRouter>
       <Suspense fallback={<PageLoader />}>
         <Routes>
+          <Route path="/login" element={<Login />} />
           <Route path="/" element={<Layout />}>
             <Route element={<RequireAuth><Outlet /></RequireAuth>}>
               <Route index element={<Dashboard />} />
@@ -48,7 +53,9 @@ function AppContent() {
               <Route path="tasks" element={<Tasks />} />
               <Route path="trash" element={<Trash />} />
               <Route path="case/:id" element={<CaseDetails />} />
+              <Route path="case/:id/report" element={<CaseReport />} />
               <Route path="reports" element={<Reports />} />
+              <Route path="super-admin" element={<SuperAdmin />} />
             </Route>
             {/* Rolls pages are public */}
             <Route path="rolls" element={<RollsLibrary />} />
@@ -64,12 +71,15 @@ function AppContent() {
 
 function App() {
   return (
-    <AppProvider>
-      <UIProvider>
-        <AppContent />
-      </UIProvider>
-    </AppProvider>
+    <AuthProvider>
+      <AppProvider>
+        <UIProvider>
+          <AppContent />
+        </UIProvider>
+      </AppProvider>
+    </AuthProvider>
   );
 }
 
 export default App;
+

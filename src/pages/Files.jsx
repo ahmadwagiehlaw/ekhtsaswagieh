@@ -10,7 +10,7 @@ import AdvancedSearchModal from '../components/AdvancedSearchModal';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 
 export default function Files() {
-  const { cases, schema, settings, deleteCaseFromFirebase } = useAppContext();
+  const { cases, schema, settings, deleteCaseFromFirebase, saveCaseToFirebase } = useAppContext();
   const { toast, showConfirm } = useUI();
   const navigate = useNavigate();
   const location = useLocation();
@@ -23,6 +23,8 @@ export default function Files() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const [selectedCaseIds, setSelectedCaseIds] = useState([]);
+  const [activeShoba, setActiveShoba] = useState('متداول'); // 'all', 'متداول', 'حفظ'
+  const [quickLocationEditId, setQuickLocationEditId] = useState(null);
 
   // Advanced Search Params
   const [advancedParams, setAdvancedParams] = useState(null);
@@ -105,6 +107,35 @@ export default function Files() {
 
   const filteredCases = useMemo(() => {
     let result = cases;
+
+    // 1. Shoba Filter
+    const archiveLocations = settings?.archiveLocations || ['شعبة الحفظ', 'الحفظ', 'حفظ'];
+    const specialLocations = ['شعبة تحت التحديد', 'تحت التحديد', 'شعبة خاصة', 'خاصة']; // Can be configured later
+    
+    if (activeShoba === 'متداول') {
+      result = result.filter(c => {
+         const loc = String(c['مكان الملف'] || '').trim();
+         const decision = String(c['القرار'] || c['قرار الجلسة'] || c['المنطوق'] || '');
+         const hasJudgment = decision.includes('حكم') || decision.includes('للحكم') || (c.sessions && c.sessions.some(s => s.judgment));
+         
+         // المتداول: ليس مسجلاً كشعبة حفظ ولا شعبة خاصة، وليس به حكم نهائي مسجل
+         return !archiveLocations.includes(loc) && !specialLocations.includes(loc) && !hasJudgment;
+      });
+    } else if (activeShoba === 'تحت_التحديد') {
+      result = result.filter(c => {
+         const loc = String(c['مكان الملف'] || '').trim();
+         return specialLocations.includes(loc);
+      });
+    } else if (activeShoba === 'حفظ') {
+      result = result.filter(c => {
+         const loc = String(c['مكان الملف'] || '').trim();
+         const decision = String(c['القرار'] || c['قرار الجلسة'] || c['المنطوق'] || '');
+         const hasJudgment = decision.includes('حكم') || decision.includes('للحكم') || (c.sessions && c.sessions.some(s => s.judgment));
+         
+         // شعبة الحفظ: مسجل في مكان الملف كحفظ، والأهم أن يكون له حكم
+         return archiveLocations.includes(loc) && hasJudgment;
+      });
+    }
 
     if (roleFilter !== 'all') {
       result = result.filter(c => {
@@ -240,11 +271,11 @@ export default function Files() {
     }
 
     return result;
-  }, [cases, searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly]);
+  }, [cases, searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, activeShoba, settings]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, sortBy]);
+  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, sortBy, activeShoba]);
 
   const getPrimaryValue = (cObj, possibleKeys) => {
     for (let k of possibleKeys) {
@@ -365,6 +396,34 @@ export default function Files() {
         onClose={() => setIsAdvancedSearchOpen(false)}
         onSearch={handleAdvancedSearch}
       />
+
+      {/* Tab bar for Shoba Filtering */}
+      <div className="bg-slate-100 p-1 rounded-2xl flex items-center justify-between mb-4">
+        <button 
+          onClick={() => setActiveShoba('متداول')}
+          className={`flex-1 py-2 text-sm font-black rounded-xl transition ${activeShoba === 'متداول' ? 'bg-white text-indigo-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:bg-white/50'}`}
+        >
+          المتداول
+        </button>
+        <button 
+          onClick={() => setActiveShoba('تحت_التحديد')}
+          className={`flex-1 py-2 text-sm font-black rounded-xl transition ${activeShoba === 'تحت_التحديد' ? 'bg-white text-indigo-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:bg-white/50'}`}
+        >
+          شعبة تحت التحديد
+        </button>
+        <button 
+          onClick={() => setActiveShoba('حفظ')}
+          className={`flex-1 py-2 text-sm font-black rounded-xl transition ${activeShoba === 'حفظ' ? 'bg-white text-indigo-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:bg-white/50'}`}
+        >
+          شعبة الحفظ
+        </button>
+        <button
+          onClick={() => setActiveShoba('all')}
+          className={`flex-1 py-2 text-sm font-black rounded-xl transition ${activeShoba === 'all' ? 'bg-white text-indigo-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:bg-white/50'}`}
+        >
+          الكل
+        </button>
+      </div>
 
       {/* Filter & Actions Bar */}
       <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm sticky top-[76px] z-30 no-print flex flex-col gap-3">
@@ -732,11 +791,13 @@ export default function Files() {
                       <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-black border backdrop-blur-md shadow-sm ${isAppellant ? 'bg-rose-500/90 text-white border-rose-400' : isAppellee ? 'bg-emerald-500/90 text-white border-emerald-400' : 'bg-amber-500/90 text-white border-amber-400'}`}>
                         {role || 'ملف دعوى'}
                       </span>
-                      {fileLocation && (
-                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-white bg-black/50 px-2 py-1 rounded-lg backdrop-blur-md">
-                          <MapPin className="w-3.5 h-3.5" /> {fileLocation}
-                        </div>
-                      )}
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setQuickLocationEditId(c.id); }}
+                        className="flex items-center gap-1.5 text-[10px] font-bold text-white bg-black/50 px-2 py-1 rounded-lg backdrop-blur-md hover:bg-black/70 transition"
+                        title="تغيير مكان الملف"
+                      >
+                        <MapPin className="w-3.5 h-3.5" /> {fileLocation || 'حدد المكان'} <span className="opacity-50 ml-0.5">▼</span>
+                      </button>
                     </div>
                   </div>
                 )}
@@ -766,11 +827,13 @@ export default function Files() {
                             <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-black border ${badgeBgClass}`}>
                               {role || 'ملف دعوى'}
                             </span>
-                            {fileLocation && (
-                              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
-                                <MapPin className="w-3.5 h-3.5" /> {fileLocation}
-                              </div>
-                            )}
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setQuickLocationEditId(c.id); }}
+                              className={`flex items-center gap-1.5 text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-lg border transition hover:bg-slate-100 ${fileLocation ? 'text-slate-500 bg-slate-50 border-slate-100' : 'text-amber-600 bg-amber-50 border-amber-200'}`}
+                              title="تغيير مكان الملف"
+                            >
+                              <MapPin className="w-3.5 h-3.5" /> {fileLocation || 'حدد المكان'} <span className="opacity-50 ml-0.5">▼</span>
+                            </button>
                           </div>
                         )}
                       </div>

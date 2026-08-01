@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, collection } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDpil-ZG7qzutPNK9A04Hrmv4DOXF2RgnA",
@@ -12,13 +13,24 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
 
-// Legacy reference (for migration if needed)
+// ─── Multi-Tenant Dynamic References ────────────────────────────
+// These functions return refs scoped to a specific workspace (tenantId)
+export const getSettingsRef = (tenantId) => doc(db, "tenants", tenantId, "appData", "settings");
+export const getSchemaRef = (tenantId) => doc(db, "tenants", tenantId, "appData", "schema");
+export const getCasesRef = (tenantId) => collection(db, "tenants", tenantId, "cases");
+export const getRollsRef = (tenantId) => collection(db, "tenants", tenantId, "rolls");
+export const getTasksRef = (tenantId) => collection(db, "tenants", tenantId, "tasks");
+
+// ─── Global / Admin References ──────────────────────────────────
+export const USERS_DIRECTORY_REF = collection(db, "users_directory");
+export const INVITES_REF = collection(db, "invites");
+
+// ─── Legacy References (Read-Only for Migration Script) ─────────
 export const LEGACY_MAIN_DOC_REF = doc(db, "appData", "main");
-
-// New Architecture References
-export const SETTINGS_DOC_REF = doc(db, "appData", "settings");
-export const SCHEMA_DOC_REF = doc(db, "appData", "schema");
-export const CASES_COLLECTION_REF = collection(db, "cases");
-export const ROLLS_COLLECTION_REF = collection(db, "rolls");
-export const TASKS_COLLECTION_REF = collection(db, "tasks");
+export const LEGACY_SETTINGS_DOC_REF = doc(db, "appData", "settings");
+export const LEGACY_SCHEMA_DOC_REF = doc(db, "appData", "schema");
+export const LEGACY_CASES_COLLECTION_REF = collection(db, "cases");
+export const LEGACY_ROLLS_COLLECTION_REF = collection(db, "rolls");
+export const LEGACY_TASKS_COLLECTION_REF = collection(db, "tasks");

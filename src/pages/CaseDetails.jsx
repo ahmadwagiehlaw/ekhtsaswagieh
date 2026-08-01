@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2, Bell, AlertTriangle, FileText, ExternalLink, BookOpen, Files, Hash, Paperclip, Scale, Loader2, Plus, Star, MessageSquare } from 'lucide-react';
+import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2, Bell, AlertTriangle, FileText, ExternalLink, BookOpen, Files, Hash, Paperclip, Scale, Loader2, Plus, Star, MessageSquare, Printer } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import AddSessionModal from '../components/AddSessionModal';
@@ -10,6 +10,7 @@ import ProceduresModal from '../components/ProceduresModal';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 import { localizeNumber } from '../utils/numberUtils';
 import { calculateLitigationStage } from '../utils/caseUtils';
+import { calculateDashboardStats } from '../utils/statsUtils';
 import { uploadToR2 } from '../lib/r2';
 import imageCompression from 'browser-image-compression';
 import { useRef } from 'react';
@@ -253,6 +254,9 @@ export default function CaseDetails() {
     textColorClass = 'text-slate-500';
   }
 
+  const caseStats = React.useMemo(() => calculateDashboardStats([caseData], settings), [caseData, settings]);
+  const dynamicAlerts = caseStats.alerts;
+
   const coverImageDoc = (caseData.documents || []).find(doc => doc.type === 'غلاف الملف' && doc.fileType === 'image');
   const coverImageUrl = coverImageDoc ? coverImageDoc.url : null;
 
@@ -354,6 +358,14 @@ export default function CaseDetails() {
           تفاصيل الدعوى
         </div>
 
+        <button 
+          onClick={() => navigate(`/case/${id}/report`)}
+          className="w-10 h-10 ml-2 rounded-xl bg-indigo-50 text-indigo-600 shadow-sm flex items-center justify-center transition hover:bg-indigo-100"
+          title="طباعة التقرير الفردي"
+        >
+          <Printer className="w-5 h-5" />
+        </button>
+
         {(canEditData || canDeleteData) ? (
           isEditing ? (
             <div className="flex gap-2">
@@ -396,6 +408,26 @@ export default function CaseDetails() {
           <div className="w-10 h-10"></div>
         )}
       </div>
+
+      {/* Dynamic Alerts Banner */}
+      {dynamicAlerts.length > 0 && (
+        <div className="mx-4 sm:mx-0 flex flex-col gap-2">
+          {dynamicAlerts.map((alert, idx) => (
+            <div key={idx} className="bg-rose-50 border border-rose-200 rounded-xl p-3 shadow-sm flex items-start gap-3 animate-fade-in relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-12 h-12 bg-rose-500 opacity-5 rounded-bl-full pointer-events-none"></div>
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5 relative z-10" />
+              <div className="relative z-10">
+                <h4 className="font-black text-rose-900 text-sm mb-1">
+                  تنبيه إجرائي: {alert.ruleName}
+                </h4>
+                <p className="text-xs font-bold text-rose-700">
+                  لقد مر {alert.daysPassed} يوم. متبقي {alert.daysLeft} يوم. يرجى الانتباه!
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* HERO CARD - Primary Info */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mx-4 sm:mx-0 relative">

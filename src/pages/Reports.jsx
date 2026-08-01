@@ -203,10 +203,11 @@ export default function Reports() {
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500"
               >
                 <option value="">كل الأحكام</option>
-                <option value="للصالح">للصالح</option>
-                <option value="للضد">للضد</option>
-                <option value="جزئي">جزئي</option>
-                <option value="إجرائي">إجرائي</option>
+                <option value="صالح">صالح</option>
+                <option value="ضد">ضد</option>
+                <option value="غير منه للخصومة">غير منه للخصومة</option>
+                <option value="تمهيدي">تمهيدي</option>
+                <option value="حكم منه للخصومة">حكم منه للخصومة</option>
               </select>
             </div>
           )}
