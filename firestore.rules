@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function hasUserDoc() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/users_directory/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users_directory/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return hasUserDoc() && getUserData().role == 'super_admin';
+    }
+
+    function isConsultant() {
+      return hasUserDoc() && getUserData().role == 'consultant';
+    }
+
+    function hasTenantAccess(tenantId) {
+      return hasUserDoc() && getUserData().tenantId == tenantId;
+    }
+
+    // 1. Multi-Tenant Isolated Data
+    match /tenants/{tenantId}/{document=**} {
+      allow read, write: if hasTenantAccess(tenantId) || isSuperAdmin();
+    }
+
+    // 2. Users Directory
+    match /users_directory/{userId} {
+      // Anyone can read their own data
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Allow consultant/admin to read employee data
+      allow read: if hasUserDoc() && getUserData().tenantId == resource.data.tenantId;
+
+      // Allow consultant/admin to create an employee entry for their own tenant
+      allow create: if (isConsultant() || isSuperAdmin()) 
+                   && request.resource.data.tenantId == getUserData().tenantId;
+
+      // Allow new consultants to create their own entry (when signing up with an invite)
+      // They won't have a role yet in the directory, so we check if they are writing to their own uid
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+
+      // Allow updating own record (or admin)
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 3. Invites Collection
+    match /invites/{code} {
+      // Anyone can read an invite to verify it before signup
+      allow read: if true;
+      
+      // Only Super Admin can create new invites
+      allow create: if isSuperAdmin();
+      
+      // Anyone can update it (to mark as used) ONLY IF they are setting used to true
+      allow update: if request.resource.data.used == true;
+    }
+
+    // 4. Legacy Roots (For Migration Script Only)
+    // Keep these open enough for the super_admin to migrate successfully.
+    match /appData/{document=**} {
+      allow read: if isSuperAdmin();
+      allow write: if isSuperAdmin(); // Allow write just in case
+    }
+    match /cases/{document=**} {
+      allow read: if isSuperAdmin();
+      allow write: if isSuperAdmin(); // Allow write just in case
+    }
+    match /rolls/{document=**} {
+      allow read: if isSuperAdmin();
+      allow write: if isSuperAdmin();
+    }
+    match /tasks/{document=**} {
+      allow read: if isSuperAdmin();
+      allow write: if isSuperAdmin();
+    }
+  }
+}

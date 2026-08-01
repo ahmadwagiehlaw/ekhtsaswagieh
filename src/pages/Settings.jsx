@@ -1,11 +1,15 @@
 import React, { useState, useRef } from 'react';
 import { useAppContext } from '../context/AppState';
-import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList, Scale, Download, FileJson, ArrowUpFromLine, Copy, Clock } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { firebaseConfig, USERS_DIRECTORY_REF } from '../lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList, Scale, Download, FileJson, ArrowUpFromLine, Copy, Clock, Fingerprint } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useUI } from '../context/UIContext';
 
 export default function Settings() {
   const { isAdmin, loginAdmin, logoutAdmin, cases, schema, settings, saveSettingsToFirebase, deleteAllCases, saveBatchCasesToFirebase, saveSchemaToFirebase } = useAppContext();
+  const { userData } = useAuth();
   const { toast, showConfirm, showPrompt } = useUI();
   
   const [password, setPassword] = useState('');
@@ -182,6 +186,41 @@ export default function Settings() {
 
   const handleSaveSettings = async () => {
     setIsProcessing(true);
+    
+    // Create accounts for new employees
+    if (userData?.tenantId) {
+      for (const emp of localEmployees) {
+        if (!emp.username || !emp.password) continue;
+        
+        try {
+          const email = `${emp.username.toLowerCase().trim()}@${userData.tenantId.trim()}.ekhtsas.local`;
+          
+          const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: email,
+              password: emp.password,
+              returnSecureToken: false
+            })
+          });
+          
+          const data = await response.json();
+          if (response.ok && data.localId) {
+            // Write employee role to directory
+            await setDoc(doc(USERS_DIRECTORY_REF, data.localId), {
+              email: email,
+              role: 'employee',
+              tenantId: userData.tenantId,
+              name: emp.name
+            });
+          }
+        } catch (error) {
+          console.error("Error provisioning employee:", error);
+        }
+      }
+    }
+
     await saveSettingsToFirebase({
       ...settings,
       employees: localEmployees,
@@ -857,10 +896,22 @@ export default function Settings() {
 
           {/* Employees Management */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-              <Users className="w-5 h-5 text-emerald-600" />
-              <h3 className="font-black text-sm text-navy-900">إدارة الموظفين والصلاحيات</h3>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-black text-sm text-navy-900">إدارة الموظفين والصلاحيات</h3>
+              </div>
+              {userData?.tenantId && (
+                <div className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-2">
+                  <Fingerprint className="w-4 h-4" />
+                  <span className="text-[10px] font-black">كود المستشار:</span>
+                  <span className="text-sm font-mono font-black tracking-wider">{userData.tenantId}</span>
+                </div>
+              )}
             </div>
+            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+              لإضافة موظف، أدخل اسمه ومعرف الدخول بالإنجليزية (Username). سيتطلب من الموظف إدخال "معرف الدخول" و "كود المستشار" لتسجيل الدخول.
+            </p>
             
             <div className="space-y-3">
               {localEmployees.map((emp, index) => {
@@ -874,6 +925,12 @@ export default function Settings() {
                       setLocalEmployees(newEmp);
                     }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
                     
+                    <input type="text" placeholder="معرف الدخول (مثال: omar)" value={emp.username || ''} onChange={e => {
+                      const newEmp = [...localEmployees];
+                      newEmp[index].username = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                      setLocalEmployees(newEmp);
+                    }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto bg-slate-50" dir="ltr" />
+
                     <input 
                       type="text"
                       list="jobTitlesList"
@@ -947,7 +1004,7 @@ export default function Settings() {
               })}
             </div>
 
-            <button onClick={() => setLocalEmployees([...localEmployees, { name: '', jobTitle: '', password: '', permissions: { canEditData: true, canDeleteData: true, canManageRolls: true, canManageTasks: true } }])} className="w-full border-2 border-dashed border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-2">
+            <button onClick={() => setLocalEmployees([...localEmployees, { name: '', username: '', jobTitle: '', password: '', permissions: { canEditData: true, canDeleteData: true, canManageRolls: true, canManageTasks: true } }])} className="w-full border-2 border-dashed border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-2">
               <Plus className="w-4 h-4"/> إضافة موظف جديد
             </button>
           </div>
