@@ -201,9 +201,7 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
                 placeholder="مثال: رفض الطعن، وقف تنفيذي، إلخ..."
                 className="w-full text-sm font-bold p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition outline-none"
               />
-              <datalist id="jtype-bulk">
-                {Object.keys(settings?.judgmentTextMap || {}).map(t => <option key={t} value={t}>{t}</option>)}
-              </datalist>
+
             </div>
           </div>
 

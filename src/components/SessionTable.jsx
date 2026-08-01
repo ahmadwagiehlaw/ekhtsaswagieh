@@ -20,7 +20,6 @@ const ALL_COLUMNS = [
 ];
 
 // ─── Judgment Data ───────────────────────────────────────────────
-const JUDGMENT_CATEGORIES = ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
 
 const JUDGMENT_TYPES = {
   'حكم منه للخصومة': ['اعتبار كأن لم تكن', 'سقوط الخصومة', 'انقضاء الخصومة', 'شطب'],
@@ -50,13 +49,17 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
   const { showPrompt, toast } = useUI();
   const navigate = useNavigate();
   
+  const typeFahs = settings?.sessionTypes?.[0] || 'فحص';
+  const typeMawdoo = settings?.sessionTypes?.[1] || 'موضوع';
+  const JUDGMENT_CATEGORIES = settings?.judgmentCategories || ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
+
   const defaultDecisions = settings?.decisions || PREDEFINED_DECISIONS;
   const [isManageDecisionsOpen, setIsManageDecisionsOpen] = useState(false);
   const [newDecisionOption, setNewDecisionOption] = useState('');
 
   // View state
   const [filterDecision, setFilterDecision] = useState(null); // 'للحكم' or null
-  const [filterType, setFilterType] = useState(null); // 'فحص', 'موضوع', or null
+  const [filterType, setFilterType] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('الرول');
   const [sortOrder, setSortOrder] = useState('asc');
@@ -79,7 +82,7 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
   const [bulkData, setBulkData] = useState({
     'تاريخ الجلسة': '',
     'القرار': '',
-    'نوع الجلسة': 'فحص'
+    'نوع الجلسة': typeFahs
   });
   const [isBulkSaving, setIsBulkSaving] = useState(false);
 
@@ -164,7 +167,7 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
     const firstSelectedId = Array.from(newSel)[0];
     const firstCase = dayCases.find(c => c.id === firstSelectedId);
     if (firstCase) {
-        setBulkData(prev => ({...prev, 'نوع الجلسة': getFieldValueLocal(firstCase, ['نوع الجلسة']) || 'فحص'}));
+        setBulkData(prev => ({...prev, 'نوع الجلسة': getFieldValueLocal(firstCase, ['نوع الجلسة']) || typeFahs}));
     }
   };
 
@@ -175,7 +178,7 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
       const allIds = new Set(filteredCases.map(c => c.id));
       setSelectedCaseIds(allIds);
       if (filteredCases.length > 0) {
-        setBulkData(prev => ({...prev, 'نوع الجلسة': getFieldValueLocal(filteredCases[0], ['نوع الجلسة']) || 'فحص'}));
+        setBulkData(prev => ({...prev, 'نوع الجلسة': getFieldValueLocal(filteredCases[0], ['نوع الجلسة']) || typeFahs}));
       }
     }
   };
@@ -202,7 +205,7 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
              id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
              date: oldDate,
              decision: payload['القرار'] || getFieldValueLocal(cObj, ['القرار']) || 'بدون قرار',
-             type: getFieldValueLocal(cObj, ['نوع الجلسة']) || 'فحص',
+             type: getFieldValueLocal(cObj, ['نوع الجلسة']) || typeFahs,
              roll: getFieldValueLocal(cObj, ['الرول']) || '',
              notes: getFieldValueLocal(cObj, ['الملاحظات']) || ''
           };
@@ -216,7 +219,7 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
       }
       if (updates.length > 0) {
         await Promise.all(updates);
-        setBulkData({ 'تاريخ الجلسة': '', 'القرار': '', 'نوع الجلسة': 'فحص' });
+        setBulkData({ 'تاريخ الجلسة': '', 'القرار': '', 'نوع الجلسة': typeFahs });
       }
       setSelectedCaseIds(new Set());
     } catch (e) {
@@ -234,7 +237,7 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
     const j = session?.judgment || {};
     setEditData({
       'الرول': getFieldValueLocal(cObj, ['الرول']) || '',
-      'نوع الجلسة': getFieldValueLocal(cObj, ['نوع الجلسة']) || 'فحص',
+      'نوع الجلسة': getFieldValueLocal(cObj, ['نوع الجلسة']) || typeFahs,
       'آخر جلسة': getFieldValueLocal(cObj, ['آخر جلسة', 'تاريخ الجلسة']) || '',
       'القرار': getFieldValueLocal(cObj, ['القرار']) || '',
       'الملاحظات': getFieldValueLocal(cObj, ['الملاحظات']) || '',
@@ -266,7 +269,7 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
         id: Date.now().toString(),
         date: oldDate,
         decision: newData['القرار'] || getFieldValueLocal(cObj, ['القرار']) || 'بدون قرار',
-        type: getFieldValueLocal(cObj, ['نوع الجلسة']) || 'فحص',
+        type: getFieldValueLocal(cObj, ['نوع الجلسة']) || typeFahs,
         roll: getFieldValueLocal(cObj, ['الرول']) || '',
         notes: newData['الملاحظات'] || getFieldValueLocal(cObj, ['الملاحظات']) || ''
       };
@@ -366,7 +369,7 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
       const prevCase = filteredCases[idx - 1];
       setEditData(prev => ({ 
         ...prev, 
-        'نوع الجلسة': getFieldValueLocal(prevCase, ['نوع الجلسة']) || 'فحص',
+        'نوع الجلسة': getFieldValueLocal(prevCase, ['نوع الجلسة']) || typeFahs,
         'آخر جلسة': getFieldValueLocal(prevCase, ['آخر جلسة', 'تاريخ الجلسة']) || '',
         'القرار': getFieldValueLocal(prevCase, ['القرار']) || '',
       }));
@@ -395,16 +398,16 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
           </button>
           <div className="w-px h-5 bg-slate-200 mx-1"></div>
           <button 
-            onClick={() => setFilterType(filterType === 'فحص' ? null : 'فحص')}
-            className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition border ${filterType === 'فحص' ? 'bg-indigo-100 text-indigo-700 border-indigo-200 shadow-inner' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}
+            onClick={() => setFilterType(filterType === typeFahs ? null : typeFahs)}
+            className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition border ${filterType === typeFahs ? 'bg-indigo-100 text-indigo-700 border-indigo-200 shadow-inner' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}
           >
-            فحص
+            {typeFahs}
           </button>
           <button 
-            onClick={() => setFilterType(filterType === 'موضوع' ? null : 'موضوع')}
-            className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition border ${filterType === 'موضوع' ? 'bg-emerald-100 text-emerald-700 border-emerald-200 shadow-inner' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}
+            onClick={() => setFilterType(filterType === typeMawdoo ? null : typeMawdoo)}
+            className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition border ${filterType === typeMawdoo ? 'bg-emerald-100 text-emerald-700 border-emerald-200 shadow-inner' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}
           >
-            موضوع
+            {typeMawdoo}
           </button>
         </div>
 
@@ -474,11 +477,13 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <button 
-                onClick={() => setBulkData({...bulkData, 'نوع الجلسة': bulkData['نوع الجلسة'] === 'فحص' ? 'موضوع' : 'فحص'})}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100"
+                onClick={() => setBulkData({...bulkData, 'نوع الجلسة': bulkData['نوع الجلسة'] === typeFahs ? typeMawdoo : typeFahs})}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100"
               >
-                <RefreshCcw className="w-3 h-3" />
-                {bulkData['نوع الجلسة'] || 'فحص'}
+                <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${bulkData['نوع الجلسة'] === typeMawdoo ? 'bg-indigo-500' : 'bg-slate-300'}`}>
+                  <div className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${bulkData['نوع الجلسة'] === typeMawdoo ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                </div>
+                {bulkData['نوع الجلسة'] || typeFahs}
               </button>
               
               <input 
@@ -637,11 +642,11 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
                     <td className="px-3 py-2.5 text-[10px] font-bold text-slate-700">
                       {isEditing ? (
                          <button 
-                           onClick={() => setEditData({...editData, 'نوع الجلسة': editData['نوع الجلسة'] === 'فحص' ? 'موضوع' : 'فحص'})}
+                           onClick={() => setEditData({...editData, 'نوع الجلسة': editData['نوع الجلسة'] === typeFahs ? typeMawdoo : typeFahs})}
                            className="flex items-center justify-center gap-1 w-full p-1 rounded border border-slate-300 bg-white hover:bg-slate-100 focus:outline-none"
                          >
                            <RefreshCcw className="w-3 h-3 text-slate-400" />
-                           {editData['نوع الجلسة'] || 'فحص'}
+                           {editData['نوع الجلسة'] || typeFahs}
                          </button>
                       ) : (
                         getFieldValueLocal(cObj, ['نوع الجلسة'])

@@ -1,24 +1,31 @@
 // src/utils/caseUtils.js
 
+export const getFieldVal = (data, keys) => {
+  if (!data) return '';
+  for (let k of keys) {
+    if (data[k] !== undefined && data[k] !== null && data[k] !== '') {
+       return data[k];
+    }
+  }
+  return '';
+};
+
 /**
  * Calculates the dynamic litigation stage based on case properties and sessions.
  * @param {Object} caseData - The case object
  * @returns {string} The computed litigation stage
  */
 export const calculateLitigationStage = (caseData) => {
-  // Extract essential fields (considering multiple possible schema keys)
-  const getFieldValue = (data, keys) => {
-    for (let k of keys) {
-      if (data[k] !== undefined && data[k] !== null && data[k] !== '') {
-         return data[k];
-      }
-    }
-    return '';
-  };
 
-  const fileLocation = getFieldValue(caseData, ['مكان الملف']);
-  const decision = getFieldValue(caseData, ['القرار', 'قرار الجلسة', 'المنطوق']);
-  const role = getFieldValue(caseData, ['الصفة', 'صفة']) || '';
+  const fileLocation = getFieldVal(caseData, ['مكان الملف']);
+  const decision = getFieldVal(caseData, ['القرار', 'قرار الجلسة', 'المنطوق']);
+  const judgment = getFieldVal(caseData, ['الحكم', 'منطوق الحكم', 'حكم']);
+  const isFinalJudgment = getFieldVal(caseData, ['نهائي', 'بات', 'حكم نهائي']);
+  
+  // Also check sessions for recent decisions/judgments
+  let hasSessionJudgment = false;
+  let latestSessionDecision = '';
+  const role = getFieldVal(caseData, ['الصفة', 'صفة']) || '';
   
   const isAppellant = role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
   const isAppellee = role.includes('مطعون ضده') || role.includes('مطعون ضدنا') || role.includes('مستأنف ضده') || role.includes('مدعى عليه') || role.includes('مدعى علينا');

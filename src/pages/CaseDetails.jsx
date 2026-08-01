@@ -14,6 +14,7 @@ import { calculateDashboardStats } from '../utils/statsUtils';
 import { uploadToR2 } from '../lib/r2';
 import imageCompression from 'browser-image-compression';
 import { useRef } from 'react';
+import SmartAutocomplete from '../components/SmartAutocomplete';
 
 export default function CaseDetails() {
   const { id } = useParams();
@@ -108,14 +109,6 @@ export default function CaseDetails() {
     if (val === null || val === undefined) return true;
     const s = String(val).trim();
     return s === '' || s === '-' || s === '---' || s === 'لا يوجد' || s === 'لايوجد';
-  };
-
-  const getAutocompleteOptions = (fieldId) => {
-    const values = cases
-      .map(c => c[fieldId])
-      .filter(val => val && typeof val === 'string' && val.trim() !== '')
-      .map(val => val.trim());
-    return [...new Set(values)];
   };
 
   const handleAddUrgentReminder = async (urgentText) => {
@@ -785,6 +778,7 @@ export default function CaseDetails() {
 
                          const roleOptions = settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل'];
                          const sessionTypeOptions = settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة'];
+                         const typeFahs = sessionTypeOptions[0] || 'فحص';
                          const fileLocationOptions = settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي'];
 
                         return (
@@ -860,37 +854,49 @@ export default function CaseDetails() {
                               ) : ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى'].includes(field.id) ? (
                                   <div className="flex items-center gap-2">
                                     <div className="flex-[2]">
-                                      <input type={field.type === 'number' ? 'number' : 'text'} value={val} list={`list-${field.id}`} onChange={(e) => {
-                                          let v = e.target.value;
-                                          if (field.type === 'number') v = v.replace(/[^\d]/g, '');
-                                          setEditData({...editData, [field.id]: v});
-                                      }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
-                                      <datalist id={`list-${field.id}`}>
-                                        {getAutocompleteOptions(field.id).map((opt, i) => <option key={i} value={opt} />)}
-                                      </datalist>
+                                      <SmartAutocomplete
+                                        id={field.id}
+                                        value={val}
+                                        onChange={(v) => {
+                                            let finalV = v;
+                                            if (field.type === 'number') finalV = finalV.replace(/[^\d]/g, '');
+                                            setEditData({...editData, [field.id]: finalV});
+                                        }}
+                                        cases={cases}
+                                        fieldPaths={[field.id]}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition"
+                                      />
                                     </div>
                                     <div className="flex-[1] relative">
                                       <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">السنة</span>
-                                      <input type={schema.find(f => f.id === 'السنة' || f.id === 'سنة' || f.id === 'year')?.type === 'number' ? 'number' : 'text'} value={editData['السنة'] || editData['سنة'] || editData['year'] || ''} list={`list-السنة`} onChange={(e) => {
-                                          let v = e.target.value;
-                                          if (schema.find(f => f.id === 'السنة' || f.id === 'سنة' || f.id === 'year')?.type === 'number') v = v.replace(/[^\d]/g, '');
-                                          setEditData({...editData, ['السنة']: v});
-                                      }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
-                                      <datalist id={`list-السنة`}>
-                                        {getAutocompleteOptions('السنة').map((opt, i) => <option key={i} value={opt} />)}
-                                      </datalist>
+                                      <SmartAutocomplete
+                                        id="السنة"
+                                        value={editData['السنة'] || editData['سنة'] || editData['year'] || ''}
+                                        onChange={(v) => {
+                                            let finalV = v;
+                                            if (schema.find(f => f.id === 'السنة' || f.id === 'سنة' || f.id === 'year')?.type === 'number') finalV = finalV.replace(/[^\d]/g, '');
+                                            setEditData({...editData, ['السنة']: finalV});
+                                        }}
+                                        cases={cases}
+                                        fieldPaths={['السنة', 'سنة', 'year']}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition relative z-0"
+                                      />
                                     </div>
                                   </div>
                               ) : (
                                   <>
-                                    <input type={field.type === 'number' ? 'number' : 'text'} value={val} list={`list-${field.id}`} onChange={(e) => {
-                                        let v = e.target.value;
-                                        if (field.type === 'number') v = v.replace(/[^\d]/g, '');
-                                        setEditData({...editData, [field.id]: v});
-                                    }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
-                                    <datalist id={`list-${field.id}`}>
-                                      {getAutocompleteOptions(field.id).map((opt, i) => <option key={i} value={opt} />)}
-                                    </datalist>
+                                      <SmartAutocomplete
+                                        id={field.id}
+                                        value={val}
+                                        onChange={(v) => {
+                                            let finalV = v;
+                                            if (field.type === 'number') finalV = finalV.replace(/[^\d]/g, '');
+                                            setEditData({...editData, [field.id]: finalV});
+                                        }}
+                                        cases={cases}
+                                        fieldPaths={[field.id]}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition"
+                                      />
                                   </>
                               )
                             ) : ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى'].includes(field.id) ? (
@@ -1074,7 +1080,7 @@ export default function CaseDetails() {
                                  
                                  {/* Type Edit */}
                                  <select
-                                    value={editSessionData.type ?? session.type ?? 'فحص'}
+                                    value={editSessionData.type ?? session.type ?? sessionTypeOptions[0]}
                                     onChange={(e) => setEditSessionData({ ...editSessionData, type: e.target.value })}
                                     className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 focus:outline-none focus:border-emerald-400"
                                  >
@@ -1109,7 +1115,7 @@ export default function CaseDetails() {
                                  
                                  {/* Type View */}
                                  <div className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-1.5 rounded-md border border-emerald-200">
-                                    {session.type || 'فحص'}
+                                    {session.type || sessionTypeOptions[0]}
                                  </div>
                                  
                                  {/* Decision View */}
@@ -1271,7 +1277,7 @@ export default function CaseDetails() {
                         const j = session.judgment || {};
                         
                         const JudgmentEditor = () => {
-                          const initialCat = j.category || j._category || (session.decision?.includes('فحص') ? 'فحص' : '');
+                          const initialCat = j.category || j._category || (session.decision?.includes(sessionTypeOptions[0]) ? sessionTypeOptions[0] : '');
                           const initialRes = j.result || j._result || session.judgmentClassification || '';
                           const initialType = j.type || j._type || session.shortJudgment || '';
                           const initialVerd = j.fullVerdict || j._verdict || session.verdict || '';
@@ -1314,9 +1320,6 @@ export default function CaseDetails() {
 
                           const handleTypeChange = (newType) => {
                             setType(newType);
-                            if (newType && settings?.judgmentTextMap?.[newType]) {
-                               setVerd(settings.judgmentTextMap[newType]);
-                            }
                           };
                           const [saving, setSaving] = React.useState(false);
                           const rc = resColorMap[res] || 'slate';
@@ -1408,9 +1411,7 @@ export default function CaseDetails() {
                                     placeholder="نوع الحكم..."
                                     className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400"
                                   />
-                                  <datalist id={`jtype-${session.id}`}>
-                                    {Object.keys(settings?.judgmentTextMap || {}).map(t => <option key={t} value={t}>{t}</option>)}
-                                  </datalist>
+
                                 </div>
                               </div>
                               <div className="grid grid-cols-2 gap-2 mb-2">

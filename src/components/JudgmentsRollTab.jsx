@@ -24,6 +24,14 @@ const getFieldVal = (obj, keys) => {
   return '';
 };
 
+const isSessionRecorded = (session) => {
+  if (!session) return false;
+  if (session.hasJudgment) return true;
+  if (session.shortJudgment || session.judgmentClassification || session.verdict) return true;
+  if (session.judgment && (session.judgment.type || session.judgment.category || session.judgment.result || session.judgment.fullVerdict || session.judgment._type || session.judgment._category || session.judgment._result || session.judgment._verdict)) return true;
+  return false;
+};
+
 // Clipboard image paste hook
 function usePasteImage(onImage) {
   const handlePaste = useCallback((e) => {
@@ -155,7 +163,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
     return all.filter(c => {
       // Always include if this session already has a judgment
       const session = c.sessions?.find(s => s.date === date);
-      if (session && session.hasJudgment) return true;
+      if (isSessionRecorded(session)) return true;
 
       const decision = getFieldVal(c, ['القرار']);
       return decision.includes('للحكم') || decision.includes('رفض') || decision.includes('حكم');
@@ -167,7 +175,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
   const roles = settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص'];
 
   const [searchQ, setSearchQ] = useState('');
-  const [sessionTypeFilter, setSessionTypeFilter] = useState('الكل');
+  const [sessionTypeFilter, setSessionTypeFilter] = useState('موضوع');
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -232,12 +240,12 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
     if (judgmentFilter === 'recorded') {
       result = result.filter(c => {
          const session = c.sessions?.find(s => s.date === date);
-         return session?.hasJudgment;
+         return isSessionRecorded(session);
       });
     } else if (judgmentFilter === 'unrecorded') {
       result = result.filter(c => {
          const session = c.sessions?.find(s => s.date === date);
-         return !session?.hasJudgment;
+         return !isSessionRecorded(session);
       });
     }
 
@@ -621,7 +629,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                   const isNoInterest = role === 'لا شأن';
                   const session = cObj.sessions?.find(s => s.date === date);
                   const j = session?.judgment || {};
-                  const hasJudgment = session?.hasJudgment;
+                  const hasJudgment = isSessionRecorded(session);
 
                   return (
                     <tr
@@ -718,15 +726,12 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                                 value={editData._type}
                                 onChange={e => {
                                   const v = e.target.value;
-                                  const map = settings?.judgmentTextMap || {};
-                                  setEditData(d => applyDefaultRules('_type', v, { ...d, _type: v, _verdict: map[v] || d._verdict }));
+                                  setEditData(d => applyDefaultRules('_type', v, { ...d, _type: v }));
                                 }}
                                 placeholder="نوع الحكم..."
                                 className="w-full text-[10px] font-bold p-1 rounded border border-rose-200"
                               />
-                              <datalist id={`jtype-${cObj.id}`}>
-                                {Object.keys(settings?.judgmentTextMap || {}).map(t => <option key={t} value={t} />)}
-                              </datalist>
+
                             </div>
                           ) : (
                             <span className="text-[10px] font-bold text-slate-600">{j.type || j._type || session?.shortJudgment || '-'}</span>

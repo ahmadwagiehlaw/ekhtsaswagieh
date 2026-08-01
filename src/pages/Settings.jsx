@@ -37,11 +37,7 @@ export default function Settings() {
   const [localFileLocations, setLocalFileLocations] = useState(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
   const [localCommonProcedures, setLocalCommonProcedures] = useState(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
   const [localCaseClassifications, setLocalCaseClassifications] = useState(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
-  const [localJudgmentTextMap, setLocalJudgmentTextMap] = useState(settings?.judgmentTextMap || {
-    'وقف جزائي': 'وقف الدعوى جزائيا لمدة شهر',
-    'اعتبار': 'اعتبار الدعوى كأن لم تكن',
-    'رفض': 'بقبول الدعوي شكلا ورفضها موضوعا وإلزام رافعها المصروفات'
-  });
+
   const migrateJudgmentRule = (rule) => {
     if (rule.triggerField) {
       return {
@@ -177,11 +173,7 @@ export default function Settings() {
     setLocalCaseClassifications(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
     setLocalJudgmentCategories(settings?.judgmentCategories || ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي']);
     setLocalJudgmentClassifications(settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء']);
-    setLocalJudgmentTextMap(settings?.judgmentTextMap || {
-      'وقف جزائي': 'وقف الدعوى جزائيا لمدة شهر',
-      'اعتبار': 'اعتبار الدعوى كأن لم تكن',
-      'رفض': 'بقبول الدعوي شكلا ورفضها موضوعا وإلزام رافعها المصروفات'
-    });
+
     setLocalDeadlineRules(settings?.deadlineRules || [
       { name: 'الطعن العادي', days: 60, targetRole: 'طاعنين', description: 'ميعاد الطعن العادي 60 يوماً' },
       { name: 'تعجيل من الوقف الجزائي', days: 15, triggerAfterDays: 30, targetRole: 'طاعنين', description: 'يجب التعجيل خلال 15 يوماً بعد مرور شهر من الوقف' }
@@ -241,7 +233,7 @@ export default function Settings() {
       caseClassifications: localCaseClassifications,
       judgmentCategories: localJudgmentCategories,
       judgmentClassifications: localJudgmentClassifications,
-      judgmentTextMap: localJudgmentTextMap,
+
       judgmentDefaults: localJudgmentDefaults,
       deadlineRules: localDeadlineRules
     });
@@ -1318,77 +1310,7 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Judgment Types Management */}
-          <details className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-0">
-<summary className="flex items-center justify-between pb-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-slate-100 transition-colors">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-sky-600" />
-                <h3 className="font-black text-sm text-navy-900"><span className="text-[12px] opacity-70 group-open:hidden ml-1">▼</span><span className="text-[12px] opacity-70 hidden group-open:inline ml-1">▲</span> إدارة أنواع الأحكام (نصوص المنطوق الافتراضية)</h3>
-              </div>
-              <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}><button 
-                onClick={async () => {
-                  const newType = await showPrompt('إضافة نوع حكم', 'أدخل اسم نوع الحكم الجديد (مثال: عدم اختصاص):');
-                  if (newType?.trim() && !localJudgmentTextMap[newType.trim()]) {
-                    const newText = await showPrompt('إضافة نوع حكم', `أدخل المنطوق الافتراضي للحكم '${newType.trim()}':`);
-                    if (newText !== null) {
-                      setLocalJudgmentTextMap({ ...localJudgmentTextMap, [newType.trim()]: newText.trim() });
-                    }
-                  } else if (localJudgmentTextMap[newType?.trim()]) {
-                    toast('نوع الحكم موجود بالفعل', 'error');
-                  }
-                }}
-                className="bg-sky-50 text-sky-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-sky-100"
-              >
-                <Plus className="w-4 h-4"/> إضافة نوع
-              </button></div></summary>
-<div className="pt-2 space-y-4">
-            
-            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
-              قم بإدارة أنواع الأحكام ونصوص المنطوق المرتبطة بها لتسريع إدخال الأحكام. هذه الأنواع ستظهر في قوائم الإكمال التلقائي لنوع الحكم.
-            </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {Object.keys(localJudgmentTextMap).length === 0 && (
-                <div className="col-span-full text-center py-4 bg-slate-50 rounded-xl border border-slate-100 text-slate-400 text-xs font-bold">لا توجد أنواع أحكام مضافة</div>
-              )}
-              {Object.entries(localJudgmentTextMap).map(([typeKey, verdictText], idx) => (
-                <div key={idx} className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col gap-2 hover:border-sky-300 transition group relative">
-                  <div className="flex items-center justify-between">
-                     <span className="text-xs font-bold text-sky-800 bg-sky-100 px-2 py-0.5 rounded-md">{typeKey}</span>
-                     <div className="flex gap-1">
-                        <button 
-                          onClick={async () => {
-                            const newText = await showPrompt('تعديل المنطوق', `قم بتعديل المنطوق الافتراضي لـ '${typeKey}':`, verdictText);
-                            if (newText !== null) {
-                              setLocalJudgmentTextMap({ ...localJudgmentTextMap, [typeKey]: newText });
-                            }
-                          }}
-                          className="text-slate-400 hover:text-sky-600 p-1.5 bg-white rounded-md shadow-sm border border-slate-200 transition"
-                          title="تعديل"
-                        ><Edit3 className="w-3.5 h-3.5"/></button>
-                        <button 
-                          onClick={async () => {
-                            const confirm = await showConfirm('حذف نوع الحكم', `هل أنت متأكد من حذف نوع الحكم '${typeKey}'؟`, 'delete_judgment_type');
-                            if (confirm) {
-                              const newMap = { ...localJudgmentTextMap };
-                              delete newMap[typeKey];
-                              setLocalJudgmentTextMap(newMap);
-                            }
-                          }}
-                          className="text-slate-400 hover:text-rose-600 p-1.5 bg-white rounded-md shadow-sm border border-slate-200 transition"
-                          title="حذف"
-                        ><Trash2 className="w-3.5 h-3.5"/></button>
-                     </div>
-                  </div>
-                  <div className="text-[10px] sm:text-[11px] font-bold text-slate-600 line-clamp-3 leading-relaxed mt-1" title={verdictText}>
-                     {verdictText || <span className="text-slate-400 italic">بدون منطوق</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          
-</div>
-</details>
           {/* Default Judgment Settings Management */}
           <details className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-0">
 <summary className="flex items-center justify-between pb-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-slate-100 transition-colors">
@@ -1409,11 +1331,7 @@ export default function Settings() {
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <datalist id="judgmentTypesSettings">
-                {Object.keys(localJudgmentTextMap).map(typeKey => (
-                  <option key={typeKey} value={typeKey} />
-                ))}
-              </datalist>
+
               {localJudgmentDefaults.map((rule, idx) => {
                 const isExpanded = expandedRules.includes(idx);
                 const toggleExpand = () => setExpandedRules(prev => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]);

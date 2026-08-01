@@ -3,6 +3,7 @@ import { X, Save, Plus } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { useNavigate } from 'react-router-dom';
+import SmartAutocomplete from './SmartAutocomplete';
 
 export default function AddCaseModal({ isOpen, onClose }) {
   const { schema, createNewCase, settings, cases } = useAppContext();
@@ -11,15 +12,6 @@ export default function AddCaseModal({ isOpen, onClose }) {
   const [isSaving, setIsSaving] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(['📌 بيانات أساسية']);
   const navigate = useNavigate();
-
-  const getAutocompleteOptions = (fieldId) => {
-    if (!cases) return [];
-    const values = cases
-      .map(c => c[fieldId])
-      .filter(val => val && typeof val === 'string' && val.trim() !== '')
-      .map(val => val.trim());
-    return [...new Set(values)];
-  };
 
   if (!isOpen) return null;
 
@@ -174,37 +166,46 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                     {['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى'].includes(field.id) ? (
                                        <div className="flex items-center gap-2 mb-2">
                                           <div className="flex-[2] relative">
-                                            <input type={field.type === 'number' ? 'number' : 'text'} value={val} list={`list-add-${field.id}`} onChange={(e) => {
-                                                let v = e.target.value;
-                                                if (field.type === 'number') v = v.replace(/[^\d]/g, '');
-                                                setFormData({...formData, [field.id]: v});
-                                            }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition" />
-                                            <datalist id={`list-add-${field.id}`}>
-                                              {getAutocompleteOptions(field.id).map((opt, i) => <option key={i} value={opt} />)}
-                                            </datalist>
+                                            <SmartAutocomplete
+                                              id={field.id}
+                                              value={val}
+                                              onChange={(v) => {
+                                                  let finalV = v;
+                                                  if (field.type === 'number') finalV = finalV.replace(/[^\d]/g, '');
+                                                  setFormData({...formData, [field.id]: finalV});
+                                              }}
+                                              cases={cases}
+                                              fieldPaths={[field.id]}
+                                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition"
+                                            />
                                           </div>
                                           <div className="flex-[1] relative">
-                                            <span className="absolute -top-6 right-1 text-[10px] font-black text-slate-500">السنة</span>
-                                            <input type={schema.find(f => f.id === 'السنة' || f.id === 'سنة' || f.id === 'year')?.type === 'number' ? 'number' : 'text'} value={formData['السنة'] || formData['سنة'] || formData['year'] || ''} list={`list-add-السنة`} onChange={(e) => {
-                                                let v = e.target.value;
-                                                if (schema.find(f => f.id === 'السنة' || f.id === 'سنة' || f.id === 'year')?.type === 'number') v = v.replace(/[^\d]/g, '');
-                                                setFormData({...formData, ['السنة']: v});
-                                            }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition" />
-                                            <datalist id={`list-add-السنة`}>
-                                              {getAutocompleteOptions('السنة').map((opt, i) => <option key={i} value={opt} />)}
-                                            </datalist>
+                                            <span className="absolute -top-6 right-1 text-[10px] font-black text-slate-500 z-10">السنة</span>
+                                            <SmartAutocomplete
+                                              id="السنة"
+                                              value={formData['السنة'] || formData['سنة'] || formData['year'] || ''}
+                                              onChange={(v) => {
+                                                  let finalV = v;
+                                                  if (schema.find(f => f.id === 'السنة' || f.id === 'سنة' || f.id === 'year')?.type === 'number') finalV = finalV.replace(/[^\d]/g, '');
+                                                  setFormData({...formData, ['السنة']: finalV});
+                                              }}
+                                              cases={cases}
+                                              fieldPaths={['السنة', 'سنة', 'year']}
+                                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition relative z-0"
+                                            />
                                           </div>
                                        </div>
                                     ) : (
-                                       <input 
-                                         type={field.type === 'number' ? 'number' : 'text'}
+                                       <SmartAutocomplete
+                                         id={field.id}
                                          value={val}
-                                         list={`list-add-${field.id}`}
-                                         onChange={(e) => {
-                                             let v = e.target.value;
-                                             if (field.type === 'number') v = v.replace(/[^\d]/g, '');
-                                             setFormData({...formData, [field.id]: v});
+                                         onChange={(v) => {
+                                             let finalV = v;
+                                             if (field.type === 'number') finalV = finalV.replace(/[^\d]/g, '');
+                                             setFormData({...formData, [field.id]: finalV});
                                          }}
+                                         cases={cases}
+                                         fieldPaths={[field.id]}
                                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition"
                                        />
                                     )}

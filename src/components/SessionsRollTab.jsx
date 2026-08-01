@@ -123,7 +123,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
     setEditingId(cObj.id);
     setEditData({
       'الرول': getFieldVal(cObj, ['الرول']) || '',
-      'نوع الجلسة': getFieldVal(cObj, ['نوع الجلسة']) || 'فحص',
+      'نوع الجلسة': getFieldVal(cObj, ['نوع الجلسة']) || typeFahs,
       'آخر جلسة': getFieldVal(cObj, ['آخر جلسة', 'تاريخ الجلسة']) || '',
       'القرار': getFieldVal(cObj, ['القرار']) || session?.decision || '',
       'الملاحظات': getFieldVal(cObj, ['الملاحظات']) || session?.notes || '',
@@ -140,7 +140,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
         id: Date.now().toString(),
         date: oldDate,
         decision: newData['القرار'] || getFieldVal(cObj, ['القرار']) || 'بدون قرار',
-        type: getFieldVal(cObj, ['نوع الجلسة']) || 'فحص',
+        type: getFieldVal(cObj, ['نوع الجلسة']) || typeFahs,
         roll: getFieldVal(cObj, ['الرول']) || '',
         notes: newData['الملاحظات'] || '',
       };
@@ -160,6 +160,8 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
 
   const decisionOptions = settings?.decisions || PREDEFINED_DECISIONS;
   const sessionTypes = settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة'];
+  const typeFahs = sessionTypes[0] || 'فحص';
+  const typeMawdoo = sessionTypes[1] || 'موضوع';
 
   if (!date) {
     return (
@@ -514,7 +516,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                                   const prev = filteredCases[idx - 1];
                                   setTimeout(() => setEditData(d => ({
                                     ...d,
-                                    'نوع الجلسة': getFieldVal(prev, ['نوع الجلسة']) || 'فحص',
+                                    'نوع الجلسة': getFieldVal(prev, ['نوع الجلسة']) || typeFahs,
                                     'آخر جلسة': getFieldVal(prev, ['آخر جلسة', 'تاريخ الجلسة']) || '',
                                     'القرار': getFieldVal(prev, ['القرار']) || '',
                                   })), 0);

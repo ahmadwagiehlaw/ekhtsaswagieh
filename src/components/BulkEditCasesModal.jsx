@@ -205,8 +205,7 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
   const sessionTypeOptions = settings?.sessionTypes || ['موضوع', 'فحص', 'للحكم', 'أول جلسة'];
   const fileLocationOptions = settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي'];
   const decisionOptions = settings?.decisions || ['للحكم', 'تصريح', 'للإطلاع', 'للإعلان', 'آخر أجل'];
-
-  const JUDGMENT_CATEGORIES = ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
+  const JUDGMENT_CATEGORIES = settings?.judgmentCategories || ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
   const JUDGMENT_RESULTS = [
     { value: 'صالح', label: 'صالح' },
     { value: 'ضد', label: 'ضد' },

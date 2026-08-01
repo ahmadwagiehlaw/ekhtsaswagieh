@@ -4,6 +4,7 @@ import { FolderOpen, CalendarDays, Settings, Plus, LayoutDashboard, Scale, Bell,
 import { useAppContext } from '../context/AppState';
 import { useAuth } from '../context/AuthContext';
 import AddCaseModal from './AddCaseModal';
+import NotificationCenter from './NotificationCenter';
 
 export default function Layout() {
   const { settings, isAdmin, currentUserPermissions } = useAppContext();
@@ -107,25 +108,7 @@ export default function Layout() {
           >
             <Search className="w-5 h-5" />
           </button>
-          <button 
-            onClick={() => {
-              if ('Notification' in window) {
-                Notification.requestPermission().then(permission => {
-                  if (permission === 'granted') {
-                    new Notification('اختصاصي', {
-                      body: 'تم تفعيل الإشعارات بنجاح!',
-                      icon: '/icon-192.png'
-                    });
-                  }
-                });
-              }
-            }}
-            className="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-slate-300 hover:text-white"
-            title="الإشعارات"
-          >
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-navy-900"></span>
-          </button>
+          <NotificationCenter />
         </div>
       </header>
 

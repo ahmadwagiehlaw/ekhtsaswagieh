@@ -13,11 +13,15 @@ export default function RollsLibrary() {
   const { toast, showConfirm } = useUI();
   
   const rollTypes = settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام'];
+  const sessionTypes = settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة'];
+  const baseTypeDefault = rollTypes[0] || 'رول جلسة';
+  const typeFahs = sessionTypes[0] || 'فحص';
+  const typeMawdoo = sessionTypes[1] || 'موضوع';
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [rollDate, setRollDate] = useState('');
-  const [baseType, setBaseType] = useState('رول جلسة');
-  const [circuitType, setCircuitType] = useState('فحص');
+  const [baseType, setBaseType] = useState(baseTypeDefault);
+  const [circuitType, setCircuitType] = useState(typeFahs);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -103,8 +107,8 @@ export default function RollsLibrary() {
       toast('تم تعديل بيانات الرول بنجاح', 'success');
       setEditingRoll(null);
       setRollDate('');
-      setBaseType('رول جلسة');
-      setCircuitType('فحص');
+      setBaseType(baseTypeDefault);
+      setCircuitType(typeFahs);
     } catch (err) {
       toast('حدث خطأ أثناء التعديل', 'error');
     } finally {
@@ -188,7 +192,7 @@ export default function RollsLibrary() {
 
   const getRollStyle = (type) => {
     const isJudgment = type.includes('حصر') || type.includes('أحكام');
-    const isFahs = type.includes('فحص');
+    const isFahs = type.includes(typeFahs);
     const isMawdoo = type.includes('موضوع');
 
     let theme = { 
@@ -340,8 +344,8 @@ export default function RollsLibrary() {
                   setIsUploadModalOpen(false);
                   setEditingRoll(null);
                   setRollDate('');
-                  setBaseType('رول جلسة');
-                  setCircuitType('فحص');
+                  setBaseType(baseTypeDefault);
+                  setCircuitType(typeFahs);
                 }} 
                 className="text-slate-400 hover:text-rose-500 transition bg-white rounded-full p-1 border border-slate-200"
               >
@@ -364,7 +368,7 @@ export default function RollsLibrary() {
                 <div className="space-y-2 flex-1">
                   <label className="text-xs font-bold text-slate-500">نوع الرول</label>
                   <div className="flex flex-wrap gap-1.5">
-                    {['رول جلسة', 'حصر أحكام'].map(type => (
+                    {[baseTypeDefault, rollTypes[3] || 'حصر أحكام'].map(type => (
                       <button
                         key={type}
                         type="button"
@@ -380,7 +384,7 @@ export default function RollsLibrary() {
                 <div className="space-y-2 flex-1">
                   <label className="text-xs font-bold text-slate-500">الدائرة</label>
                   <div className="flex flex-wrap gap-1.5">
-                    {['فحص', 'موضوع'].map(type => (
+                    {[typeFahs, typeMawdoo].map(type => (
                       <button
                         key={type}
                         type="button"
@@ -451,8 +455,8 @@ export default function RollsLibrary() {
                         <button
                           onClick={() => {
                             const parts = roll.type.split(' - ');
-                            setBaseType(parts[0] || 'رول جلسة');
-                            setCircuitType(parts[1] || 'فحص');
+                            setBaseType(parts[0] || baseTypeDefault);
+                            setCircuitType(parts[1] || typeFahs);
                             setRollDate(roll.date);
                             setEditingRoll(roll);
                           }}
