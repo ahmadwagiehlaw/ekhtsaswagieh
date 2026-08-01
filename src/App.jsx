@@ -69,15 +69,19 @@ function AppContent() {
 
 }
 
+import ErrorBoundary from './components/ErrorBoundary';
+
 function App() {
   return (
-    <AuthProvider>
-      <AppProvider>
-        <UIProvider>
-          <AppContent />
-        </UIProvider>
-      </AppProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppProvider>
+          <UIProvider>
+            <AppContent />
+          </UIProvider>
+        </AppProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

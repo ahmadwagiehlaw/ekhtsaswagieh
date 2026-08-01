@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { onSnapshot, setDoc, doc, writeBatch, getDocs, deleteDoc } from 'firebase/firestore';
 import { db, getSettingsRef, getSchemaRef, getCasesRef, getRollsRef, getTasksRef } from '../lib/firebase';
 import { useAuth } from './AuthContext';
@@ -32,12 +32,20 @@ export const AppProvider = ({ children }) => {
   const tenantId = userData?.tenantId;
   const isAdmin = userData?.role === 'super_admin' || userData?.role === 'consultant';
   const isEmployee = userData?.role === 'employee';
+  
+  let empPermissions = null;
+  if (isEmployee && settings?.employees) {
+    const emp = settings.employees.find(e => `${e.username}@${tenantId}.ekhtsas.local` === userData?.email);
+    if (emp && emp.permissions) {
+      empPermissions = emp.permissions;
+    }
+  }
 
   const currentUserPermissions = {
-    canEditData: isAdmin || isEmployee,
-    canDeleteData: isAdmin || isEmployee,
-    canManageRolls: isAdmin || isEmployee,
-    canManageTasks: isAdmin || isEmployee
+    canEditData: isAdmin || (isEmployee && empPermissions?.canEditData),
+    canDeleteData: isAdmin || (isEmployee && empPermissions?.canDeleteData),
+    canManageRolls: isAdmin || (isEmployee && empPermissions?.canManageRolls),
+    canManageTasks: isAdmin || (isEmployee && empPermissions?.canManageTasks)
   };
 
   useEffect(() => {
@@ -349,8 +357,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  return (
-    <AppContext.Provider value={{
+  const contextValue = useMemo(() => ({
       cases,
       deletedCases,
       rolls,
@@ -361,7 +368,7 @@ export const AppProvider = ({ children }) => {
       currentUser: currentUser?.email || '',
       currentUserPermissions,
       loading,
-      logoutAdmin,
+      logoutAdmin: logout,
       saveCaseToFirebase,
       createNewCase,
       checkDuplicateCase,
@@ -376,7 +383,13 @@ export const AppProvider = ({ children }) => {
       globalTasks,
       saveGlobalTask,
       deleteGlobalTask
-    }}>
+  }), [
+    cases, deletedCases, rolls, schema, settings, isAdmin, isEmployee, 
+    currentUser, currentUserPermissions, loading
+  ]);
+
+  return (
+    <AppContext.Provider value={contextValue}>
       {children}
     </AppContext.Provider>
   );
