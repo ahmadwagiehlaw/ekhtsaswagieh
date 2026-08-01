@@ -216,6 +216,13 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
     else setSelectedIds(new Set(filteredCases.map(c => c.id)));
   };
 
+  const unrecordedCount = useMemo(() => {
+    return judgmentCases.filter(c => {
+      const session = c.sessions?.find(s => s.date === date);
+      return !isSessionRecorded(session);
+    }).length;
+  }, [judgmentCases, date]);
+
   const filteredCases = useMemo(() => {
     let result = judgmentCases;
     
@@ -284,7 +291,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
     });
 
     return result;
-  }, [judgmentCases, searchQ, sessionTypeFilter, date, sortConfig]);
+  }, [judgmentCases, searchQ, sessionTypeFilter, judgmentFilter, date, sortConfig]);
 
   const startEdit = (cObj) => {
     const session = cObj.sessions?.find(s => s.date === date);
@@ -513,7 +520,11 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
             }`}
           >
             <Filter className="w-3.5 h-3.5" /> 
-            {judgmentFilter === 'all' ? 'عرض: الكل' : judgmentFilter === 'recorded' ? 'عرض: الأحكام المسجلة' : 'عرض: بدون أحكام'}
+            {judgmentFilter === 'all' 
+              ? `عرض: الكل (${unrecordedCount > 0 ? `${unrecordedCount} متبقي` : 'مكتمل'})` 
+              : judgmentFilter === 'recorded' 
+                ? 'عرض: الأحكام المسجلة' 
+                : `عرض: بدون أحكام (${unrecordedCount})`}
           </button>
         </div>
       </div>

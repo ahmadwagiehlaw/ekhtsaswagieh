@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppState';
 import { useAuth } from '../context/AuthContext';
 import { firebaseConfig, USERS_DIRECTORY_REF } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
-import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList, Scale, Download, FileJson, ArrowUpFromLine, Copy, Clock, Fingerprint, Edit3 } from 'lucide-react';
+import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList, Scale, Download, FileJson, ArrowUpFromLine, Copy, Clock, Fingerprint, Edit3, Search } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useUI } from '../context/UIContext';
 
@@ -71,6 +71,8 @@ export default function Settings() {
     { name: 'تعجيل من الوقف الجزائي', days: 15, triggerAfterDays: 30, targetRole: 'طاعنين', description: 'يجب التعجيل خلال 15 يوماً بعد مرور شهر من الوقف' }
   ]);
   const [expandedRules, setExpandedRules] = useState([]);
+  const [rulesSearchQuery, setRulesSearchQuery] = useState('');
+  const [expandedRuleGroups, setExpandedRuleGroups] = useState(['قواعد عامة']); // Default expand first/general group
   const [deletePassword, setDeletePassword] = useState('');
   const backupInputRef = useRef(null);
   const [backupRestoreStatus, setBackupRestoreStatus] = useState(null); // { type: 'success'|'error'|'preview', data: ... }
@@ -1330,246 +1332,304 @@ export default function Settings() {
               قم بإعداد قواعد ديناميكية متعددة الشروط لملء تفاصيل الحكم آلياً عند تسجيل حكم (مثلاً: إذا كانت الصفة "طاعنين" والفئة "نهائي" {'->'} يتم تعبئة التصنيف والمنطوق بـ "..." ). 
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Toolbar: Search and Expand/Collapse */}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-slate-50 p-2 rounded-xl border border-slate-200">
+              <div className="flex-1 relative min-w-[200px]">
+                <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                <input 
+                  type="text" 
+                  placeholder="ابحث في القواعد (بالاسم، النوع، الصفة...)" 
+                  value={rulesSearchQuery}
+                  onChange={e => setRulesSearchQuery(e.target.value)}
+                  className="w-full text-xs font-bold pl-3 pr-9 py-2 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none bg-white"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setExpandedRuleGroups([...new Set(localJudgmentDefaults.map(r => r.conditions.type ? `قواعد: ${r.conditions.type.trim()}` : 'قواعد عامة'))])} className="text-[10px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition">فرد الكل</button>
+                <button onClick={() => setExpandedRuleGroups([])} className="text-[10px] font-bold text-slate-600 bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded-lg transition">طي الكل</button>
+              </div>
+            </div>
 
-              {localJudgmentDefaults.map((rule, idx) => {
-                const isExpanded = expandedRules.includes(idx);
-                const toggleExpand = () => setExpandedRules(prev => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]);
-                
-                const getRuleSummary = (r) => {
-                    const conds = [];
-                    if (r.conditions.role) conds.push(`الصفة "${r.conditions.role}"`);
-                    if (r.conditions.category) conds.push(`الفئة "${r.conditions.category}"`);
-                    if (r.conditions.classification) conds.push(`التصنيف "${r.conditions.classification}"`);
-                    if (r.conditions.type) conds.push(`النوع "${r.conditions.type}"`);
-                    if (r.conditions.sessionType) conds.push(`الجلسة "${r.conditions.sessionType}"`);
-                    if (r.conditions.decision) conds.push(`القرار يحتوي "${r.conditions.decision}"`);
-                    
-                    const acts = [];
-                    if (r.actions.category) acts.push(`الفئة "${r.actions.category}"`);
-                    if (r.actions.classification) acts.push(`التصنيف "${r.actions.classification}"`);
-                    if (r.actions.type) acts.push(`النوع "${r.actions.type}"`);
-                    if (r.actions.text) acts.push(`المنطوق "${r.actions.text.slice(0, 25)}${r.actions.text.length > 25 ? '...' : ''}"`);
-                    
-                    const condStr = conds.length > 0 ? conds.join(' و ') : 'أي دعوى';
-                    const actStr = acts.length > 0 ? acts.join('، و') : 'لا شيء';
-                    return (
-                        <div className="text-[11px] font-bold text-slate-600 leading-relaxed truncate">
-                            <span className="text-rose-500 ml-1">لو:</span> {condStr} <span className="mx-2 text-slate-300">|</span> <span className="text-emerald-600 ml-1">يتم تعبئة:</span> {actStr}
-                        </div>
-                    );
-                };
+            <div className="space-y-4">
+              {(() => {
+                 const grouped = {};
+                 localJudgmentDefaults.forEach((rule, originalIdx) => {
+                   if (rulesSearchQuery) {
+                     const q = rulesSearchQuery.toLowerCase();
+                     const match = (rule.name || '').toLowerCase().includes(q) ||
+                                   (rule.conditions.type || '').toLowerCase().includes(q) ||
+                                   (rule.conditions.role || '').toLowerCase().includes(q) ||
+                                   (rule.conditions.category || '').toLowerCase().includes(q) ||
+                                   (rule.actions.text || '').toLowerCase().includes(q);
+                     if (!match) return;
+                   }
+                   const groupName = rule.conditions.type ? `قواعد: ${rule.conditions.type.trim()}` : 'قواعد عامة';
+                   if (!grouped[groupName]) grouped[groupName] = [];
+                   grouped[groupName].push({ rule, idx: originalIdx });
+                 });
 
-                return (
-                <div key={idx} className={`flex flex-col gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 hover:border-indigo-300 transition ${isExpanded ? 'col-span-full' : ''}`}>
-                  <div className="flex items-center justify-between">
-                    <div 
-                      onClick={toggleExpand}
-                      className="flex items-center gap-2 text-xs font-black text-indigo-800 bg-indigo-100 hover:bg-indigo-200 transition px-2 py-1 rounded w-max cursor-pointer select-none"
-                    >
-                      {rule.name || `قاعدة رقم ${idx + 1}`}
-                      <span className="opacity-50 text-[9px]">{isExpanded ? '▼' : '◀'}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={toggleExpand} className="text-slate-500 hover:bg-slate-200 px-2 py-1 rounded-lg flex items-center gap-1 text-[10px] font-bold transition">
-                        <Edit3 className="w-4 h-4"/> تعديل
-                      </button>
-                      <button onClick={() => setLocalJudgmentDefaults([...localJudgmentDefaults, JSON.parse(JSON.stringify(rule))])} className="text-sky-500 hover:bg-sky-100 px-2 py-1 rounded-lg flex items-center gap-1 text-[10px] font-bold transition">
-                        <Copy className="w-4 h-4"/> تكرار
-                      </button>
-                      <button onClick={() => setLocalJudgmentDefaults(localJudgmentDefaults.filter((_, i) => i !== idx))} className="text-rose-500 hover:bg-rose-100 px-2 py-1 rounded-lg flex items-center gap-1 text-[10px] font-bold transition">
-                        <Trash2 className="w-4 h-4"/> حذف
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {!isExpanded ? (
-                    <div className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm cursor-pointer hover:border-indigo-200 transition" onClick={toggleExpand}>
-                       {getRuleSummary(rule)}
-                    </div>
-                  ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1 animate-in fade-in slide-in-from-top-2">
-                    <div className="col-span-full mb-2">
-                        <label className="text-[10px] font-bold text-slate-500 block mb-1">اسم القاعدة (اختياري، يسهل التعرف عليها)</label>
-                        <input
-                            type="text"
-                            placeholder="مثال: رفض الطعن موضوعاً"
-                            value={rule.name}
-                            onChange={(e) => {
-                              const newRules = [...localJudgmentDefaults];
-                              newRules[idx].name = e.target.value;
-                              setLocalJudgmentDefaults(newRules);
-                            }}
-                            className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-white"
-                        />
-                    </div>
-                    {/* Conditions */}
-                    <div className="space-y-2 border-r-[3px] border-indigo-400 pr-3 bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
-                      <p className="text-[11px] font-black text-slate-700 mb-2 border-b border-slate-100 pb-2">إذا تحققت الشروط التالية (اترك الحقل فارغاً لتجاهله):</p>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">الصفة</label>
-                          <select 
-                            value={rule.conditions.role}
-                            onChange={(e) => {
-                              const newRules = [...localJudgmentDefaults];
-                              newRules[idx].conditions.role = e.target.value;
-                              setLocalJudgmentDefaults(newRules);
-                            }}
-                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                          >
-                            <option value="">- أي صفة -</option>
-                            {localRoles.map(r => <option key={r} value={r}>{r}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">فئة الحكم</label>
-                          <select 
-                            value={rule.conditions.category}
-                            onChange={(e) => {
-                              const newRules = [...localJudgmentDefaults];
-                              newRules[idx].conditions.category = e.target.value;
-                              setLocalJudgmentDefaults(newRules);
-                            }}
-                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                          >
-                            <option value="">- أي فئة -</option>
-                            {localJudgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تصنيف الحكم</label>
-                          <select 
-                            value={rule.conditions.classification}
-                            onChange={(e) => {
-                              const newRules = [...localJudgmentDefaults];
-                              newRules[idx].conditions.classification = e.target.value;
-                              setLocalJudgmentDefaults(newRules);
-                            }}
-                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                          >
-                            <option value="">- أي تصنيف -</option>
-                            {localJudgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
-                          <input 
-                            type="text"
-                            list="judgmentTypesSettings"
-                            value={rule.conditions.type}
-                            onChange={(e) => {
-                              const newRules = [...localJudgmentDefaults];
-                              newRules[idx].conditions.type = e.target.value;
-                              setLocalJudgmentDefaults(newRules);
-                            }}
-                            placeholder="- أي نوع -"
-                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">نوع الجلسة</label>
-                          <select 
-                            value={rule.conditions.sessionType}
-                            onChange={(e) => {
-                              const newRules = [...localJudgmentDefaults];
-                              newRules[idx].conditions.sessionType = e.target.value;
-                              setLocalJudgmentDefaults(newRules);
-                            }}
-                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                          >
-                            <option value="">- أي نوع جلسة -</option>
-                            {localSessionTypes.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">القرار</label>
-                          <select 
-                            value={rule.conditions.decision}
-                            onChange={(e) => {
-                              const newRules = [...localJudgmentDefaults];
-                              newRules[idx].conditions.decision = e.target.value;
-                              setLocalJudgmentDefaults(newRules);
-                            }}
-                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                          >
-                            <option value="">- أي قرار -</option>
-                            {localDecisions.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Actions */}
-                    <div className="space-y-2 border-r-[3px] border-emerald-400 pr-3 bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
-                      <p className="text-[11px] font-black text-slate-700 mb-2 border-b border-slate-100 pb-2">يتم التعبئة التلقائية للبيانات بـ:</p>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تغيير فئة الحكم إلى</label>
-                          <select 
-                            value={rule.actions.category}
-                            onChange={(e) => {
-                              const newRules = [...localJudgmentDefaults];
-                              newRules[idx].actions.category = e.target.value;
-                              setLocalJudgmentDefaults(newRules);
-                            }}
-                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
-                          >
-                            <option value="">-- بدون تغيير --</option>
-                            {localJudgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تغيير تصنيف الحكم إلى</label>
-                          <select 
-                            value={rule.actions.classification}
-                            onChange={(e) => {
-                              const newRules = [...localJudgmentDefaults];
-                              newRules[idx].actions.classification = e.target.value;
-                              setLocalJudgmentDefaults(newRules);
-                            }}
-                            className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
-                          >
-                            <option value="">-- بدون تغيير --</option>
-                            {localJudgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تعبئة نوع الحكم بـ</label>
-                        <input 
-                          type="text" 
-                          list="judgmentTypesSettings"
-                          placeholder="النوع (اختياري)" 
-                          value={rule.actions.type}
-                          onChange={(e) => {
-                            const newRules = [...localJudgmentDefaults];
-                            newRules[idx].actions.type = e.target.value;
-                            setLocalJudgmentDefaults(newRules);
-                          }}
-                          className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تعبئة المنطوق بـ</label>
-                        <textarea 
-                          placeholder="المنطوق الافتراضي (اختياري)" 
-                          value={rule.actions.text}
-                          onChange={(e) => {
-                            const newRules = [...localJudgmentDefaults];
-                            newRules[idx].actions.text = e.target.value;
-                            setLocalJudgmentDefaults(newRules);
-                          }}
-                          className="w-full text-xs font-bold p-2 rounded-lg border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 min-h-[40px] resize-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  )}
-                </div>
-              )})}
+                 if (Object.keys(grouped).length === 0) return <div className="text-center py-6 text-slate-400 text-xs font-bold bg-slate-50 rounded-xl border border-slate-100">لا توجد قواعد مطابقة للبحث</div>;
+
+                 return Object.entries(grouped).map(([gName, rulesList]) => {
+                   const isGroupExpanded = expandedRuleGroups.includes(gName) || rulesSearchQuery; // Always expand if searching
+                   return (
+                     <div key={gName} className="border border-slate-200 rounded-xl bg-slate-50 overflow-hidden shadow-sm transition-all">
+                       <div 
+                         onClick={() => setExpandedRuleGroups(prev => prev.includes(gName) ? prev.filter(g => g !== gName) : [...prev, gName])}
+                         className="flex items-center justify-between p-3 hover:bg-slate-100 cursor-pointer select-none transition"
+                       >
+                         <div className="flex items-center gap-2">
+                           <div className="w-6 h-6 rounded-md bg-indigo-100 text-indigo-600 flex items-center justify-center font-black text-[11px]">{rulesList.length}</div>
+                           <h4 className="font-black text-xs text-navy-900">{gName}</h4>
+                         </div>
+                         <span className="text-slate-400 text-[10px]">{isGroupExpanded ? '▼' : '◀'}</span>
+                       </div>
+                       
+                       {isGroupExpanded && (
+                         <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3 bg-white border-t border-slate-100">
+                           {rulesList.map(({ rule, idx }) => {
+                              const isExpanded = expandedRules.includes(idx);
+                              const toggleExpand = () => setExpandedRules(prev => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]);
+                              
+                              const getRuleSummary = (r) => {
+                                  const conds = [];
+                                  if (r.conditions.role) conds.push(`الصفة "${r.conditions.role}"`);
+                                  if (r.conditions.category) conds.push(`الفئة "${r.conditions.category}"`);
+                                  if (r.conditions.classification) conds.push(`التصنيف "${r.conditions.classification}"`);
+                                  if (r.conditions.type) conds.push(`النوع "${r.conditions.type}"`);
+                                  if (r.conditions.sessionType) conds.push(`الجلسة "${r.conditions.sessionType}"`);
+                                  if (r.conditions.decision) conds.push(`القرار "${r.conditions.decision}"`);
+                                  
+                                  const acts = [];
+                                  if (r.actions.category) acts.push(`الفئة "${r.actions.category}"`);
+                                  if (r.actions.classification) acts.push(`التصنيف "${r.actions.classification}"`);
+                                  if (r.actions.type) acts.push(`النوع "${r.actions.type}"`);
+                                  if (r.actions.text) acts.push(`المنطوق "${r.actions.text.slice(0, 25)}${r.actions.text.length > 25 ? '...' : ''}"`);
+                                  
+                                  const condStr = conds.length > 0 ? conds.join(' + ') : 'أي دعوى';
+                                  const actStr = acts.length > 0 ? acts.join('، و') : 'لا شيء';
+                                  return (
+                                      <div className="text-[10px] font-bold text-slate-600 leading-relaxed truncate">
+                                          <span className="text-rose-500 ml-1">لو:</span> {condStr} <span className="mx-2 text-slate-300">|</span> <span className="text-emerald-600 ml-1">يتم تعبئة:</span> {actStr}
+                                      </div>
+                                  );
+                              };
+
+                              return (
+                              <div key={idx} className={`flex flex-col gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 hover:border-indigo-300 transition ${isExpanded ? 'col-span-full' : ''}`}>
+                                <div className="flex items-center justify-between">
+                                  <div 
+                                    onClick={toggleExpand}
+                                    className="flex items-center gap-1 text-[11px] font-black text-indigo-800 hover:text-indigo-600 transition w-max cursor-pointer select-none"
+                                  >
+                                    <span className="text-indigo-400 ml-1">{isExpanded ? '▼' : '◀'}</span>
+                                    {rule.name || `قاعدة رقم ${idx + 1}`}
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <button onClick={toggleExpand} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition" title="تعديل">
+                                      <Edit3 className="w-3.5 h-3.5"/>
+                                    </button>
+                                    <button onClick={() => setLocalJudgmentDefaults([...localJudgmentDefaults, JSON.parse(JSON.stringify(rule))])} className="text-slate-400 hover:text-sky-600 hover:bg-sky-50 p-1.5 rounded-lg transition" title="تكرار">
+                                      <Copy className="w-3.5 h-3.5"/>
+                                    </button>
+                                    <button onClick={() => setLocalJudgmentDefaults(localJudgmentDefaults.filter((_, i) => i !== idx))} className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition" title="حذف">
+                                      <Trash2 className="w-3.5 h-3.5"/>
+                                    </button>
+                                  </div>
+                                </div>
+                                
+                                {!isExpanded ? (
+                                  <div className="bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm cursor-pointer hover:border-indigo-200 transition" onClick={toggleExpand}>
+                                     {getRuleSummary(rule)}
+                                  </div>
+                                ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1 animate-in fade-in slide-in-from-top-2">
+                                  <div className="col-span-full">
+                                      <label className="text-[9px] font-bold text-slate-500 block mb-1">اسم القاعدة (اختياري)</label>
+                                      <input
+                                          type="text"
+                                          placeholder="مثال: رفض الطعن موضوعاً"
+                                          value={rule.name}
+                                          onChange={(e) => {
+                                            const newRules = [...localJudgmentDefaults];
+                                            newRules[idx].name = e.target.value;
+                                            setLocalJudgmentDefaults(newRules);
+                                          }}
+                                          className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-white"
+                                      />
+                                  </div>
+                                  {/* Conditions */}
+                                  <div className="space-y-2 border-r-2 border-indigo-300 pr-2 bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm">
+                                    <p className="text-[10px] font-black text-slate-700 mb-2 border-b border-slate-100 pb-1">شروط التطبيق (اتركها فارغة للتجاهل):</p>
+                                    
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">الصفة</label>
+                                        <select 
+                                          value={rule.conditions.role}
+                                          onChange={(e) => {
+                                            const newRules = [...localJudgmentDefaults];
+                                            newRules[idx].conditions.role = e.target.value;
+                                            setLocalJudgmentDefaults(newRules);
+                                          }}
+                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                                        >
+                                          <option value="">- أي صفة -</option>
+                                          {localRoles.map(r => <option key={r} value={r}>{r}</option>)}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">فئة الحكم</label>
+                                        <select 
+                                          value={rule.conditions.category}
+                                          onChange={(e) => {
+                                            const newRules = [...localJudgmentDefaults];
+                                            newRules[idx].conditions.category = e.target.value;
+                                            setLocalJudgmentDefaults(newRules);
+                                          }}
+                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                                        >
+                                          <option value="">- أي فئة -</option>
+                                          {localJudgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">تصنيف الحكم</label>
+                                        <select 
+                                          value={rule.conditions.classification}
+                                          onChange={(e) => {
+                                            const newRules = [...localJudgmentDefaults];
+                                            newRules[idx].conditions.classification = e.target.value;
+                                            setLocalJudgmentDefaults(newRules);
+                                          }}
+                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                                        >
+                                          <option value="">- أي تصنيف -</option>
+                                          {localJudgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
+                                        <input 
+                                          type="text"
+                                          value={rule.conditions.type}
+                                          onChange={(e) => {
+                                            const newRules = [...localJudgmentDefaults];
+                                            newRules[idx].conditions.type = e.target.value;
+                                            setLocalJudgmentDefaults(newRules);
+                                          }}
+                                          placeholder="- أي نوع -"
+                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">نوع الجلسة</label>
+                                        <select 
+                                          value={rule.conditions.sessionType}
+                                          onChange={(e) => {
+                                            const newRules = [...localJudgmentDefaults];
+                                            newRules[idx].conditions.sessionType = e.target.value;
+                                            setLocalJudgmentDefaults(newRules);
+                                          }}
+                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                                        >
+                                          <option value="">- أي نوع جلسة -</option>
+                                          {localSessionTypes.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">القرار</label>
+                                        <select 
+                                          value={rule.conditions.decision}
+                                          onChange={(e) => {
+                                            const newRules = [...localJudgmentDefaults];
+                                            newRules[idx].conditions.decision = e.target.value;
+                                            setLocalJudgmentDefaults(newRules);
+                                          }}
+                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                                        >
+                                          <option value="">- أي قرار -</option>
+                                          {localDecisions.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Actions */}
+                                  <div className="space-y-2 border-r-2 border-emerald-400 pr-2 bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm">
+                                    <p className="text-[10px] font-black text-slate-700 mb-2 border-b border-slate-100 pb-1">تعبئة البيانات تلقائياً بـ:</p>
+                                    
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">فئة الحكم</label>
+                                        <select 
+                                          value={rule.actions.category}
+                                          onChange={(e) => {
+                                            const newRules = [...localJudgmentDefaults];
+                                            newRules[idx].actions.category = e.target.value;
+                                            setLocalJudgmentDefaults(newRules);
+                                          }}
+                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
+                                        >
+                                          <option value="">-- بدون تغيير --</option>
+                                          {localJudgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">تصنيف الحكم</label>
+                                        <select 
+                                          value={rule.actions.classification}
+                                          onChange={(e) => {
+                                            const newRules = [...localJudgmentDefaults];
+                                            newRules[idx].actions.classification = e.target.value;
+                                            setLocalJudgmentDefaults(newRules);
+                                          }}
+                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
+                                        >
+                                          <option value="">-- بدون تغيير --</option>
+                                          {localJudgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label className="text-[8px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
+                                      <input 
+                                        type="text" 
+                                        placeholder="النوع (اختياري)" 
+                                        value={rule.actions.type}
+                                        onChange={(e) => {
+                                          const newRules = [...localJudgmentDefaults];
+                                          newRules[idx].actions.type = e.target.value;
+                                          setLocalJudgmentDefaults(newRules);
+                                        }}
+                                        className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-[8px] font-bold text-slate-500 block mb-0.5">منطوق الحكم</label>
+                                      <textarea 
+                                        placeholder="المنطوق الافتراضي (اختياري)" 
+                                        value={rule.actions.text}
+                                        onChange={(e) => {
+                                          const newRules = [...localJudgmentDefaults];
+                                          newRules[idx].actions.text = e.target.value;
+                                          setLocalJudgmentDefaults(newRules);
+                                        }}
+                                        className="w-full text-[10px] font-bold p-2 rounded-md border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 min-h-[40px] resize-none"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                                )}
+                              </div>
+                              );
+                           })}
+                         </div>
+                       )}
+                     </div>
+                   );
+                 });
+              })()}
             </div>
           
 </div>
