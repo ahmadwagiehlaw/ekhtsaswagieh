@@ -9,7 +9,7 @@ import {
   Edit3, Check, X, ChevronRight, ChevronLeft, Search,
   CheckSquare, Square, ClipboardList, Bell, Eye, CopyPlus,
   Printer, ExternalLink, Save, RefreshCcw, AlertCircle, Plus, Trash2,
-  ArrowUpDown, ArrowUp, ArrowDown, Columns, Settings2
+  ArrowUpDown, ArrowUp, ArrowDown, Columns, Settings2, FileText
 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
@@ -19,6 +19,7 @@ import BulkSessionRolloverModal from './BulkSessionRolloverModal';
 import ExportPDFModal from './ExportPDFModal';
 import QuickAddCaseModal from './QuickAddCaseModal';
 import GlobalRollSearchModal from './GlobalRollSearchModal';
+import GlobalTemplatePrintModal from './GlobalTemplatePrintModal';
 
 const PREDEFINED_DECISIONS = [
   'للحكم','تصريح','للإعلان','للاطلاع','للإخطار',
@@ -53,6 +54,8 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   const [editData, setEditData] = useState({});
   const [searchQ, setSearchQ] = useState('');
   const [isBulkProcedureOpen, setIsBulkProcedureOpen] = useState(false);
+  const [isHoveredSession, setIsHoveredSession] = useState(null);
+  const [isPrintViewOpen, setIsPrintViewOpen] = useState(false);
   const [isRolloverOpen, setIsRolloverOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
@@ -294,6 +297,12 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
               className="flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-slate-50 transition"
             >
               <CopyPlus className="w-3.5 h-3.5" /> ترحيل
+            </button>
+            <button
+              onClick={() => setIsPrintViewOpen(true)}
+              className="flex items-center gap-1 bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-indigo-600 transition"
+            >
+              <FileText className="w-3.5 h-3.5" /> وثائق
             </button>
             <button
               onClick={async () => {
@@ -570,6 +579,13 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
         initialQuery={searchQ}
         sessionDate={date}
       />
+      {isPrintViewOpen && (
+        <GlobalTemplatePrintModal
+          cases={filteredCases.filter(c => selectedIds.has(c.id))}
+          sessionDate={date}
+          onClose={() => setIsPrintViewOpen(false)}
+        />
+      )}
     </div>
   );
 }

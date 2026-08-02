@@ -548,7 +548,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
               onClick={() => setIsPrintViewOpen(true)}
               className="flex items-center gap-1 bg-slate-800 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-slate-900 transition"
             >
-              <FileText className="w-3.5 h-3.5" /> استخراج شهادات
+              <FileText className="w-3.5 h-3.5" /> تحرير وثيقة
             </button>
             <button
               onClick={() => setIsBulkProcedureOpen(true)}

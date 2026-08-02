@@ -7,6 +7,7 @@ import ExportPDFModal from '../components/ExportPDFModal';
 import BulkAssignTaskModal from '../components/BulkAssignTaskModal';
 import BulkEditCasesModal from '../components/BulkEditCasesModal';
 import AdvancedSearchModal from '../components/AdvancedSearchModal';
+import GlobalTemplatePrintModal from '../components/GlobalTemplatePrintModal';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 import useSessionState from '../hooks/useSessionState';
 
@@ -39,6 +40,7 @@ export default function Files() {
   const [showRecentlyModifiedOnly, setShowRecentlyModifiedOnly] = useSessionState('files_showRecentlyModifiedOnly', false);
   const [showRecentlyViewedOnly, setShowRecentlyViewedOnly] = useSessionState('files_showRecentlyViewedOnly', false);
   const [isSelectionReportModalOpen, setIsSelectionReportModalOpen] = useState(false);
+  const [isPrintViewOpen, setIsPrintViewOpen] = useState(false);
 
   // Sorting and collapsible states
   const [sortBy, setSortBy] = useSessionState('files_sortBy', 'none');
@@ -913,24 +915,28 @@ export default function Files() {
             className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 transition shrink-0"
           >
             <Edit3 className="w-4 h-4" />
-            <span className="hidden sm:inline">تعديل البيانات</span>
-            <span className="sm:hidden">تعديل</span>
+            <span>تعديل</span>
+          </button>
+          <button
+            onClick={() => setIsPrintViewOpen(true)}
+            className="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 transition shrink-0"
+          >
+            <FileText className="w-4 h-4" />
+            <span>وثائق</span>
           </button>
           <button
             onClick={() => setIsAssignModalOpen(true)}
             className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 transition shrink-0"
           >
             <ClipboardList className="w-4 h-4" />
-            <span className="hidden sm:inline">إسناد مهمة</span>
-            <span className="sm:hidden">إسناد</span>
+            <span>إسناد</span>
           </button>
           <button
             onClick={() => setIsSelectionReportModalOpen(true)}
             className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 transition shrink-0"
           >
             <Printer className="w-4 h-4" />
-            <span className="hidden sm:inline">إنشاء تقرير</span>
-            <span className="sm:hidden">تقرير</span>
+            <span>تقرير</span>
           </button>
           <button
             onClick={async () => {
@@ -948,8 +954,7 @@ export default function Files() {
             className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 transition shrink-0"
           >
             <Trash2 className="w-4 h-4" />
-            <span className="hidden sm:inline">حذف جماعي</span>
-            <span className="sm:hidden">حذف</span>
+            <span>حذف</span>
           </button>
           <button
             onClick={() => setSelectedCaseIds([])}
@@ -1047,6 +1052,14 @@ export default function Files() {
         onClose={() => setIsAdvancedSearchOpen(false)}
         onSearch={handleAdvancedSearch}
       />
+
+      {isPrintViewOpen && (
+        <GlobalTemplatePrintModal
+          cases={cases.filter(c => selectedCaseIds.includes(c.id))}
+          sessionDate={formatDateString(new Date().toISOString())}
+          onClose={() => setIsPrintViewOpen(false)}
+        />
+      )}
     </div>
   );
 }

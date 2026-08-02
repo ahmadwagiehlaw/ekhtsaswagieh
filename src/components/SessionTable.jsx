@@ -522,7 +522,7 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
                 onClick={() => setIsPrintViewOpen(true)}
                 className="flex items-center gap-1 bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition"
               >
-                <FileText className="w-3.5 h-3.5" /> استخراج شهادات
+                <FileText className="w-3.5 h-3.5" /> تحرير وثيقة
               </button>
             </div>
           </div>

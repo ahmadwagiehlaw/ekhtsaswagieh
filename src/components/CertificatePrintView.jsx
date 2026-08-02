@@ -30,6 +30,15 @@ export default function CertificatePrintView({ cases, sessionDate, template, onC
       '{{القرار}}': getFieldVal(c, ['القرار']) || '',
       '{{نوع_الجلسة}}': getFieldVal(c, ['نوع الجلسة']) || '',
       '{{اسم_المستشار}}': settings?.consultantName || 'أحمد وجيه',
+      '{{المحكمة}}': getFieldVal(c, ['المحكمة']) || '',
+      '{{الدائرة}}': getFieldVal(c, ['الدائرة']) || '',
+      '{{الصفة}}': getFieldVal(c, ['الصفة']) || '',
+      '{{الملاحظات}}': getFieldVal(c, ['الملاحظات']) || '',
+      '{{رقم_الحفظ}}': getFieldVal(c, ['رقم الحفظ']) || '',
+      '{{حكم_تمهيدي}}': getFieldVal(c, ['حكم تمهيدي', 'التمهيدي']) || '',
+      '{{منطوق_الحكم}}': getFieldVal(c, ['المنطوق']) || '',
+      '{{تصنيف_الحكم}}': getFieldVal(c, ['تصنيف الحكم']) || '',
+      '{{الرول}}': getFieldVal(c, ['الرول']) || '',
     };
 
     // Replace all occurrences of each variable

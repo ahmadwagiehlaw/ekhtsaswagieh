@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Save, Trash2, Edit3, Copy, FileText, Search, Settings, Variable } from 'lucide-react';
+import { Plus, Save, Trash2, Edit3, Copy, FileText, Search, Settings, Variable, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 
@@ -64,6 +64,8 @@ export default function SmartDocumentsTab() {
   const [activeTemplate, setActiveTemplate] = useState(templates[0] || null);
   const [isEditingMeta, setIsEditingMeta] = useState(false);
   const [metaForm, setMetaForm] = useState({ name: '', category: '' });
+  const [expandedCats, setExpandedCats] = useState({ 'شهادات': true, 'عام': true });
+  const [showMoreVars, setShowMoreVars] = useState(false);
   
   const editorRef = useRef(null);
 
@@ -141,15 +143,31 @@ export default function SmartDocumentsTab() {
     return acc;
   }, {});
 
-  const variablesList = [
+  const toggleCat = (cat) => {
+    setExpandedCats(prev => ({ ...prev, [cat]: !prev[cat] }));
+  };
+
+  const mainVariables = [
     { label: 'رقم الدعوى', val: '{{رقم_الدعوى}}' },
     { label: 'السنة', val: '{{السنة}}' },
     { label: 'المدعي', val: '{{المدعي}}' },
     { label: 'ضد', val: '{{ضد}}' },
     { label: 'الجلسة الحالية', val: '{{الجلسة_الحالية}}' },
     { label: 'القرار', val: '{{القرار}}' },
+  ];
+
+  const moreVariables = [
     { label: 'نوع الجلسة', val: '{{نوع_الجلسة}}' },
     { label: 'اسم المستشار', val: '{{اسم_المستشار}}' },
+    { label: 'المحكمة', val: '{{المحكمة}}' },
+    { label: 'الدائرة', val: '{{الدائرة}}' },
+    { label: 'الصفة', val: '{{الصفة}}' },
+    { label: 'الملاحظات', val: '{{الملاحظات}}' },
+    { label: 'رقم الحفظ', val: '{{رقم_الحفظ}}' },
+    { label: 'حكم تمهيدي', val: '{{حكم_تمهيدي}}' },
+    { label: 'منطوق الحكم', val: '{{منطوق_الحكم}}' },
+    { label: 'تصنيف الحكم', val: '{{تصنيف_الحكم}}' },
+    { label: 'الرول', val: '{{الرول}}' },
   ];
 
   return (
@@ -169,29 +187,39 @@ export default function SmartDocumentsTab() {
         
         <div className="flex-1 overflow-y-auto p-3 space-y-4">
           {Object.keys(groupedTemplates).map(cat => (
-            <div key={cat} className="space-y-2">
-              <h4 className="text-xs font-black text-slate-400 border-b pb-1">{cat}</h4>
-              <div className="space-y-1">
-                {groupedTemplates[cat].map(tpl => (
-                  <div 
-                    key={tpl.id}
-                    onClick={() => setActiveTemplate(tpl)}
-                    className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition ${activeTemplate?.id === tpl.id ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-slate-50 border border-transparent'}`}
-                  >
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <FileText className={`w-4 h-4 shrink-0 ${activeTemplate?.id === tpl.id ? 'text-indigo-600' : 'text-slate-400'}`} />
-                      <span className={`text-xs font-bold truncate ${activeTemplate?.id === tpl.id ? 'text-indigo-800' : 'text-slate-600'}`}>
-                        {tpl.name}
-                      </span>
+            <div key={cat} className="space-y-1">
+              <button 
+                onClick={() => toggleCat(cat)}
+                className="w-full flex items-center justify-between p-1 hover:bg-slate-50 rounded"
+              >
+                <h4 className="text-xs font-black text-slate-500 flex items-center gap-1">
+                  {expandedCats[cat] ? <ChevronDown className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+                  {cat} ({groupedTemplates[cat].length})
+                </h4>
+              </button>
+              {expandedCats[cat] && (
+                <div className="space-y-1 pr-2 border-r-2 border-slate-100 mr-2">
+                  {groupedTemplates[cat].map(tpl => (
+                    <div 
+                      key={tpl.id}
+                      onClick={() => setActiveTemplate(tpl)}
+                      className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition ${activeTemplate?.id === tpl.id ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-slate-50 border border-transparent'}`}
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <FileText className={`w-4 h-4 shrink-0 ${activeTemplate?.id === tpl.id ? 'text-indigo-600' : 'text-slate-400'}`} />
+                        <span className={`text-xs font-bold truncate ${activeTemplate?.id === tpl.id ? 'text-indigo-800' : 'text-slate-600'}`}>
+                          {tpl.name}
+                        </span>
+                      </div>
+                      {isAdmin && (
+                        <button onClick={(e) => { e.stopPropagation(); handleDelete(tpl.id); }} className="text-slate-300 hover:text-rose-500">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
-                    {isAdmin && (
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(tpl.id); }} className="text-slate-300 hover:text-rose-500">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -260,9 +288,9 @@ export default function SmartDocumentsTab() {
             </div>
 
             {/* Variables Bar */}
-            <div className="bg-amber-50 p-2 border-b border-amber-100 flex items-center gap-2 overflow-x-auto whitespace-nowrap">
+            <div className="bg-amber-50 p-2 border-b border-amber-100 flex items-center gap-2 flex-wrap relative">
               <span className="text-[10px] font-black text-amber-800 flex items-center gap-1 shrink-0"><Variable className="w-3 h-3"/> المتغيرات السحرية:</span>
-              {variablesList.map(v => (
+              {mainVariables.map(v => (
                 <button 
                   key={v.val}
                   onClick={() => insertVariable(v.val)}
@@ -272,7 +300,29 @@ export default function SmartDocumentsTab() {
                   {v.label}
                 </button>
               ))}
-              <span className="text-[9px] text-slate-500 mr-2 shrink-0">(اضغط على المتغير لإدراجه في مكان المؤشر بالمحرر)</span>
+              
+              <div className="relative">
+                <button 
+                  onClick={() => setShowMoreVars(!showMoreVars)}
+                  className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded hover:bg-indigo-100 transition shrink-0 flex items-center gap-1"
+                >
+                  المزيد <ChevronDown className="w-3 h-3" />
+                </button>
+                {showMoreVars && (
+                  <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-xl z-50 p-2 grid grid-cols-2 gap-1">
+                    {moreVariables.map(v => (
+                      <button 
+                        key={v.val}
+                        onClick={() => { insertVariable(v.val); setShowMoreVars(false); }}
+                        className="text-right text-[10px] font-bold text-slate-700 hover:bg-slate-100 p-1.5 rounded"
+                      >
+                        {v.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span className="text-[9px] text-slate-500 shrink-0 mr-auto">(اضغط للإدراج)</span>
             </div>
 
             {/* Editor Surface */}

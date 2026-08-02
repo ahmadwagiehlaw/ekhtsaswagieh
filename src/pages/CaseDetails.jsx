@@ -6,6 +6,7 @@ import { useUI } from '../context/UIContext';
 import AddSessionModal from '../components/AddSessionModal';
 import CaseDocuments from '../components/CaseDocuments';
 import AlertsModal from '../components/AlertsModal';
+import GlobalTemplatePrintModal from '../components/GlobalTemplatePrintModal';
 import ProceduresModal from '../components/ProceduresModal';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 import { localizeNumber } from '../utils/numberUtils';
@@ -49,6 +50,7 @@ export default function CaseDetails() {
   const [editSessionData, setEditSessionData] = useState({});
   const [activeNoteSessionIdx, setActiveNoteSessionIdx] = useState(null);
   const [activeJudgmentSessionIdx, setActiveJudgmentSessionIdx] = useState(null);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   // Track Recently Viewed Cases
   React.useEffect(() => {
@@ -1620,6 +1622,24 @@ export default function CaseDetails() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Floating Document Button */}
+      <button 
+        onClick={() => setIsPrintModalOpen(true)}
+        className="fixed bottom-24 left-6 md:left-12 w-14 h-14 bg-indigo-500 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-indigo-600 hover:-translate-y-1 transition-all z-40 print:hidden animate-in fade-in zoom-in"
+        title="إنشاء وثائق"
+      >
+        <FileText className="w-6 h-6" />
+      </button>
+
+      {/* Document Print Modal */}
+      {isPrintModalOpen && (
+        <GlobalTemplatePrintModal
+          cases={[caseData]}
+          sessionDate={formatDateString(new Date().toISOString())}
+          onClose={() => setIsPrintModalOpen(false)}
+        />
       )}
     </div>
   );
