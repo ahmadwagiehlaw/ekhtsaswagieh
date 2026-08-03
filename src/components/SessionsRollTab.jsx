@@ -84,7 +84,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   const [rowCache, setRowCache] = useState({}); // { caseId: { ...editData } }
 
   const [searchQ, setSearchQ] = useState('');
-  const [sessionTypeFilter, setSessionTypeFilter] = useState('الكل'); // 'الكل' | 'فحص' | 'موضوع' | ...
+  const [sessionTypeFilter, setSessionTypeFilter] = useState('موضوع'); // الوضع الافتراضي: موضوع
   const searchRef = useRef(null);
   const [isBulkProcedureOpen, setIsBulkProcedureOpen] = useState(false);
   const [isPrintViewOpen, setIsPrintViewOpen] = useState(false);
@@ -98,7 +98,9 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   const [sortConfig, setSortConfig] = useState({ key: 'الرول', direction: 'asc' });
   const [visibleCols, setVisibleCols] = useState({
     roll: true, caseName: true, plaintiff: true, defendant: true,
-    type: true, decision: true, nextDate: true, notes: true
+    type: true, decision: true, nextDate: true, notes: true,
+    // أعمدة اختيارية إضافية
+    fileLocation: false, role: false, caseClass: false, subject: false
   });
 
   const handleSort = (key) => {
@@ -380,25 +382,27 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
           </button>
         </div>
 
-        {/* Session type filter (replaces tooltip hint) */}
-        <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl">
-          {['الكل', ...sessionTypes.slice(0, 3)].map(t => (
-            <button
-              key={t}
-              onClick={() => setSessionTypeFilter(t)}
-              className={`px-2.5 py-1 text-[10px] font-black rounded-lg transition-all ${
-                sessionTypeFilter === t
-                  ? t === 'الكل' ? 'bg-navy-900 text-white shadow-sm'
-                    : t.includes('فحص') ? 'bg-blue-500 text-white shadow-sm'
-                    : t.includes('موضوع') ? 'bg-amber-500 text-white shadow-sm'
-                    : 'bg-indigo-500 text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              {t === 'الكل' ? 'الكل' : t}
-            </button>
-          ))}
-        </div>
+        {/* Session type filter — قراءة ديناميكية من بيانات اليوم */}
+        {(() => {
+          const uniqueTypes = ['الكل', ...Array.from(new Set(
+            dayCases.map(c => getFieldVal(c, ['نوع الجلسة'])).filter(Boolean)
+          ))];
+          return (
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl">
+              {uniqueTypes.map(t => (
+                <button
+                  key={t}
+                  onClick={() => setSessionTypeFilter(t)}
+                  className={`px-2.5 py-1 text-[10px] font-black rounded-lg transition-all ${
+                    sessionTypeFilter === t ? 'bg-navy-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Search */}
         <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 flex-1 min-w-[160px]">
@@ -429,20 +433,31 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
           </button>
 
           {showColPicker && (
-            <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-slate-200 shadow-xl rounded-xl p-2 z-20 flex flex-col gap-1">
+            <div className="absolute top-full left-0 mt-1 w-52 bg-white border border-slate-200 shadow-xl rounded-xl p-2 z-20 flex flex-col gap-1">
+              <p className="text-[9px] font-black text-slate-400 px-2 pb-1 border-b border-slate-100">أعمدة الجدول</p>
               {Object.entries({
                 roll: 'الرول', caseName: 'الدعوى', plaintiff: 'المدعي',
                 defendant: 'ضد', type: 'نوع الجلسة', decision: 'القرار',
-                nextDate: 'الجلسة القادمة', notes: 'الملاحظات'
+                nextDate: 'الجلسة القادمة', notes: 'الملاحظات',
               }).map(([k, label]) => (
                 <label key={k} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={visibleCols[k]}
-                    onChange={() => toggleCol(k)}
-                    className="rounded text-indigo-600 focus:ring-indigo-500"
-                  />
+                  <input type="checkbox" checked={visibleCols[k]} onChange={() => toggleCol(k)}
+                    className="rounded text-indigo-600 focus:ring-indigo-500" />
                   <span className="text-xs font-bold text-slate-700">{label}</span>
+                </label>
+              ))}
+              <p className="text-[9px] font-black text-slate-400 px-2 py-1 border-t border-slate-100 mt-1">أعمدة إضافية</p>
+              {Object.entries({
+                fileLocation: 'مكان الملف',
+                role: 'الصفة',
+                caseClass: 'تصنيف الدعوى',
+                subject: 'موضوع الدعوى',
+              }).map(([k, label]) => (
+                <label key={k} className="flex items-center gap-2 px-2 py-1.5 hover:bg-indigo-50 rounded cursor-pointer">
+                  <input type="checkbox" checked={!!visibleCols[k]} onChange={() => toggleCol(k)}
+                    className="rounded text-indigo-600 focus:ring-indigo-500" />
+                  <span className="text-xs font-bold text-indigo-700">{label}</span>
+                  <span className="text-[8px] text-indigo-400 mr-auto">إضافي</span>
                 </label>
               ))}
             </div>
@@ -458,9 +473,64 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
             className="flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition">
             <Printer className="w-3.5 h-3.5" /> طباعة
           </button>
-          <button onClick={() => window.open(`/day-roll/${date}`, '_blank')}
-            className="flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition">
-            <ExternalLink className="w-3.5 h-3.5" /> شاشة كاملة
+          {/* كشف ملفات: يفتح صفحة طباعة منظمة باسم المستشار وتاريخ الجلسة */}
+          <button
+            onClick={() => {
+              const targetCases = selectedIds.size > 0
+                ? filteredCases.filter(c => selectedIds.has(c.id))
+                : filteredCases;
+              const counselorName = settings?.counselorName || settings?.name || 'المستشار';
+              const html = `
+                <!DOCTYPE html><html dir="rtl" lang="ar">
+                <head><meta charset="UTF-8"><title>كشف جلسة ${date}</title>
+                <style>
+                  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; color: #1e293b; direction: rtl; }
+                  h1 { font-size: 18px; font-weight: 900; margin-bottom: 4px; color: #0f172a; }
+                  h2 { font-size: 13px; color: #64748b; font-weight: 600; margin-bottom: 16px; }
+                  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                  th { background: #0f172a; color: white; padding: 8px 10px; text-align: right; font-weight: 900; }
+                  td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+                  tr:nth-child(even) { background: #f8fafc; }
+                  tr:hover { background: #f1f5f9; }
+                  .badge { display:inline-block; padding: 2px 8px; border-radius: 99px; font-weight: 900; font-size:10px; }
+                  @media print { body { margin: 10px; } }
+                </style></head>
+                <body>
+                <h1>كشف جلسة السيد / ${counselorName}</h1>
+                <h2>تاريخ الجلسة: ${date} — عدد الدعاوى: ${targetCases.length}</h2>
+                <table>
+                  <thead><tr>
+                    <th>رقم</th><th>الرول</th><th>رقم الدعوى</th><th>المدعي</th><th>ضد</th><th>الصفة</th><th>نوع الجلسة</th><th>القرار</th><th>الجلسة القادمة</th><th>الملاحظات</th>
+                  </tr></thead>
+                  <tbody>
+                    ${targetCases.map((c, i) => `
+                      <tr>
+                        <td>${i + 1}</td>
+                        <td><strong>${c['الرول'] || ''}</strong></td>
+                        <td dir="ltr">${c['رقم الدعوى'] || ''} / ${c['السنة'] || ''}</td>
+                        <td>${c['المدعي'] || ''}</td>
+                        <td>${c['المدعى_عليه'] || c['المدعى عليه'] || ''}</td>
+                        <td>${c['الصفة'] || c['صفة'] || ''}</td>
+                        <td>${c['نوع الجلسة'] || ''}</td>
+                        <td>${c['القرار'] || ''}</td>
+                        <td>${c['آخر جلسة'] || c['تاريخ الجلسة'] || ''}</td>
+                        <td>${c['الملاحظات'] || ''}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+                <script>window.onload = () => window.print();</script>
+                </body></html>
+              `;
+              const win = window.open('', '_blank');
+              win.document.write(html);
+              win.document.close();
+            }}
+            className="flex items-center gap-1 bg-navy-900 text-amber-300 hover:bg-navy-800 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition"
+            title={selectedIds.size > 0 ? `كشف المحدد (${selectedIds.size})` : 'كشف كامل للجلسة'}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            كشف ملفات{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
           </button>
         </div>
       </div>
@@ -542,9 +612,13 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                 {visibleCols.caseName && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="رقم الدعوى" label="الدعوى" />}
                 {visibleCols.plaintiff && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="المدعي" label="المدعي" />}
                 {visibleCols.defendant && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="المدعى_عليه" label="ضد" />}
+                {visibleCols.role && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="الصفة" label="الصفة" width="w-20" />}
                 {visibleCols.type && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="نوع الجلسة" label="نوع الجلسة" width="w-24" />}
                 {visibleCols.decision && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="القرار" label="القرار" width="w-32" />}
                 {visibleCols.nextDate && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="آخر جلسة" label="الجلسة القادمة" width="w-32" />}
+                {visibleCols.fileLocation && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="مكان الملف" label="مكان الملف" width="w-24" />}
+                {visibleCols.caseClass && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="تصنيف الدعوى" label="التصنيف" width="w-24" />}
+                {visibleCols.subject && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="موضوع الدعوى" label="الموضوع" />}
                 {visibleCols.notes && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="الملاحظات" label="الملاحظات" />}
                 <th className="px-2 py-2.5 w-20"></th>
               </tr>
@@ -652,8 +726,22 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                       <td className="px-2 py-2">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-[11px] font-bold text-slate-700 line-clamp-2" title={cObj['المدعى_عليه']}>{cObj['المدعى_عليه'] || '-'}</span>
-                          {role && <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${isNoInterest ? 'bg-slate-100 text-slate-500' : 'bg-rose-100 text-rose-700'}`}>{role}</span>}
+                          {role && !visibleCols.role && <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${isNoInterest ? 'bg-slate-100 text-slate-500' : 'bg-rose-100 text-rose-700'}`}>{role}</span>}
                         </div>
+                      </td>
+                    )}
+
+                    {/* Role / الصفة — optional extra column */}
+                    {visibleCols.role && (
+                      <td className="px-2 py-2 w-20">
+                        {role ? (
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                            role.includes('طاعن') ? 'bg-rose-100 text-rose-700' :
+                            role.includes('مطعون') ? 'bg-emerald-100 text-emerald-700' :
+                            role === 'لا شأن' ? 'bg-slate-100 text-slate-400' :
+                            'bg-indigo-100 text-indigo-700'
+                          }`}>{role}</span>
+                        ) : <span className="text-slate-300 text-[9px]">-</span>}
                       </td>
                     )}
 
@@ -751,6 +839,32 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                           </span>
                         )}
                       </EditableCell>
+                    )}
+
+                    {/* مكان الملف — extra optional col */}
+                    {visibleCols.fileLocation && (
+                      <td className="px-2 py-2 w-24">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          fileLocation === 'غير موجود' ? 'bg-rose-100 text-rose-700' :
+                          fileLocation === 'مؤقت' ? 'bg-amber-100 text-amber-700' :
+                          fileLocation === 'خارج الاختصاص' ? 'bg-indigo-100 text-indigo-700' :
+                          fileLocation ? 'bg-emerald-100 text-emerald-700' : 'text-slate-300'
+                        }`}>{fileLocation || '-'}</span>
+                      </td>
+                    )}
+
+                    {/* تصنيف الدعوى — extra optional col */}
+                    {visibleCols.caseClass && (
+                      <td className="px-2 py-2 w-24">
+                        <span className="text-[10px] font-bold text-slate-600">{cObj['تصنيف الدعوى'] || '-'}</span>
+                      </td>
+                    )}
+
+                    {/* موضوع الدعوى — extra optional col */}
+                    {visibleCols.subject && (
+                      <td className="px-2 py-2">
+                        <span className="text-[10px] text-slate-500 line-clamp-2">{cObj['موضوع الدعوى'] || '-'}</span>
+                      </td>
                     )}
 
                     {/* Actions */}
