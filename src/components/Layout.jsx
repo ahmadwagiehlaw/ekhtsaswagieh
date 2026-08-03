@@ -52,7 +52,7 @@ export default function Layout() {
             <h1 className="text-base sm:text-xl font-black text-white tracking-tight leading-none pb-1">اختصاص</h1>
             <div className="h-[1px] w-full bg-gradient-to-l from-amber-400/70 to-transparent rounded-full"></div>
             <span className="text-[11px] sm:text-[13px] font-bold text-amber-400 leading-none mt-1">
-              {userData?.canCustomizeLogo && settings?.officeName ? settings.officeName : 'م. أحمد وجيه'}
+              {settings?.consultantName || 'أحمد وجيه'}
             </span>
           </div>
         </div>

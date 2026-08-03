@@ -11,7 +11,7 @@ export default function Settings() {
   const { isAdmin, loginAdmin, logoutAdmin, cases, schema, settings, saveSettingsToFirebase, deleteAllCases, saveBatchCasesToFirebase, saveSchemaToFirebase } = useAppContext();
   const { userData } = useAuth();
   const { toast, showConfirm, showPrompt } = useUI();
-  
+
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const fileInputRef = useRef(null);
@@ -22,8 +22,8 @@ export default function Settings() {
 
   // Schema state
   const [localSchema, setLocalSchema] = useState(schema || []);
-  const [activeTab, setActiveTab] = useState('judgments'); // judgments, lists, schema, other, data
-  const [localOfficeName, setLocalOfficeName] = useState(settings?.officeName || '');
+  const [activeTab, setActiveTab] = useState('other'); // judgments, lists, schema, other, data
+  const [localConsultantName, setLocalConsultantName] = useState(settings?.consultantName || settings?.officeName || '');
 
   // Advanced state
   const [localEmployees, setLocalEmployees] = useState(settings?.employees || []);
@@ -37,6 +37,8 @@ export default function Settings() {
   const [localFileLocations, setLocalFileLocations] = useState(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
   const [localCommonProcedures, setLocalCommonProcedures] = useState(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
   const [localCaseClassifications, setLocalCaseClassifications] = useState(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
+  const [localCourtDegree, setLocalCourtDegree] = useState(settings?.courtDegree || 'أول درجة');
+  const [localCourtSpecialization, setLocalCourtSpecialization] = useState(settings?.courtSpecialization || 'قضاء إداري');
 
   const migrateJudgmentRule = (rule) => {
     if (rule.triggerField) {
@@ -159,7 +161,7 @@ export default function Settings() {
     }
     setIsProcessing(false);
   };
-  
+
   // Sync settings when loaded
   React.useEffect(() => {
     setLocalEmployees(settings?.employees || []);
@@ -175,6 +177,8 @@ export default function Settings() {
     setLocalCaseClassifications(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
     setLocalJudgmentCategories(settings?.judgmentCategories || ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي']);
     setLocalJudgmentClassifications(settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء']);
+    setLocalCourtDegree(settings?.courtDegree || 'أول درجة');
+    setLocalCourtSpecialization(settings?.courtSpecialization || 'قضاء إداري');
 
     setLocalDeadlineRules(settings?.deadlineRules || [
       { name: 'الطعن العادي', days: 60, targetRole: 'طاعنين', description: 'ميعاد الطعن العادي 60 يوماً' },
@@ -183,16 +187,25 @@ export default function Settings() {
   }, [settings]);
 
   const handleSaveSettings = async () => {
+    // Validate employees before processing
+    for (const emp of localEmployees) {
+      if (emp.password && emp.password.length > 0 && emp.password.length < 6) {
+        toast(`كلمة المرور للموظف "${emp.name || emp.username}" يجب أن تكون 6 أحرف/أرقام على الأقل`, 'error');
+        return; // Stop saving
+      }
+    }
+
     setIsProcessing(true);
-    
+
     // Create accounts for new employees
     if (userData?.tenantId) {
       for (const emp of localEmployees) {
         if (!emp.username || !emp.password) continue;
-        
+
         try {
-          const email = `${emp.username.toLowerCase().trim()}@${userData.tenantId.trim()}.ekhtsas.local`;
-          
+          const safeTenantId = userData.tenantId.replace(/_/g, '-').trim();
+          const email = `${emp.username.toLowerCase().trim()}@${safeTenantId}.ekhtsas.local`;
+
           const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -202,7 +215,7 @@ export default function Settings() {
               returnSecureToken: false
             })
           });
-          
+
           const data = await response.json();
           if (response.ok && data.localId) {
             // Write employee role to directory
@@ -212,16 +225,45 @@ export default function Settings() {
               tenantId: userData.tenantId,
               name: emp.name
             });
+          } else if (!response.ok) {
+            if (data.error?.message === 'EMAIL_EXISTS') {
+              // Attempt to update password if changed
+              const oldEmp = settings?.employees?.find(e => e.username.toLowerCase() === emp.username.toLowerCase());
+              if (oldEmp && oldEmp.password !== emp.password) {
+                try {
+                  const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email, password: oldEmp.password, returnSecureToken: true })
+                  });
+                  const signInData = await signInRes.json();
+
+                  if (signInRes.ok && signInData.idToken) {
+                    await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ idToken: signInData.idToken, password: emp.password, returnSecureToken: false })
+                    });
+                  }
+                } catch (err) {
+                  console.error("Failed to update employee password", err);
+                }
+              }
+            } else {
+              console.error("Firebase Auth Error for employee:", data.error?.message);
+              toast(`تعذر إنشاء/تحديث حساب للموظف ${emp.username}: ${data.error?.message || 'خطأ غير معروف'}`, 'error');
+            }
           }
         } catch (error) {
           console.error("Error provisioning employee:", error);
+          toast(`فشل الاتصال لإنشاء حساب الموظف ${emp.username}`, 'error');
         }
       }
     }
 
     await saveSettingsToFirebase({
       ...settings,
-      officeName: localOfficeName,
+      consultantName: localConsultantName,
       employees: localEmployees,
       decisions: localDecisions,
       reviewTasks: localReviewTasks,
@@ -235,6 +277,8 @@ export default function Settings() {
       caseClassifications: localCaseClassifications,
       judgmentCategories: localJudgmentCategories,
       judgmentClassifications: localJudgmentClassifications,
+      courtDegree: localCourtDegree,
+      courtSpecialization: localCourtSpecialization,
 
       judgmentDefaults: localJudgmentDefaults,
       deadlineRules: localDeadlineRules
@@ -253,9 +297,9 @@ export default function Settings() {
       toast('كلمة المرور غير صحيحة!', 'error');
       return;
     }
-    
+
     const confirmed = await showConfirm('تحذير نهائي', 'هل أنت متأكد من مسح جميع البيانات بشكل لا رجعة فيه؟');
-    
+
     if (confirmed) {
       setIsProcessing(true);
       const success = await deleteAllCases();
@@ -344,8 +388,8 @@ export default function Settings() {
         const key = getCaseKey(excelCase);
         if (existingMap.has(key)) {
           const existingCase = existingMap.get(key);
-          const merged = { ...existingCase, ...excelCase, id: key }; 
-          
+          const merged = { ...existingCase, ...excelCase, id: key };
+
           // Basic diff ignoring id
           const { id: id1, ...c1 } = existingCase;
           const { id: id2, ...c2 } = merged;
@@ -353,7 +397,7 @@ export default function Settings() {
             updated++;
           }
           newMergedData.push(merged);
-          existingMap.delete(key); 
+          existingMap.delete(key);
         } else {
           added++;
           newMergedData.push({ ...excelCase, id: key });
@@ -362,7 +406,7 @@ export default function Settings() {
 
       // Keep rest
       const kept = existingMap.size;
-      
+
       setSyncData({
         added,
         updated,
@@ -428,8 +472,8 @@ export default function Settings() {
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <input 
-                type="password" 
+              <input
+                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="كلمة المرور..."
@@ -446,7 +490,7 @@ export default function Settings() {
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto pb-6">
-      
+
       {/* Admin Header */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -464,11 +508,11 @@ export default function Settings() {
 
       {/* Tabs */}
       <div className="flex bg-slate-200/50 p-1 rounded-xl flex-wrap">
+        <button onClick={() => setActiveTab('other')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'other' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚙️ الإعدادات الأساسية</button>
         <button onClick={() => setActiveTab('judgments')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'judgments' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚖️ الجلسات والأحكام</button>
         <button onClick={() => setActiveTab('lists')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'lists' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>📁 قوائم النظام</button>
         <button onClick={() => setActiveTab('deadlines')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'deadlines' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⏰ المواعيد</button>
         <button onClick={() => setActiveTab('schema')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'schema' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🧩 هيكلة الحقول</button>
-        <button onClick={() => setActiveTab('other')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'other' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚙️ إعدادات أخرى</button>
         <button onClick={() => setActiveTab('data')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'data' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🛡️ بيانات ونسخ</button>
       </div>
 
@@ -629,189 +673,189 @@ export default function Settings() {
       {/* DEADLINES TAB */}
       {activeTab === 'deadlines' && (
         <details className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-0 animate-in fade-in zoom-in duration-300">
-<summary className="flex items-center justify-between pb-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-slate-100 transition-colors">
+          <summary className="flex items-center justify-between pb-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-slate-100 transition-colors">
             <div className="flex items-center gap-2">
               <Clock className="w-5 h-5 text-rose-600" />
               <h3 className="font-black text-sm text-navy-900"><span className="text-[12px] opacity-70 group-open:hidden ml-1">▼</span><span className="text-[12px] opacity-70 hidden group-open:inline ml-1">▲</span> محرك قواعد المواعيد الإجرائية</h3>
             </div>
-            <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}><button 
+            <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}><button
               onClick={() => {
                 setLocalDeadlineRules([...localDeadlineRules, { name: 'قاعدة جديدة', days: 30, targetRole: 'طاعنين', description: '' }]);
-              }} 
+              }}
               className="bg-amber-100 text-amber-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-amber-200"
             >
-              <Plus className="w-4 h-4"/> إضافة قاعدة
+              <Plus className="w-4 h-4" /> إضافة قاعدة
             </button></div></summary>
-<div className="pt-2 space-y-4">
+          <div className="pt-2 space-y-4">
 
-          <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
-            تتحكم هذه القواعد في التنبيهات التي تظهر في لوحة القيادة. إذا كانت القاعدة مرتبطة بـ "الطعن" سيتم حسابها من تاريخ الحكم. وإذا كانت مرتبطة بـ "وقف جزائي" سيتم حسابها من تاريخ الجلسة بعد انقضاء مدة الوقف.
-          </p>
+            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+              تتحكم هذه القواعد في التنبيهات التي تظهر في لوحة القيادة. إذا كانت القاعدة مرتبطة بـ "الطعن" سيتم حسابها من تاريخ الحكم. وإذا كانت مرتبطة بـ "وقف جزائي" سيتم حسابها من تاريخ الجلسة بعد انقضاء مدة الوقف.
+            </p>
 
-          <div className="space-y-3">
-            {localDeadlineRules.map((rule, idx) => (
-              <div key={idx} className="flex flex-col sm:flex-row gap-2 bg-slate-50 p-4 rounded-xl border border-slate-200 items-start sm:items-center">
-                <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[9px] text-slate-500 font-bold block mb-1">اسم القاعدة (مثال: الطعن، وقف جزائي)</label>
-                    <input 
-                      type="text" 
-                      value={rule.name} 
-                      onChange={e => {
-                        const newRules = [...localDeadlineRules];
-                        newRules[idx].name = e.target.value;
-                        setLocalDeadlineRules(newRules);
-                      }} 
-                      className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 focus:border-rose-400 focus:ring-1 focus:ring-rose-400 outline-none" 
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[9px] text-slate-500 font-bold block mb-1">صفة المصلحة الموجهة لها التنبيه</label>
-                    <select 
-                      value={rule.targetRole || 'طاعنين'} 
-                      onChange={e => {
-                        const newRules = [...localDeadlineRules];
-                        newRules[idx].targetRole = e.target.value;
-                        setLocalDeadlineRules(newRules);
-                      }} 
-                      className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 focus:border-rose-400 focus:ring-1 focus:ring-rose-400 outline-none"
-                    >
-                      <option value="طاعنين">الطاعن / المدعي</option>
-                      <option value="مطعون ضدنا">المطعون ضده / المدعى عليه</option>
-                    </select>
-                  </div>
-                  <div className="flex gap-2">
-                    {rule.name.includes('وقف') && (
-                      <div className="flex-1">
-                        <label className="text-[9px] text-slate-500 font-bold block mb-1">تفعيل بعد (يوم)</label>
-                        <input 
-                          type="number" 
-                          value={rule.triggerAfterDays || 30} 
-                          onChange={e => {
-                            const newRules = [...localDeadlineRules];
-                            newRules[idx].triggerAfterDays = e.target.value;
-                            setLocalDeadlineRules(newRules);
-                          }} 
-                          className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 outline-none" 
-                        />
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <label className="text-[9px] text-slate-500 font-bold block mb-1">المهلة (يوم)</label>
-                      <input 
-                        type="number" 
-                        value={rule.days} 
+            <div className="space-y-3">
+              {localDeadlineRules.map((rule, idx) => (
+                <div key={idx} className="flex flex-col sm:flex-row gap-2 bg-slate-50 p-4 rounded-xl border border-slate-200 items-start sm:items-center">
+                  <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[9px] text-slate-500 font-bold block mb-1">اسم القاعدة (مثال: الطعن، وقف جزائي)</label>
+                      <input
+                        type="text"
+                        value={rule.name}
                         onChange={e => {
                           const newRules = [...localDeadlineRules];
-                          newRules[idx].days = e.target.value;
+                          newRules[idx].name = e.target.value;
                           setLocalDeadlineRules(newRules);
-                        }} 
-                        className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 outline-none" 
+                        }}
+                        className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 focus:border-rose-400 focus:ring-1 focus:ring-rose-400 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-slate-500 font-bold block mb-1">صفة المصلحة الموجهة لها التنبيه</label>
+                      <select
+                        value={rule.targetRole || 'طاعنين'}
+                        onChange={e => {
+                          const newRules = [...localDeadlineRules];
+                          newRules[idx].targetRole = e.target.value;
+                          setLocalDeadlineRules(newRules);
+                        }}
+                        className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 focus:border-rose-400 focus:ring-1 focus:ring-rose-400 outline-none"
+                      >
+                        <option value="طاعنين">الطاعن / المدعي</option>
+                        <option value="مطعون ضدنا">المطعون ضده / المدعى عليه</option>
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      {rule.name.includes('وقف') && (
+                        <div className="flex-1">
+                          <label className="text-[9px] text-slate-500 font-bold block mb-1">تفعيل بعد (يوم)</label>
+                          <input
+                            type="number"
+                            value={rule.triggerAfterDays || 30}
+                            onChange={e => {
+                              const newRules = [...localDeadlineRules];
+                              newRules[idx].triggerAfterDays = e.target.value;
+                              setLocalDeadlineRules(newRules);
+                            }}
+                            className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 outline-none"
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <label className="text-[9px] text-slate-500 font-bold block mb-1">المهلة (يوم)</label>
+                        <input
+                          type="number"
+                          value={rule.days}
+                          onChange={e => {
+                            const newRules = [...localDeadlineRules];
+                            newRules[idx].days = e.target.value;
+                            setLocalDeadlineRules(newRules);
+                          }}
+                          className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="text-[9px] text-slate-500 font-bold block mb-1">وصف الميعاد</label>
+                      <input
+                        type="text"
+                        value={rule.description || ''}
+                        onChange={e => {
+                          const newRules = [...localDeadlineRules];
+                          newRules[idx].description = e.target.value;
+                          setLocalDeadlineRules(newRules);
+                        }}
+                        className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 outline-none"
                       />
                     </div>
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="text-[9px] text-slate-500 font-bold block mb-1">وصف الميعاد</label>
-                    <input 
-                      type="text" 
-                      value={rule.description || ''} 
-                      onChange={e => {
-                        const newRules = [...localDeadlineRules];
-                        newRules[idx].description = e.target.value;
-                        setLocalDeadlineRules(newRules);
-                      }} 
-                      className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 outline-none" 
-                    />
-                  </div>
+                  <button
+                    onClick={() => setLocalDeadlineRules(localDeadlineRules.filter((_, i) => i !== idx))}
+                    className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg transition self-end sm:self-auto mt-2 sm:mt-0"
+                    title="حذف"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => setLocalDeadlineRules(localDeadlineRules.filter((_, i) => i !== idx))} 
-                  className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg transition self-end sm:self-auto mt-2 sm:mt-0"
-                  title="حذف"
-                >
-                  <Trash2 className="w-4 h-4"/>
-                </button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <div className="pt-3 border-t border-slate-100">
-            <button onClick={handleSaveSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">
-              {isProcessing ? 'جاري الحفظ...' : 'حفظ المواعيد'}
-            </button>
+            <div className="pt-3 border-t border-slate-100">
+              <button onClick={handleSaveSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">
+                {isProcessing ? 'جاري الحفظ...' : 'حفظ المواعيد'}
+              </button>
+            </div>
+
           </div>
-        
-</div>
-</details>
+        </details>
       )}
 
       {/* SCHEMA TAB */}
       {activeTab === 'schema' && (
         <details className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-0 animate-in fade-in zoom-in duration-300">
-<summary className="flex items-center justify-between pb-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-slate-100 transition-colors">
+          <summary className="flex items-center justify-between pb-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-slate-100 transition-colors">
             <div className="flex items-center gap-2">
               <LayoutTemplate className="w-5 h-5 text-navy-900" />
               <h3 className="font-black text-sm text-navy-900"><span className="text-[12px] opacity-70 group-open:hidden ml-1">▼</span><span className="text-[12px] opacity-70 hidden group-open:inline ml-1">▲</span> إدارة الحقول (Dynamic Schema)</h3>
             </div>
             <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}><button onClick={addSchemaField} className="bg-amber-100 text-amber-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-amber-200">
-              <Plus className="w-4 h-4"/> إضافة حقل
+              <Plus className="w-4 h-4" /> إضافة حقل
             </button></div></summary>
-<div className="pt-2 space-y-4">
+          <div className="pt-2 space-y-4">
 
-          <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
-            يمكنك من هنا تخصيص الحقول التي تظهر في استمارة القضية دون الحاجة لمبرمج. 
-            المعرّف (ID) هو اسم العمود في ملف الإكسيل.
-          </p>
+            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+              يمكنك من هنا تخصيص الحقول التي تظهر في استمارة القضية دون الحاجة لمبرمج.
+              المعرّف (ID) هو اسم العمود في ملف الإكسيل.
+            </p>
 
-          <div className="space-y-3">
-            {localSchema.map((field, index) => (
-              <div key={index} className="flex flex-col sm:flex-row gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 items-start sm:items-center">
-                <div className="flex-1 w-full grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <div>
-                    <label className="text-[9px] text-slate-500 font-bold block mb-1">اسم العرض</label>
-                    <input type="text" value={field.label} onChange={e => updateSchemaField(index, 'label', e.target.value)} className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300" />
+            <div className="space-y-3">
+              {localSchema.map((field, index) => (
+                <div key={index} className="flex flex-col sm:flex-row gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 items-start sm:items-center">
+                  <div className="flex-1 w-full grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div>
+                      <label className="text-[9px] text-slate-500 font-bold block mb-1">اسم العرض</label>
+                      <input type="text" value={field.label} onChange={e => updateSchemaField(index, 'label', e.target.value)} className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300" />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-slate-500 font-bold block mb-1">المعرف (طابق الإكسيل)</label>
+                      <input type="text" value={field.id} onChange={e => updateSchemaField(index, 'id', e.target.value)} className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 bg-slate-100" />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-slate-500 font-bold block mb-1">النوع</label>
+                      <select value={field.type} onChange={e => updateSchemaField(index, 'type', e.target.value)} className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300">
+                        <option value="text">نص</option>
+                        <option value="number">رقم</option>
+                        <option value="textarea">نص طويل</option>
+                        <option value="date">تاريخ</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2 pt-5">
+                      <label className="flex items-center gap-1 text-[10px] font-bold text-slate-600">
+                        <input type="checkbox" checked={field.visible} onChange={e => updateSchemaField(index, 'visible', e.target.checked)} />
+                        مرئي
+                      </label>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[9px] text-slate-500 font-bold block mb-1">المعرف (طابق الإكسيل)</label>
-                    <input type="text" value={field.id} onChange={e => updateSchemaField(index, 'id', e.target.value)} className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 bg-slate-100" />
-                  </div>
-                  <div>
-                    <label className="text-[9px] text-slate-500 font-bold block mb-1">النوع</label>
-                    <select value={field.type} onChange={e => updateSchemaField(index, 'type', e.target.value)} className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300">
-                      <option value="text">نص</option>
-                      <option value="number">رقم</option>
-                      <option value="textarea">نص طويل</option>
-                      <option value="date">تاريخ</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2 pt-5">
-                    <label className="flex items-center gap-1 text-[10px] font-bold text-slate-600">
-                      <input type="checkbox" checked={field.visible} onChange={e => updateSchemaField(index, 'visible', e.target.checked)} />
-                      مرئي
-                    </label>
-                  </div>
+                  <button onClick={() => removeSchemaField(index)} className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg transition self-end sm:self-auto mt-2 sm:mt-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-                <button onClick={() => removeSchemaField(index)} className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg transition self-end sm:self-auto mt-2 sm:mt-0">
-                  <Trash2 className="w-4 h-4"/>
-                </button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <div className="pt-3 border-t border-slate-100">
-            <button onClick={saveSchema} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">
-              {isProcessing ? 'جاري الحفظ...' : 'حفظ هيكلة الحقول'}
-            </button>
+            <div className="pt-3 border-t border-slate-100">
+              <button onClick={saveSchema} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">
+                {isProcessing ? 'جاري الحفظ...' : 'حفظ هيكلة الحقول'}
+              </button>
+            </div>
+
           </div>
-        
-</div>
-</details>
+        </details>
       )}
 
       {/* OTHER TAB */}
       {activeTab === 'other' && (
         <div className="space-y-6 animate-in fade-in zoom-in duration-300">
-          
+
           {/* Global Preferences */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
@@ -823,24 +867,24 @@ export default function Settings() {
                 <div className="flex flex-col gap-2 flex-1">
                   <label className="text-xs font-bold text-slate-700">تنسيق الأرقام (للعرض والطباعة):</label>
                   <div className="flex bg-slate-100 p-1 rounded-xl self-start">
-                     <button 
-                       onClick={() => setLocalNumberFormat('en')}
-                       className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'en' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                     >
-                       إنجليزي (123)
-                     </button>
-                     <button 
-                       onClick={() => setLocalNumberFormat('ar')}
-                       className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'ar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                     >
-                       عربي (١٢٣)
-                     </button>
+                    <button
+                      onClick={() => setLocalNumberFormat('en')}
+                      className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'en' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      إنجليزي (123)
+                    </button>
+                    <button
+                      onClick={() => setLocalNumberFormat('ar')}
+                      className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'ar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      عربي (١٢٣)
+                    </button>
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-2 flex-1">
                   <label className="text-xs font-bold text-slate-700">تنسيق التواريخ الافتراضي:</label>
-                  <select 
+                  <select
                     value={localDateFormat}
                     onChange={e => setLocalDateFormat(e.target.value)}
                     className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
@@ -860,7 +904,7 @@ export default function Settings() {
                   <h4 className="text-xs font-black text-navy-900">الرسائل التأكيدية</h4>
                   <p className="text-[10px] text-slate-500 font-bold">إعادة تفعيل الرسائل التأكيدية التي قمت بتعطيلها مسبقاً عبر خيار (عدم الإظهار مجدداً).</p>
                 </div>
-                <button 
+                <button
                   onClick={handleResetConfirms}
                   className="bg-slate-100 hover:bg-slate-200 text-slate-750 text-xs font-black px-4 py-2 rounded-xl border border-slate-200 transition shadow-sm self-start sm:self-auto"
                 >
@@ -868,19 +912,58 @@ export default function Settings() {
                 </button>
               </div>
 
-              {userData?.canCustomizeLogo && (
-                <div className="flex flex-col gap-2 pt-3 border-t border-slate-100">
-                  <h4 className="text-xs font-black text-navy-900">تخصيص الشعار واسم المكتب</h4>
-                  <p className="text-[10px] text-slate-500 font-bold">يمكنك تغيير الاسم الافتراضي (م. أحمد وجيه) ليظهر اسم مكتبك الخاص أعلى التطبيق.</p>
+              <div className="flex flex-col sm:flex-row gap-4 pt-3 border-t border-slate-100">
+                <div className="flex flex-col gap-2 flex-1">
+                  <h4 className="text-xs font-black text-navy-900">تخصيص الشعار واسم القسم</h4>
+                  <p className="text-[10px] text-slate-500 font-bold">يمكنك تغيير الاسم الافتراضي (أحمد وجيه) ليظهر اسمك الخاص أعلى التطبيق.</p>
                   <input
                     type="text"
-                    value={localOfficeName}
-                    onChange={(e) => setLocalOfficeName(e.target.value)}
+                    value={localConsultantName}
+                    onChange={(e) => setLocalConsultantName(e.target.value)}
                     placeholder="مثال: مكتب الفهد للمحاماة والاستشارات القانونية"
                     className="w-full text-sm font-bold p-3 rounded-xl border border-slate-200 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 bg-slate-50"
                   />
                 </div>
-              )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-between border-t border-slate-100 pt-4">
+                <div className="flex flex-col gap-2 flex-1">
+                  <label className="text-xs font-black text-navy-900">درجة التقاضي للقسم</label>
+                  <p className="text-[10px] text-slate-500 font-bold mb-1">يؤثر هذا الخيار على ظهور الحقول المتقدمة للطعون.</p>
+                  <select
+                    value={localCourtDegree}
+                    onChange={e => setLocalCourtDegree(e.target.value)}
+                    className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
+                  >
+                    <option value="أول درجة">أول درجة</option>
+                    <option value="ثان درجة">ثان درجة</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-2 flex-1">
+                  <label className="text-xs font-black text-navy-900">تخصص المحكمة</label>
+                  <p className="text-[10px] text-slate-500 font-bold mb-1">يحدد المصطلحات (مثال: طاعن/مطعون، دعوى/طعن) في النظام.</p>
+                  <select
+                    value={localCourtSpecialization}
+                    onChange={e => {
+                      const spec = e.target.value;
+                      setLocalCourtSpecialization(spec);
+                    }}
+                    className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
+                  >
+                    <option value="قضاء إداري">قضاء إداري</option>
+                    <option value="الإدارية العليا">الإدارية العليا</option>
+                    <option value="قضاء مدني">قضاء مدني</option>
+                    <option value="نقض">نقض</option>
+                    <option value="قضاء تأديبي">قضاء تأديبي</option>
+                    <option value="استئنافية">استئنافية</option>
+                  </select>
+                </div>
+              </div>
+              <div className="bg-blue-50 text-blue-700 p-3 rounded-xl border border-blue-100 text-xs font-bold flex gap-2 items-start mt-2">
+                <span>💡</span>
+                <span>تغيير تخصص المحكمة سيعمل على ضبط المسميات في واجهة التطبيق، لتغيير قائمة "الصفة" و "نوع الجلسة"، يرجى تحديثها من نافذة "قوائم النظام".</span>
+              </div>
             </div>
           </div>
 
@@ -899,11 +982,11 @@ export default function Settings() {
                   </button>
                 </div>
               ))}
-              <button 
+              <button
                 onClick={async () => {
                   const newTask = await showPrompt('إضافة مهمة إطلاع', 'أدخل اسم المهمة الجديدة:');
                   if (newTask?.trim()) setLocalReviewTasks([...localReviewTasks, newTask.trim()]);
-                }} 
+                }}
                 className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
               >
                 <Plus className="w-3 h-3" /> إضافة مهمة
@@ -913,7 +996,7 @@ export default function Settings() {
 
           {/* Employees Management */}
           <details className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-0">
-<summary className="flex items-center justify-between pb-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-slate-100 transition-colors">
+            <summary className="flex items-center justify-between pb-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-slate-100 transition-colors">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-emerald-600" />
                 <h3 className="font-black text-sm text-navy-900"><span className="text-[12px] opacity-70 group-open:hidden ml-1">▼</span><span className="text-[12px] opacity-70 hidden group-open:inline ml-1">▲</span> إدارة الموظفين والصلاحيات</h3>
@@ -925,108 +1008,108 @@ export default function Settings() {
                   <span className="text-sm font-mono font-black tracking-wider">{userData.tenantId}</span>
                 </div>
               )}</summary>
-<div className="pt-2 space-y-4">
-            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
-              لإضافة موظف، أدخل اسمه ومعرف الدخول بالإنجليزية (Username). سيتطلب من الموظف إدخال "معرف الدخول" و "كود المستشار" لتسجيل الدخول.
-            </p>
-            
-            <div className="space-y-3">
-              {localEmployees.map((emp, index) => {
-                const empPerms = emp.permissions || { canEditData: true, canDeleteData: true, canManageRolls: true, canManageTasks: true };
-                return (
-                <div key={index} className="flex flex-col gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                  <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-                    <input type="text" placeholder="الاسم" value={emp.name} onChange={e => {
-                      const newEmp = [...localEmployees];
-                      newEmp[index].name = e.target.value;
-                      setLocalEmployees(newEmp);
-                    }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
-                    
-                    <input type="text" placeholder="معرف الدخول (مثال: omar)" value={emp.username || ''} onChange={e => {
-                      const newEmp = [...localEmployees];
-                      newEmp[index].username = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
-                      setLocalEmployees(newEmp);
-                    }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto bg-slate-50" dir="ltr" />
+            <div className="pt-2 space-y-4">
+              <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+                لإضافة موظف، أدخل اسمه ومعرف الدخول بالإنجليزية (Username). سيتطلب من الموظف إدخال "معرف الدخول" و "كود المستشار" لتسجيل الدخول.
+              </p>
 
-                    <input 
-                      type="text"
-                      list="jobTitlesList"
-                      placeholder="الوظيفة (مثال: محامي)"
-                      value={emp.jobTitle || ''} 
-                      onChange={e => {
-                        const newEmp = [...localEmployees];
-                        newEmp[index].jobTitle = e.target.value;
-                        setLocalEmployees(newEmp);
-                      }} 
-                      className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto bg-white"
-                    />
-                    <datalist id="jobTitlesList">
-                      <option value="محامي" />
-                      <option value="سكرتارية" />
-                      <option value="إداري" />
-                      <option value="صادر" />
-                      <option value="إطلاع" />
-                    </datalist>
+              <div className="space-y-3">
+                {localEmployees.map((emp, index) => {
+                  const empPerms = emp.permissions || { canEditData: true, canDeleteData: true, canManageRolls: true, canManageTasks: true };
+                  return (
+                    <div key={index} className="flex flex-col gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                      <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                        <input type="text" placeholder="الاسم" value={emp.name} onChange={e => {
+                          const newEmp = [...localEmployees];
+                          newEmp[index].name = e.target.value;
+                          setLocalEmployees(newEmp);
+                        }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
 
-                    <input type="text" placeholder="كلمة المرور" value={emp.password} onChange={e => {
-                      const newEmp = [...localEmployees];
-                      newEmp[index].password = e.target.value;
-                      setLocalEmployees(newEmp);
-                    }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
-                    
-                    <button onClick={() => setLocalEmployees(localEmployees.filter((_, idx) => idx !== index))} className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg shrink-0 self-end sm:self-auto mt-2 sm:mt-0">
-                      <Trash2 className="w-4 h-4"/>
-                    </button>
-                  </div>
+                        <input type="text" placeholder="معرف الدخول (مثال: omar)" value={emp.username || ''} onChange={e => {
+                          const newEmp = [...localEmployees];
+                          newEmp[index].username = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                          setLocalEmployees(newEmp);
+                        }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto bg-slate-50" dir="ltr" />
 
-                  <div className="flex flex-wrap gap-3 mt-1 p-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
-                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-navy-900 transition">
-                      <input type="checkbox" checked={empPerms.canEditData} onChange={e => {
-                         const newEmp = [...localEmployees];
-                         newEmp[index].permissions = { ...empPerms, canEditData: e.target.checked };
-                         setLocalEmployees(newEmp);
-                      }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                      📝 إضافة وتعديل القضايا
-                    </label>
-                    
-                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-rose-600 transition">
-                      <input type="checkbox" checked={empPerms.canDeleteData} onChange={e => {
-                         const newEmp = [...localEmployees];
-                         newEmp[index].permissions = { ...empPerms, canDeleteData: e.target.checked };
-                         setLocalEmployees(newEmp);
-                      }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                      🗑️ حذف القضايا
-                    </label>
+                        <input
+                          type="text"
+                          list="jobTitlesList"
+                          placeholder="الوظيفة (مثال: محامي)"
+                          value={emp.jobTitle || ''}
+                          onChange={e => {
+                            const newEmp = [...localEmployees];
+                            newEmp[index].jobTitle = e.target.value;
+                            setLocalEmployees(newEmp);
+                          }}
+                          className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto bg-white"
+                        />
+                        <datalist id="jobTitlesList">
+                          <option value="محامي" />
+                          <option value="سكرتارية" />
+                          <option value="إداري" />
+                          <option value="صادر" />
+                          <option value="إطلاع" />
+                        </datalist>
 
-                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-navy-900 transition">
-                      <input type="checkbox" checked={empPerms.canManageRolls} onChange={e => {
-                         const newEmp = [...localEmployees];
-                         newEmp[index].permissions = { ...empPerms, canManageRolls: e.target.checked };
-                         setLocalEmployees(newEmp);
-                      }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                      📅 إدارة رول الجلسات
-                    </label>
+                        <input type="text" placeholder="كلمة المرور" value={emp.password} onChange={e => {
+                          const newEmp = [...localEmployees];
+                          newEmp[index].password = e.target.value;
+                          setLocalEmployees(newEmp);
+                        }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
 
-                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-navy-900 transition">
-                      <input type="checkbox" checked={empPerms.canManageTasks} onChange={e => {
-                         const newEmp = [...localEmployees];
-                         newEmp[index].permissions = { ...empPerms, canManageTasks: e.target.checked };
-                         setLocalEmployees(newEmp);
-                      }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                      📋 إدارة المهام
-                    </label>
-                  </div>
-                </div>
-                );
-              })}
+                        <button onClick={() => setLocalEmployees(localEmployees.filter((_, idx) => idx !== index))} className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg shrink-0 self-end sm:self-auto mt-2 sm:mt-0">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-3 mt-1 p-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-navy-900 transition">
+                          <input type="checkbox" checked={empPerms.canEditData} onChange={e => {
+                            const newEmp = [...localEmployees];
+                            newEmp[index].permissions = { ...empPerms, canEditData: e.target.checked };
+                            setLocalEmployees(newEmp);
+                          }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                          📝 إضافة وتعديل القضايا
+                        </label>
+
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-rose-600 transition">
+                          <input type="checkbox" checked={empPerms.canDeleteData} onChange={e => {
+                            const newEmp = [...localEmployees];
+                            newEmp[index].permissions = { ...empPerms, canDeleteData: e.target.checked };
+                            setLocalEmployees(newEmp);
+                          }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                          🗑️ حذف القضايا
+                        </label>
+
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-navy-900 transition">
+                          <input type="checkbox" checked={empPerms.canManageRolls} onChange={e => {
+                            const newEmp = [...localEmployees];
+                            newEmp[index].permissions = { ...empPerms, canManageRolls: e.target.checked };
+                            setLocalEmployees(newEmp);
+                          }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                          📅 إدارة رول الجلسات
+                        </label>
+
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-navy-900 transition">
+                          <input type="checkbox" checked={empPerms.canManageTasks} onChange={e => {
+                            const newEmp = [...localEmployees];
+                            newEmp[index].permissions = { ...empPerms, canManageTasks: e.target.checked };
+                            setLocalEmployees(newEmp);
+                          }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                          📋 إدارة المهام
+                        </label>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button onClick={() => setLocalEmployees([...localEmployees, { name: '', username: '', jobTitle: '', password: '', permissions: { canEditData: true, canDeleteData: true, canManageRolls: true, canManageTasks: true } }])} className="w-full border-2 border-dashed border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-2">
+                <Plus className="w-4 h-4" /> إضافة موظف جديد
+              </button>
+
             </div>
-
-            <button onClick={() => setLocalEmployees([...localEmployees, { name: '', username: '', jobTitle: '', password: '', permissions: { canEditData: true, canDeleteData: true, canManageRolls: true, canManageTasks: true } }])} className="w-full border-2 border-dashed border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-2">
-              <Plus className="w-4 h-4"/> إضافة موظف جديد
-            </button>
-          
-</div>
-</details>
+          </details>
 
           {/* Save Settings Button */}
           <button onClick={handleSaveSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">
@@ -1040,14 +1123,14 @@ export default function Settings() {
               <h3 className="font-black text-sm text-rose-900">منطقة الخطر: مسح البيانات</h3>
             </div>
             <p className="text-[11px] font-bold text-rose-700">تحذير: سيتم حذف جميع القضايا والملفات بشكل نهائي. تأكد من عمل نسخة احتياطية (Excel) قبل القيام بهذه الخطوة.</p>
-            
+
             <div className="flex gap-2">
-              <input 
-                type="password" 
-                placeholder="أدخل باسوورد المدير للتأكيد" 
+              <input
+                type="password"
+                placeholder="أدخل باسوورد المدير للتأكيد"
                 value={deletePassword}
                 onChange={e => setDeletePassword(e.target.value)}
-                className="flex-1 text-xs font-bold p-2 rounded-lg border border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-500" 
+                className="flex-1 text-xs font-bold p-2 rounded-lg border border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
               />
               <button onClick={handleDeleteAll} disabled={isProcessing || !deletePassword} className="bg-rose-600 text-white font-bold px-4 py-2 rounded-lg text-xs hover:bg-rose-700 disabled:opacity-50 shadow-sm">
                 مسح جميع البيانات
@@ -1066,7 +1149,7 @@ export default function Settings() {
               <SettingsIcon className="w-5 h-5 text-indigo-600" />
               <h3 className="font-black text-sm text-navy-900">إدارة خيارات الحقول الجوهرية</h3>
             </div>
-            
+
             {/* Roles choice */}
             <div className="space-y-2">
               <h4 className="text-xs font-black text-slate-500">خيارات حقل الصفة (طاعن / مطعون ضدنا / إلخ):</h4>
@@ -1079,11 +1162,11 @@ export default function Settings() {
                     </button>
                   </div>
                 ))}
-                <button 
+                <button
                   onClick={async () => {
                     const newRole = await showPrompt('إضافة صفة', 'أدخل مسمى الصفة الجديد:');
                     if (newRole?.trim()) setLocalRoles([...localRoles, newRole.trim()]);
-                  }} 
+                  }}
                   className="flex items-center gap-1 bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-100 transition shadow-sm"
                 >
                   <Plus className="w-3 h-3" /> إضافة صفة
@@ -1103,11 +1186,11 @@ export default function Settings() {
                     </button>
                   </div>
                 ))}
-                <button 
+                <button
                   onClick={async () => {
                     const newType = await showPrompt('إضافة نوع جلسة', 'أدخل اسم نوع الجلسة الجديد:');
                     if (newType?.trim()) setLocalSessionTypes([...localSessionTypes, newType.trim()]);
-                  }} 
+                  }}
                   className="flex items-center gap-1 bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-100 transition shadow-sm"
                 >
                   <Plus className="w-3 h-3" /> إضافة نوع
@@ -1127,11 +1210,11 @@ export default function Settings() {
                     </button>
                   </div>
                 ))}
-                <button 
+                <button
                   onClick={async () => {
                     const newLoc = await showPrompt('إضافة مكان الملف', 'أدخل مسمى مكان الملف الجديد:');
                     if (newLoc?.trim()) setLocalFileLocations([...localFileLocations, newLoc.trim()]);
-                  }} 
+                  }}
                   className="flex items-center gap-1 bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-100 transition shadow-sm"
                 >
                   <Plus className="w-3 h-3" /> إضافة مكان
@@ -1155,11 +1238,11 @@ export default function Settings() {
                   </button>
                 </div>
               ))}
-              <button 
+              <button
                 onClick={async () => {
                   const newProc = await showPrompt('إضافة إجراء شائع', 'أدخل اسم الإجراء الجديد:');
                   if (newProc?.trim()) setLocalCommonProcedures([...localCommonProcedures, newProc.trim()]);
-                }} 
+                }}
                 className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
               >
                 <Plus className="w-3 h-3" /> إضافة إجراء
@@ -1182,11 +1265,11 @@ export default function Settings() {
                   </button>
                 </div>
               ))}
-              <button 
+              <button
                 onClick={async () => {
                   const newCls = await showPrompt('إضافة تصنيف', 'أدخل تصنيف الدعوى الجديد:');
                   if (newCls?.trim()) setLocalCaseClassifications([...localCaseClassifications, newCls.trim()]);
-                }} 
+                }}
                 className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
               >
                 <Plus className="w-3 h-3" /> إضافة تصنيف
@@ -1219,11 +1302,11 @@ export default function Settings() {
                   </button>
                 </div>
               ))}
-              <button 
+              <button
                 onClick={async () => {
                   const newDec = await showPrompt('إضافة قرار', 'أدخل القرار الجديد:');
                   if (newDec?.trim()) setLocalDecisions([...localDecisions, newDec.trim()]);
-                }} 
+                }}
                 className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
               >
                 <Plus className="w-3 h-3" /> إضافة قرار
@@ -1246,11 +1329,11 @@ export default function Settings() {
                   </button>
                 </div>
               ))}
-              <button 
+              <button
                 onClick={async () => {
                   const newType = await showPrompt('إضافة نوع رول', 'أدخل اسم نوع الرول الجديد:');
                   if (newType?.trim()) setLocalRollTypes([...localRollTypes, newType.trim()]);
-                }} 
+                }}
                 className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
               >
                 <Plus className="w-3 h-3" /> إضافة نوع
@@ -1273,11 +1356,11 @@ export default function Settings() {
                   </button>
                 </div>
               ))}
-              <button 
+              <button
                 onClick={async () => {
                   const newCat = await showPrompt('إضافة فئة', 'أدخل اسم فئة الحكم الجديدة (مثال: شق عاجل، نهائي):');
                   if (newCat?.trim()) setLocalJudgmentCategories([...localJudgmentCategories, newCat.trim()]);
-                }} 
+                }}
                 className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
               >
                 <Plus className="w-3 h-3" /> إضافة فئة
@@ -1300,11 +1383,11 @@ export default function Settings() {
                   </button>
                 </div>
               ))}
-              <button 
+              <button
                 onClick={async () => {
                   const newCls = await showPrompt('إضافة تصنيف', 'أدخل تصنيف الحكم الجديد (مثال: صالح، ضد):');
                   if (newCls?.trim()) setLocalJudgmentClassifications([...localJudgmentClassifications, newCls.trim()]);
-                }} 
+                }}
                 className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
               >
                 <Plus className="w-3 h-3" /> إضافة تصنيف
@@ -1315,138 +1398,138 @@ export default function Settings() {
 
           {/* Default Judgment Settings Management */}
           <details className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-0">
-<summary className="flex items-center justify-between pb-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-slate-100 transition-colors">
+            <summary className="flex items-center justify-between pb-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-slate-100 transition-colors">
               <div className="flex items-center gap-2">
                 <SettingsIcon className="w-5 h-5 text-indigo-600" />
                 <h3 className="font-black text-sm text-navy-900"><span className="text-[12px] opacity-70 group-open:hidden ml-1">▼</span><span className="text-[12px] opacity-70 hidden group-open:inline ml-1">▲</span> قواعد التعبئة التلقائية للأحكام</h3>
               </div>
-              <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}><button 
+              <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}><button
                 onClick={() => setLocalJudgmentDefaults([...localJudgmentDefaults, { name: '', conditions: { role: '', category: '', classification: '', type: '', sessionType: '', decision: '' }, actions: { category: '', classification: '', type: '', text: '' } }])}
                 className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-indigo-100"
               >
-                <Plus className="w-4 h-4"/> إضافة قاعدة
+                <Plus className="w-4 h-4" /> إضافة قاعدة
               </button></div></summary>
-<div className="pt-2 space-y-4">
-            
-            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
-              قم بإعداد قواعد ديناميكية متعددة الشروط لملء تفاصيل الحكم آلياً عند تسجيل حكم (مثلاً: إذا كانت الصفة "طاعنين" والفئة "نهائي" {'->'} يتم تعبئة التصنيف والمنطوق بـ "..." ). 
-            </p>
+            <div className="pt-2 space-y-4">
 
-            {/* Toolbar: Search and Expand/Collapse */}
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-slate-50 p-2 rounded-xl border border-slate-200">
-              <div className="flex-1 relative min-w-[200px]">
-                <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-                <input 
-                  type="text" 
-                  placeholder="ابحث في القواعد (بالاسم، النوع، الصفة...)" 
-                  value={rulesSearchQuery}
-                  onChange={e => setRulesSearchQuery(e.target.value)}
-                  className="w-full text-xs font-bold pl-3 pr-9 py-2 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none bg-white"
-                />
+              <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+                قم بإعداد قواعد ديناميكية متعددة الشروط لملء تفاصيل الحكم آلياً عند تسجيل حكم (مثلاً: إذا كانت الصفة "طاعنين" والفئة "نهائي" {'->'} يتم تعبئة التصنيف والمنطوق بـ "..." ).
+              </p>
+
+              {/* Toolbar: Search and Expand/Collapse */}
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                <div className="flex-1 relative min-w-[200px]">
+                  <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="ابحث في القواعد (بالاسم، النوع، الصفة...)"
+                    value={rulesSearchQuery}
+                    onChange={e => setRulesSearchQuery(e.target.value)}
+                    className="w-full text-xs font-bold pl-3 pr-9 py-2 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none bg-white"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setExpandedRuleGroups([...new Set(localJudgmentDefaults.map(r => r.conditions.type ? `قواعد: ${r.conditions.type.trim()}` : 'قواعد عامة'))])} className="text-[10px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition">فرد الكل</button>
+                  <button onClick={() => setExpandedRuleGroups([])} className="text-[10px] font-bold text-slate-600 bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded-lg transition">طي الكل</button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => setExpandedRuleGroups([...new Set(localJudgmentDefaults.map(r => r.conditions.type ? `قواعد: ${r.conditions.type.trim()}` : 'قواعد عامة'))])} className="text-[10px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition">فرد الكل</button>
-                <button onClick={() => setExpandedRuleGroups([])} className="text-[10px] font-bold text-slate-600 bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded-lg transition">طي الكل</button>
-              </div>
-            </div>
 
-            <div className="space-y-4">
-              {(() => {
-                 const grouped = {};
-                 localJudgmentDefaults.forEach((rule, originalIdx) => {
-                   if (rulesSearchQuery) {
-                     const q = rulesSearchQuery.toLowerCase();
-                     const match = (rule.name || '').toLowerCase().includes(q) ||
-                                   (rule.conditions.type || '').toLowerCase().includes(q) ||
-                                   (rule.conditions.role || '').toLowerCase().includes(q) ||
-                                   (rule.conditions.category || '').toLowerCase().includes(q) ||
-                                   (rule.actions.text || '').toLowerCase().includes(q);
-                     if (!match) return;
-                   }
-                   const groupName = rule.conditions.type ? `قواعد: ${rule.conditions.type.trim()}` : 'قواعد عامة';
-                   if (!grouped[groupName]) grouped[groupName] = [];
-                   grouped[groupName].push({ rule, idx: originalIdx });
-                 });
+              <div className="space-y-4">
+                {(() => {
+                  const grouped = {};
+                  localJudgmentDefaults.forEach((rule, originalIdx) => {
+                    if (rulesSearchQuery) {
+                      const q = rulesSearchQuery.toLowerCase();
+                      const match = (rule.name || '').toLowerCase().includes(q) ||
+                        (rule.conditions.type || '').toLowerCase().includes(q) ||
+                        (rule.conditions.role || '').toLowerCase().includes(q) ||
+                        (rule.conditions.category || '').toLowerCase().includes(q) ||
+                        (rule.actions.text || '').toLowerCase().includes(q);
+                      if (!match) return;
+                    }
+                    const groupName = rule.conditions.type ? `قواعد: ${rule.conditions.type.trim()}` : 'قواعد عامة';
+                    if (!grouped[groupName]) grouped[groupName] = [];
+                    grouped[groupName].push({ rule, idx: originalIdx });
+                  });
 
-                 if (Object.keys(grouped).length === 0) return <div className="text-center py-6 text-slate-400 text-xs font-bold bg-slate-50 rounded-xl border border-slate-100">لا توجد قواعد مطابقة للبحث</div>;
+                  if (Object.keys(grouped).length === 0) return <div className="text-center py-6 text-slate-400 text-xs font-bold bg-slate-50 rounded-xl border border-slate-100">لا توجد قواعد مطابقة للبحث</div>;
 
-                 return Object.entries(grouped).map(([gName, rulesList]) => {
-                   const isGroupExpanded = expandedRuleGroups.includes(gName) || rulesSearchQuery; // Always expand if searching
-                   return (
-                     <div key={gName} className="border border-slate-200 rounded-xl bg-slate-50 overflow-hidden shadow-sm transition-all">
-                       <div 
-                         onClick={() => setExpandedRuleGroups(prev => prev.includes(gName) ? prev.filter(g => g !== gName) : [...prev, gName])}
-                         className="flex items-center justify-between p-3 hover:bg-slate-100 cursor-pointer select-none transition"
-                       >
-                         <div className="flex items-center gap-2">
-                           <div className="w-6 h-6 rounded-md bg-indigo-100 text-indigo-600 flex items-center justify-center font-black text-[11px]">{rulesList.length}</div>
-                           <h4 className="font-black text-xs text-navy-900">{gName}</h4>
-                         </div>
-                         <span className="text-slate-400 text-[10px]">{isGroupExpanded ? '▼' : '◀'}</span>
-                       </div>
-                       
-                       {isGroupExpanded && (
-                         <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3 bg-white border-t border-slate-100">
-                           {rulesList.map(({ rule, idx }) => {
+                  return Object.entries(grouped).map(([gName, rulesList]) => {
+                    const isGroupExpanded = expandedRuleGroups.includes(gName) || rulesSearchQuery; // Always expand if searching
+                    return (
+                      <div key={gName} className="border border-slate-200 rounded-xl bg-slate-50 overflow-hidden shadow-sm transition-all">
+                        <div
+                          onClick={() => setExpandedRuleGroups(prev => prev.includes(gName) ? prev.filter(g => g !== gName) : [...prev, gName])}
+                          className="flex items-center justify-between p-3 hover:bg-slate-100 cursor-pointer select-none transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-md bg-indigo-100 text-indigo-600 flex items-center justify-center font-black text-[11px]">{rulesList.length}</div>
+                            <h4 className="font-black text-xs text-navy-900">{gName}</h4>
+                          </div>
+                          <span className="text-slate-400 text-[10px]">{isGroupExpanded ? '▼' : '◀'}</span>
+                        </div>
+
+                        {isGroupExpanded && (
+                          <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3 bg-white border-t border-slate-100">
+                            {rulesList.map(({ rule, idx }) => {
                               const isExpanded = expandedRules.includes(idx);
                               const toggleExpand = () => setExpandedRules(prev => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]);
-                              
+
                               const getRuleSummary = (r) => {
-                                  const conds = [];
-                                  if (r.conditions.role) conds.push(`الصفة "${r.conditions.role}"`);
-                                  if (r.conditions.category) conds.push(`الفئة "${r.conditions.category}"`);
-                                  if (r.conditions.classification) conds.push(`التصنيف "${r.conditions.classification}"`);
-                                  if (r.conditions.type) conds.push(`النوع "${r.conditions.type}"`);
-                                  if (r.conditions.sessionType) conds.push(`الجلسة "${r.conditions.sessionType}"`);
-                                  if (r.conditions.decision) conds.push(`القرار "${r.conditions.decision}"`);
-                                  
-                                  const acts = [];
-                                  if (r.actions.category) acts.push(`الفئة "${r.actions.category}"`);
-                                  if (r.actions.classification) acts.push(`التصنيف "${r.actions.classification}"`);
-                                  if (r.actions.type) acts.push(`النوع "${r.actions.type}"`);
-                                  if (r.actions.text) acts.push(`المنطوق "${r.actions.text.slice(0, 25)}${r.actions.text.length > 25 ? '...' : ''}"`);
-                                  
-                                  const condStr = conds.length > 0 ? conds.join(' + ') : 'أي دعوى';
-                                  const actStr = acts.length > 0 ? acts.join('، و') : 'لا شيء';
-                                  return (
-                                      <div className="text-[10px] font-bold text-slate-600 leading-relaxed truncate">
-                                          <span className="text-rose-500 ml-1">لو:</span> {condStr} <span className="mx-2 text-slate-300">|</span> <span className="text-emerald-600 ml-1">يتم تعبئة:</span> {actStr}
-                                      </div>
-                                  );
+                                const conds = [];
+                                if (r.conditions.role) conds.push(`الصفة "${r.conditions.role}"`);
+                                if (r.conditions.category) conds.push(`الفئة "${r.conditions.category}"`);
+                                if (r.conditions.classification) conds.push(`التصنيف "${r.conditions.classification}"`);
+                                if (r.conditions.type) conds.push(`النوع "${r.conditions.type}"`);
+                                if (r.conditions.sessionType) conds.push(`الجلسة "${r.conditions.sessionType}"`);
+                                if (r.conditions.decision) conds.push(`القرار "${r.conditions.decision}"`);
+
+                                const acts = [];
+                                if (r.actions.category) acts.push(`الفئة "${r.actions.category}"`);
+                                if (r.actions.classification) acts.push(`التصنيف "${r.actions.classification}"`);
+                                if (r.actions.type) acts.push(`النوع "${r.actions.type}"`);
+                                if (r.actions.text) acts.push(`المنطوق "${r.actions.text.slice(0, 25)}${r.actions.text.length > 25 ? '...' : ''}"`);
+
+                                const condStr = conds.length > 0 ? conds.join(' + ') : 'أي دعوى';
+                                const actStr = acts.length > 0 ? acts.join('، و') : 'لا شيء';
+                                return (
+                                  <div className="text-[10px] font-bold text-slate-600 leading-relaxed truncate">
+                                    <span className="text-rose-500 ml-1">لو:</span> {condStr} <span className="mx-2 text-slate-300">|</span> <span className="text-emerald-600 ml-1">يتم تعبئة:</span> {actStr}
+                                  </div>
+                                );
                               };
 
                               return (
-                              <div key={idx} className={`flex flex-col gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 hover:border-indigo-300 transition ${isExpanded ? 'col-span-full' : ''}`}>
-                                <div className="flex items-center justify-between">
-                                  <div 
-                                    onClick={toggleExpand}
-                                    className="flex items-center gap-1 text-[11px] font-black text-indigo-800 hover:text-indigo-600 transition w-max cursor-pointer select-none"
-                                  >
-                                    <span className="text-indigo-400 ml-1">{isExpanded ? '▼' : '◀'}</span>
-                                    {rule.name || `قاعدة رقم ${idx + 1}`}
+                                <div key={idx} className={`flex flex-col gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 hover:border-indigo-300 transition ${isExpanded ? 'col-span-full' : ''}`}>
+                                  <div className="flex items-center justify-between">
+                                    <div
+                                      onClick={toggleExpand}
+                                      className="flex items-center gap-1 text-[11px] font-black text-indigo-800 hover:text-indigo-600 transition w-max cursor-pointer select-none"
+                                    >
+                                      <span className="text-indigo-400 ml-1">{isExpanded ? '▼' : '◀'}</span>
+                                      {rule.name || `قاعدة رقم ${idx + 1}`}
+                                    </div>
+                                    <div className="flex gap-1">
+                                      <button onClick={toggleExpand} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition" title="تعديل">
+                                        <Edit3 className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button onClick={() => setLocalJudgmentDefaults([...localJudgmentDefaults, JSON.parse(JSON.stringify(rule))])} className="text-slate-400 hover:text-sky-600 hover:bg-sky-50 p-1.5 rounded-lg transition" title="تكرار">
+                                        <Copy className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button onClick={() => setLocalJudgmentDefaults(localJudgmentDefaults.filter((_, i) => i !== idx))} className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition" title="حذف">
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
                                   </div>
-                                  <div className="flex gap-1">
-                                    <button onClick={toggleExpand} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition" title="تعديل">
-                                      <Edit3 className="w-3.5 h-3.5"/>
-                                    </button>
-                                    <button onClick={() => setLocalJudgmentDefaults([...localJudgmentDefaults, JSON.parse(JSON.stringify(rule))])} className="text-slate-400 hover:text-sky-600 hover:bg-sky-50 p-1.5 rounded-lg transition" title="تكرار">
-                                      <Copy className="w-3.5 h-3.5"/>
-                                    </button>
-                                    <button onClick={() => setLocalJudgmentDefaults(localJudgmentDefaults.filter((_, i) => i !== idx))} className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition" title="حذف">
-                                      <Trash2 className="w-3.5 h-3.5"/>
-                                    </button>
-                                  </div>
-                                </div>
-                                
-                                {!isExpanded ? (
-                                  <div className="bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm cursor-pointer hover:border-indigo-200 transition" onClick={toggleExpand}>
-                                     {getRuleSummary(rule)}
-                                  </div>
-                                ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1 animate-in fade-in slide-in-from-top-2">
-                                  <div className="col-span-full">
-                                      <label className="text-[9px] font-bold text-slate-500 block mb-1">اسم القاعدة (اختياري)</label>
-                                      <input
+
+                                  {!isExpanded ? (
+                                    <div className="bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm cursor-pointer hover:border-indigo-200 transition" onClick={toggleExpand}>
+                                      {getRuleSummary(rule)}
+                                    </div>
+                                  ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1 animate-in fade-in slide-in-from-top-2">
+                                      <div className="col-span-full">
+                                        <label className="text-[9px] font-bold text-slate-500 block mb-1">اسم القاعدة (اختياري)</label>
+                                        <input
                                           type="text"
                                           placeholder="مثال: رفض الطعن موضوعاً"
                                           value={rule.name}
@@ -1456,184 +1539,184 @@ export default function Settings() {
                                             setLocalJudgmentDefaults(newRules);
                                           }}
                                           className="w-full text-xs font-bold p-1.5 rounded-lg border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-white"
-                                      />
-                                  </div>
-                                  {/* Conditions */}
-                                  <div className="space-y-2 border-r-2 border-indigo-300 pr-2 bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm">
-                                    <p className="text-[10px] font-black text-slate-700 mb-2 border-b border-slate-100 pb-1">شروط التطبيق (اتركها فارغة للتجاهل):</p>
-                                    
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div>
-                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">الصفة</label>
-                                        <select 
-                                          value={rule.conditions.role}
-                                          onChange={(e) => {
-                                            const newRules = [...localJudgmentDefaults];
-                                            newRules[idx].conditions.role = e.target.value;
-                                            setLocalJudgmentDefaults(newRules);
-                                          }}
-                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                                        >
-                                          <option value="">- أي صفة -</option>
-                                          {localRoles.map(r => <option key={r} value={r}>{r}</option>)}
-                                        </select>
-                                      </div>
-                                      <div>
-                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">فئة الحكم</label>
-                                        <select 
-                                          value={rule.conditions.category}
-                                          onChange={(e) => {
-                                            const newRules = [...localJudgmentDefaults];
-                                            newRules[idx].conditions.category = e.target.value;
-                                            setLocalJudgmentDefaults(newRules);
-                                          }}
-                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                                        >
-                                          <option value="">- أي فئة -</option>
-                                          {localJudgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                      </div>
-                                      <div>
-                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">تصنيف الحكم</label>
-                                        <select 
-                                          value={rule.conditions.classification}
-                                          onChange={(e) => {
-                                            const newRules = [...localJudgmentDefaults];
-                                            newRules[idx].conditions.classification = e.target.value;
-                                            setLocalJudgmentDefaults(newRules);
-                                          }}
-                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                                        >
-                                          <option value="">- أي تصنيف -</option>
-                                          {localJudgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                      </div>
-                                      <div>
-                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
-                                        <input 
-                                          type="text"
-                                          value={rule.conditions.type}
-                                          onChange={(e) => {
-                                            const newRules = [...localJudgmentDefaults];
-                                            newRules[idx].conditions.type = e.target.value;
-                                            setLocalJudgmentDefaults(newRules);
-                                          }}
-                                          placeholder="- أي نوع -"
-                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
                                         />
                                       </div>
-                                      <div>
-                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">نوع الجلسة</label>
-                                        <select 
-                                          value={rule.conditions.sessionType}
-                                          onChange={(e) => {
-                                            const newRules = [...localJudgmentDefaults];
-                                            newRules[idx].conditions.sessionType = e.target.value;
-                                            setLocalJudgmentDefaults(newRules);
-                                          }}
-                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                                        >
-                                          <option value="">- أي نوع جلسة -</option>
-                                          {localSessionTypes.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
+                                      {/* Conditions */}
+                                      <div className="space-y-2 border-r-2 border-indigo-300 pr-2 bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm">
+                                        <p className="text-[10px] font-black text-slate-700 mb-2 border-b border-slate-100 pb-1">شروط التطبيق (اتركها فارغة للتجاهل):</p>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div>
+                                            <label className="text-[8px] font-bold text-slate-500 block mb-0.5">الصفة</label>
+                                            <select
+                                              value={rule.conditions.role}
+                                              onChange={(e) => {
+                                                const newRules = [...localJudgmentDefaults];
+                                                newRules[idx].conditions.role = e.target.value;
+                                                setLocalJudgmentDefaults(newRules);
+                                              }}
+                                              className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                                            >
+                                              <option value="">- أي صفة -</option>
+                                              {localRoles.map(r => <option key={r} value={r}>{r}</option>)}
+                                            </select>
+                                          </div>
+                                          <div>
+                                            <label className="text-[8px] font-bold text-slate-500 block mb-0.5">فئة الحكم</label>
+                                            <select
+                                              value={rule.conditions.category}
+                                              onChange={(e) => {
+                                                const newRules = [...localJudgmentDefaults];
+                                                newRules[idx].conditions.category = e.target.value;
+                                                setLocalJudgmentDefaults(newRules);
+                                              }}
+                                              className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                                            >
+                                              <option value="">- أي فئة -</option>
+                                              {localJudgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                          </div>
+                                          <div>
+                                            <label className="text-[8px] font-bold text-slate-500 block mb-0.5">تصنيف الحكم</label>
+                                            <select
+                                              value={rule.conditions.classification}
+                                              onChange={(e) => {
+                                                const newRules = [...localJudgmentDefaults];
+                                                newRules[idx].conditions.classification = e.target.value;
+                                                setLocalJudgmentDefaults(newRules);
+                                              }}
+                                              className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                                            >
+                                              <option value="">- أي تصنيف -</option>
+                                              {localJudgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                          </div>
+                                          <div>
+                                            <label className="text-[8px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
+                                            <input
+                                              type="text"
+                                              value={rule.conditions.type}
+                                              onChange={(e) => {
+                                                const newRules = [...localJudgmentDefaults];
+                                                newRules[idx].conditions.type = e.target.value;
+                                                setLocalJudgmentDefaults(newRules);
+                                              }}
+                                              placeholder="- أي نوع -"
+                                              className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="text-[8px] font-bold text-slate-500 block mb-0.5">نوع الجلسة</label>
+                                            <select
+                                              value={rule.conditions.sessionType}
+                                              onChange={(e) => {
+                                                const newRules = [...localJudgmentDefaults];
+                                                newRules[idx].conditions.sessionType = e.target.value;
+                                                setLocalJudgmentDefaults(newRules);
+                                              }}
+                                              className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                                            >
+                                              <option value="">- أي نوع جلسة -</option>
+                                              {localSessionTypes.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                          </div>
+                                          <div>
+                                            <label className="text-[8px] font-bold text-slate-500 block mb-0.5">القرار</label>
+                                            <select
+                                              value={rule.conditions.decision}
+                                              onChange={(e) => {
+                                                const newRules = [...localJudgmentDefaults];
+                                                newRules[idx].conditions.decision = e.target.value;
+                                                setLocalJudgmentDefaults(newRules);
+                                              }}
+                                              className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                                            >
+                                              <option value="">- أي قرار -</option>
+                                              {localDecisions.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                          </div>
+                                        </div>
                                       </div>
-                                      <div>
-                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">القرار</label>
-                                        <select 
-                                          value={rule.conditions.decision}
-                                          onChange={(e) => {
-                                            const newRules = [...localJudgmentDefaults];
-                                            newRules[idx].conditions.decision = e.target.value;
-                                            setLocalJudgmentDefaults(newRules);
-                                          }}
-                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                                        >
-                                          <option value="">- أي قرار -</option>
-                                          {localDecisions.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
+
+                                      {/* Actions */}
+                                      <div className="space-y-2 border-r-2 border-emerald-400 pr-2 bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm">
+                                        <p className="text-[10px] font-black text-slate-700 mb-2 border-b border-slate-100 pb-1">تعبئة البيانات تلقائياً بـ:</p>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div>
+                                            <label className="text-[8px] font-bold text-slate-500 block mb-0.5">فئة الحكم</label>
+                                            <select
+                                              value={rule.actions.category}
+                                              onChange={(e) => {
+                                                const newRules = [...localJudgmentDefaults];
+                                                newRules[idx].actions.category = e.target.value;
+                                                setLocalJudgmentDefaults(newRules);
+                                              }}
+                                              className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
+                                            >
+                                              <option value="">-- بدون تغيير --</option>
+                                              {localJudgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                          </div>
+                                          <div>
+                                            <label className="text-[8px] font-bold text-slate-500 block mb-0.5">تصنيف الحكم</label>
+                                            <select
+                                              value={rule.actions.classification}
+                                              onChange={(e) => {
+                                                const newRules = [...localJudgmentDefaults];
+                                                newRules[idx].actions.classification = e.target.value;
+                                                setLocalJudgmentDefaults(newRules);
+                                              }}
+                                              className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
+                                            >
+                                              <option value="">-- بدون تغيير --</option>
+                                              {localJudgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <label className="text-[8px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
+                                          <input
+                                            type="text"
+                                            placeholder="النوع (اختياري)"
+                                            value={rule.actions.type}
+                                            onChange={(e) => {
+                                              const newRules = [...localJudgmentDefaults];
+                                              newRules[idx].actions.type = e.target.value;
+                                              setLocalJudgmentDefaults(newRules);
+                                            }}
+                                            className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="text-[8px] font-bold text-slate-500 block mb-0.5">منطوق الحكم</label>
+                                          <textarea
+                                            placeholder="المنطوق الافتراضي (اختياري)"
+                                            value={rule.actions.text}
+                                            onChange={(e) => {
+                                              const newRules = [...localJudgmentDefaults];
+                                              newRules[idx].actions.text = e.target.value;
+                                              setLocalJudgmentDefaults(newRules);
+                                            }}
+                                            className="w-full text-[10px] font-bold p-2 rounded-md border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 min-h-[40px] resize-none"
+                                          />
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                  
-                                  {/* Actions */}
-                                  <div className="space-y-2 border-r-2 border-emerald-400 pr-2 bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm">
-                                    <p className="text-[10px] font-black text-slate-700 mb-2 border-b border-slate-100 pb-1">تعبئة البيانات تلقائياً بـ:</p>
-                                    
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div>
-                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">فئة الحكم</label>
-                                        <select 
-                                          value={rule.actions.category}
-                                          onChange={(e) => {
-                                            const newRules = [...localJudgmentDefaults];
-                                            newRules[idx].actions.category = e.target.value;
-                                            setLocalJudgmentDefaults(newRules);
-                                          }}
-                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
-                                        >
-                                          <option value="">-- بدون تغيير --</option>
-                                          {localJudgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                      </div>
-                                      <div>
-                                        <label className="text-[8px] font-bold text-slate-500 block mb-0.5">تصنيف الحكم</label>
-                                        <select 
-                                          value={rule.actions.classification}
-                                          onChange={(e) => {
-                                            const newRules = [...localJudgmentDefaults];
-                                            newRules[idx].actions.classification = e.target.value;
-                                            setLocalJudgmentDefaults(newRules);
-                                          }}
-                                          className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
-                                        >
-                                          <option value="">-- بدون تغيير --</option>
-                                          {localJudgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <label className="text-[8px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
-                                      <input 
-                                        type="text" 
-                                        placeholder="النوع (اختياري)" 
-                                        value={rule.actions.type}
-                                        onChange={(e) => {
-                                          const newRules = [...localJudgmentDefaults];
-                                          newRules[idx].actions.type = e.target.value;
-                                          setLocalJudgmentDefaults(newRules);
-                                        }}
-                                        className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="text-[8px] font-bold text-slate-500 block mb-0.5">منطوق الحكم</label>
-                                      <textarea 
-                                        placeholder="المنطوق الافتراضي (اختياري)" 
-                                        value={rule.actions.text}
-                                        onChange={(e) => {
-                                          const newRules = [...localJudgmentDefaults];
-                                          newRules[idx].actions.text = e.target.value;
-                                          setLocalJudgmentDefaults(newRules);
-                                        }}
-                                        className="w-full text-[10px] font-bold p-2 rounded-md border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 min-h-[40px] resize-none"
-                                      />
-                                    </div>
-                                  </div>
+                                  )}
                                 </div>
-                                )}
-                              </div>
                               );
-                           })}
-                         </div>
-                       )}
-                     </div>
-                   );
-                 });
-              })()}
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
             </div>
-          
-</div>
-</details>
+          </details>
 
           {/* Save Settings Button */}
           <button onClick={handleSaveSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">

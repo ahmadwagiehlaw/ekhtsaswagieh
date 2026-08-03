@@ -11,6 +11,7 @@ export default function GlobalTemplatePrintModal({ cases, sessionDate, onClose }
   const [showPrintView, setShowPrintView] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentFolder, setCurrentFolder] = useState(null);
+  const [repeatForDefendants, setRepeatForDefendants] = useState(true);
 
   const filteredTemplates = templates.filter(t => t.name.includes(searchQuery));
   const sortedByUsage = [...templates].sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
@@ -43,6 +44,7 @@ export default function GlobalTemplatePrintModal({ cases, sessionDate, onClose }
         sessionDate={sessionDate} 
         template={selectedTemplate} 
         onClose={onClose} 
+        repeatForDefendants={repeatForDefendants}
       />
     );
   }
@@ -88,6 +90,16 @@ export default function GlobalTemplatePrintModal({ cases, sessionDate, onClose }
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pr-10 pl-4 text-sm font-bold text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition"
               />
             </div>
+            
+            <label className="flex items-center gap-2 mt-3 cursor-pointer p-2 bg-indigo-50/50 rounded-lg border border-indigo-100 hover:bg-indigo-50 transition">
+              <input 
+                type="checkbox" 
+                checked={repeatForDefendants} 
+                onChange={(e) => setRepeatForDefendants(e.target.checked)} 
+                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+              />
+              <span className="text-xs font-bold text-indigo-900">تكرار الوثيقة لكل مدعى عليه (في حال وجود أكثر من مدعى عليه بالملف)</span>
+            </label>
           </div>
         )}
 

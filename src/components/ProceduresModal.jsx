@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, ClipboardList, CheckCircle2, Trash2, FileText, Plus, Loader2, Paperclip } from 'lucide-react';
+import { X, ClipboardList, CheckCircle2, Trash2, FileText, Plus, Loader2, Paperclip, History, Edit3, Camera, FileCheck, Landmark, Search } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { uploadToR2 } from '../lib/r2';
@@ -11,7 +11,7 @@ export default function ProceduresModal({ isOpen, onClose, caseData, setCaseData
   const canEditData = isAdmin || currentUserPermissions?.canEditData;
   const { toast, showConfirm, showPrompt } = useUI();
   
-  const [newProcedure, setNewProcedure] = useState({ date: new Date().toISOString().split('T')[0], title: '', notes: '', sessionDate: '' });
+  const [newProcedure, setNewProcedure] = useState({ id: null, date: new Date().toISOString().split('T')[0], title: '', notes: '', sessionDate: '' });
   const [procedureAttachment, setProcedureAttachment] = useState(null);
   const [isUploadingProcedureFile, setIsUploadingProcedureFile] = useState(false);
   const [isAddingProcedure, setIsAddingProcedure] = useState(false);
@@ -28,40 +28,95 @@ export default function ProceduresModal({ isOpen, onClose, caseData, setCaseData
     }
     setIsAddingProcedure(true);
     
-    const newProcObj = {
-      id: Date.now().toString(),
-      title: newProcedure.title,
-      date: newProcedure.date,
-      notes: newProcedure.notes,
-      sessionDate: newProcedure.sessionDate || null,
-      attachmentUrl: procedureAttachment?.url || null,
-      attachmentName: procedureAttachment?.name || null,
-      createdAt: new Date().toISOString()
-    };
-    
-    const updatedProcedures = [...proceduresList, newProcObj];
-    
-    // Also add to documents if there is an attachment
+    let updatedProcedures;
     let updatedDocuments = caseData.documents || [];
-    if (procedureAttachment) {
-       updatedDocuments = [...updatedDocuments, {
-          id: Date.now().toString() + '_doc',
-          title: `مرفق إجراء: ${newProcedure.title}`,
-          url: procedureAttachment.url,
-          type: 'مستندات',
-          fileType: procedureAttachment.name?.match(/\.(jpg|jpeg|png|webp)$/i) ? 'image' : 'pdf',
-          date: newProcedure.date
-       }];
+
+    if (newProcedure.id) {
+       // Edit Mode
+       const procObj = {
+         ...proceduresList.find(p => p.id === newProcedure.id),
+         title: newProcedure.title,
+         date: newProcedure.date,
+         notes: newProcedure.notes,
+         sessionDate: newProcedure.sessionDate || null,
+         attachmentUrl: procedureAttachment?.url || null,
+         attachmentName: procedureAttachment?.name || null,
+       };
+       updatedProcedures = proceduresList.map(p => p.id === newProcedure.id ? procObj : p);
+       
+       if (procedureAttachment && (!procObj.attachmentUrl || procObj.attachmentUrl !== procedureAttachment.url)) {
+           updatedDocuments = [...updatedDocuments, {
+              id: Date.now().toString() + '_doc',
+              title: `مرفق إجراء: ${newProcedure.title}`,
+              url: procedureAttachment.url,
+              type: 'مستندات',
+              fileType: procedureAttachment.name?.match(/\.(jpg|jpeg|png|webp)$/i) ? 'image' : 'pdf',
+              date: newProcedure.date
+           }];
+       }
+       toast('تم تعديل الإجراء بنجاح', 'success');
+    } else {
+       // Add Mode
+       const newProcObj = {
+         id: Date.now().toString(),
+         title: newProcedure.title,
+         date: newProcedure.date,
+         notes: newProcedure.notes,
+         sessionDate: newProcedure.sessionDate || null,
+         attachmentUrl: procedureAttachment?.url || null,
+         attachmentName: procedureAttachment?.name || null,
+         createdAt: new Date().toISOString()
+       };
+       updatedProcedures = [...proceduresList, newProcObj];
+       
+       if (procedureAttachment) {
+          updatedDocuments = [...updatedDocuments, {
+             id: Date.now().toString() + '_doc',
+             title: `مرفق إجراء: ${newProcedure.title}`,
+             url: procedureAttachment.url,
+             type: 'مستندات',
+             fileType: procedureAttachment.name?.match(/\.(jpg|jpeg|png|webp)$/i) ? 'image' : 'pdf',
+             date: newProcedure.date
+          }];
+       }
+       toast('تم تسجيل الإجراء بنجاح', 'success');
     }
     
     const updatedCaseData = { ...caseData, procedures: updatedProcedures, documents: updatedDocuments };
     await saveCaseToFirebase(caseData.id, { procedures: updatedProcedures, documents: updatedDocuments });
     setCaseData(updatedCaseData);
     
-    setNewProcedure({ date: new Date().toISOString().split('T')[0], title: '', notes: '', sessionDate: '' });
+    setNewProcedure({ id: null, date: new Date().toISOString().split('T')[0], title: '', notes: '', sessionDate: '' });
     setProcedureAttachment(null);
     setIsAddingProcedure(false);
-    toast('تم تسجيل الإجراء بنجاح', 'success');
+  };
+
+  const handlePaste = async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        if (!file) continue;
+        setIsUploadingProcedureFile(true);
+        try {
+          const pastedFile = new File([file], `pasted_image_${Date.now()}.png`, { type: file.type });
+          let fileToUpload = pastedFile;
+          if (file.type.startsWith('image/')) {
+            fileToUpload = await imageCompression(pastedFile, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true });
+          }
+          const url = await uploadToR2(fileToUpload, 'ekhtsasi-light-files');
+          setProcedureAttachment({ url, name: pastedFile.name });
+          toast("تم رفع الصورة المنسوخة مؤقتاً، اضغط حفظ لتأكيد الإجراء", "success");
+        } catch (err) {
+          toast("فشل رفع الصورة", "error");
+        } finally {
+          setIsUploadingProcedureFile(false);
+        }
+        break;
+      }
+    }
   };
 
   return (
@@ -71,7 +126,7 @@ export default function ProceduresModal({ isOpen, onClose, caseData, setCaseData
         {/* Header */}
         <div className="bg-indigo-600 px-6 py-4 flex items-center justify-between text-white shrink-0">
           <div className="flex items-center gap-3">
-            <ClipboardList className="w-6 h-6" />
+            <History className="w-6 h-6" />
             <div>
                <h2 className="text-lg font-black leading-tight">سجل الإجراءات</h2>
                <p className="text-xs font-bold text-indigo-100 opacity-80">تسجيل ومتابعة الإجراءات المتخذة في الملف</p>
@@ -92,11 +147,18 @@ export default function ProceduresModal({ isOpen, onClose, caseData, setCaseData
               </div>
            ) : (
               <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
-                 {proceduresList.sort((a, b) => new Date(b.date) - new Date(a.date)).map((proc, idx) => (
+                 {proceduresList.sort((a, b) => new Date(b.date) - new Date(a.date)).map((proc, idx) => {
+                   let ProcIcon = CheckCircle2;
+                   if (proc.title?.includes('تصوير') || proc.title?.includes('استخراج')) ProcIcon = Camera;
+                   else if (proc.title?.includes('إيداع') || proc.title?.includes('مذكرة') || proc.title?.includes('تقرير')) ProcIcon = FileCheck;
+                   else if (proc.title?.includes('استعلام') || proc.title?.includes('شهادة')) ProcIcon = Search;
+                   else if (proc.title?.includes('إعلان') || proc.title?.includes('دعوى')) ProcIcon = Landmark;
+                   
+                   return (
                    <div key={proc.id || idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                      {/* Icon */}
-                     <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-slate-50 bg-white text-indigo-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                       <CheckCircle2 className="w-5 h-5" />
+                     <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-slate-50 bg-white text-indigo-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 transition-transform group-hover:scale-110">
+                       <ProcIcon className="w-5 h-5" />
                      </div>
                      {/* Card */}
                      <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -112,20 +174,42 @@ export default function ProceduresModal({ isOpen, onClose, caseData, setCaseData
                            )}
                          </div>
                          {canEditData && (
-                           <button 
-                             onClick={async () => {
-                               const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذا الإجراء؟');
-                               if (confirmed) {
-                                 const newProcs = proceduresList.filter(p => p.id !== proc.id);
-                                 const updatedCaseData = { ...caseData, procedures: newProcs };
-                                 await saveCaseToFirebase(caseData.id, { procedures: newProcs });
-                                 setCaseData(updatedCaseData);
-                               }
-                             }}
-                             className="text-slate-400 hover:text-rose-600 p-1"
-                           >
-                             <Trash2 className="w-4 h-4" />
-                           </button>
+                           <div className="flex items-center gap-1">
+                             <button
+                               onClick={() => {
+                                 setNewProcedure({
+                                   id: proc.id,
+                                   title: proc.title,
+                                   date: proc.date,
+                                   notes: proc.notes || '',
+                                   sessionDate: proc.sessionDate || ''
+                                 });
+                                 setProcedureAttachment(proc.attachmentUrl ? { url: proc.attachmentUrl, name: proc.attachmentName } : null);
+                                 setTimeout(() => {
+                                   procedureFileInputRef.current?.parentElement?.parentElement?.parentElement?.scrollIntoView({ behavior: 'smooth' });
+                                 }, 100);
+                               }}
+                               className="text-slate-400 hover:text-indigo-600 p-1"
+                               title="تعديل الإجراء"
+                             >
+                               <Edit3 className="w-4 h-4" />
+                             </button>
+                             <button 
+                               onClick={async () => {
+                                 const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذا الإجراء؟');
+                                 if (confirmed) {
+                                   const newProcs = proceduresList.filter(p => p.id !== proc.id);
+                                   const updatedCaseData = { ...caseData, procedures: newProcs };
+                                   await saveCaseToFirebase(caseData.id, { procedures: newProcs });
+                                   setCaseData(updatedCaseData);
+                                 }
+                               }}
+                               className="text-slate-400 hover:text-rose-600 p-1"
+                               title="حذف الإجراء"
+                             >
+                               <Trash2 className="w-4 h-4" />
+                             </button>
+                           </div>
                          )}
                        </div>
                        <h4 className="text-sm font-black text-navy-900 mb-2">{proc.title}</h4>
@@ -139,17 +223,18 @@ export default function ProceduresModal({ isOpen, onClose, caseData, setCaseData
                        )}
                      </div>
                    </div>
-                 ))}
+                 )})}
               </div>
            )}
 
            {/* Add Procedure Form */}
            {canEditData && (
-              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-indigo-100 shadow-sm mt-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500"></div>
-                <h4 className="text-sm font-black text-navy-900 mb-4 flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-indigo-600" /> تسجيل إجراء جديد
-                </h4>
+               <div className="bg-white p-4 sm:p-5 rounded-2xl border border-indigo-100 shadow-sm mt-6 relative overflow-hidden" onPaste={handlePaste}>
+                 <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500"></div>
+                 <h4 className="text-sm font-black text-navy-900 mb-4 flex items-center gap-2">
+                   {newProcedure.id ? <Edit3 className="w-4 h-4 text-indigo-600" /> : <Plus className="w-4 h-4 text-indigo-600" />} 
+                   {newProcedure.id ? 'تعديل الإجراء' : 'تسجيل إجراء جديد'}
+                 </h4>
                 <div className="space-y-3">
                   <div className="flex flex-col sm:flex-row gap-3">
                     <div className="flex-1 flex gap-2">
@@ -244,13 +329,24 @@ export default function ProceduresModal({ isOpen, onClose, caseData, setCaseData
                        )}
                     </div>
                     
+                     {newProcedure.id && (
+                        <button 
+                          onClick={() => {
+                             setNewProcedure({ id: null, date: new Date().toISOString().split('T')[0], title: '', notes: '', sessionDate: '' });
+                             setProcedureAttachment(null);
+                          }}
+                          className="w-full sm:w-auto bg-slate-100 text-slate-600 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-200 transition"
+                        >
+                          إلغاء التعديل
+                        </button>
+                     )}
                     <button 
                       onClick={handleAddProcedure}
                       disabled={isAddingProcedure}
                       className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 shrink-0"
                     >
-                      {isAddingProcedure ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                      حفظ الإجراء
+                      {isAddingProcedure ? <Loader2 className="w-4 h-4 animate-spin" /> : (newProcedure.id ? <Edit3 className="w-4 h-4" /> : <Plus className="w-4 h-4" />)}
+                      {newProcedure.id ? 'حفظ التعديلات' : 'حفظ الإجراء'}
                     </button>
                   </div>
                 </div>

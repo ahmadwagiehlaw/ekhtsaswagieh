@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { X, Plus, AlertCircle } from 'lucide-react';
+import { X, Plus, AlertCircle, Check } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 
 const currentYear = new Date().getFullYear();
 
 export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
-  const { createNewCase, checkDuplicateCase, settings, cases } = useAppContext();
+  const { createNewCase, checkDuplicateCase, settings, cases, saveCaseToFirebase } = useAppContext();
   const { toast } = useUI();
 
   const [formData, setFormData] = useState({
@@ -20,6 +20,9 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState(false);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+  const [createdCaseId, setCreatedCaseId] = useState(null);
+  const [customLocation, setCustomLocation] = useState('');
 
   const roles = settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص'];
   const decisions = settings?.decisions || ['للحكم', 'تصريح', 'للإعلان', 'للاطلاع', 'آخر أجل'];
@@ -79,19 +82,14 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
           createdAt: new Date().toISOString(),
         }];
       }
-      await createNewCase(caseData);
-      toast('تم إضافة الدعوى بنجاح ✅', 'success');
-      // Reset and close
-      setFormData({
-        'رقم الدعوى': '',
-        'السنة': '',
-        'المدعي': '',
-        'المدعى_عليه': '',
-        'الصفة': '',
-        'القرار': '',
-        'آخر جلسة': prefillDate || '',
-      });
-      onClose();
+      const savedCaseId = await createNewCase(caseData);
+      if (savedCaseId) {
+        setCreatedCaseId(savedCaseId);
+        setShowLocationPrompt(true);
+        toast('تم إضافة الدعوى بنجاح ✅', 'success');
+      } else {
+        toast('حدث خطأ أثناء الحفظ', 'error');
+      }
     } catch (err) {
       if (err.message === 'DUPLICATE_CASE') {
         setDuplicateWarning(true);
@@ -125,8 +123,82 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSave} className="p-5 space-y-3 overflow-y-auto">
+        {/* Form or Location Prompt */}
+        <div className="p-5 flex-1 overflow-y-auto">
+          {showLocationPrompt ? (
+            <div className="flex flex-col items-center justify-center py-6 space-y-5 text-center animate-in fade-in zoom-in duration-300">
+              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center shadow-inner mb-2">
+                <Check className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-black text-navy-900">تم الحفظ بنجاح!</h2>
+              <p className="text-slate-500 font-bold text-sm">{settings?.userTitle === 'المستشارة' ? 'أين الملف الآن معاليكي؟' : 'أين الملف الآن معاليك؟'}</p>
+              
+              <div className="flex flex-wrap justify-center gap-2 mt-2">
+                {Array.from(new Set([...(settings?.fileLocations || []), 'في المكتب', 'بالمحكمة', 'غير موجود', 'مؤقت', 'خارج الاختصاص'])).map(loc => (
+                  <button 
+                    key={loc}
+                    onClick={async () => {
+                      setIsSaving(true);
+                      await saveCaseToFirebase(createdCaseId, { 'مكان الملف': loc });
+                      setIsSaving(false);
+                      toast("تم تحديث مكان الملف بنجاح!", "success");
+                      setFormData({
+                        'رقم الدعوى': '', 'السنة': '', 'المدعي': '', 'المدعى_عليه': '', 'الصفة': '', 'القرار': '', 'آخر جلسة': prefillDate || '',
+                      });
+                      setShowLocationPrompt(false);
+                      onClose();
+                    }}
+                    className={`px-3 py-2 rounded-xl font-bold text-xs shadow-sm transition hover:-translate-y-1 ${loc === 'غير موجود' ? 'bg-rose-100 text-rose-700 hover:bg-rose-200' : loc === 'مؤقت' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : loc === 'خارج الاختصاص' ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                  >
+                    {loc}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2 mt-2 w-full max-w-sm">
+                <input 
+                  type="text" 
+                  value={customLocation}
+                  onChange={(e) => setCustomLocation(e.target.value)}
+                  placeholder="مكان آخر..."
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20"
+                />
+                <button
+                  onClick={async () => {
+                    if (!customLocation.trim()) return;
+                    setIsSaving(true);
+                    await saveCaseToFirebase(createdCaseId, { 'مكان الملف': customLocation.trim() });
+                    setIsSaving(false);
+                    toast("تم تحديث مكان الملف بنجاح!", "success");
+                    setFormData({
+                      'رقم الدعوى': '', 'السنة': '', 'المدعي': '', 'المدعى_عليه': '', 'الصفة': '', 'القرار': '', 'آخر جلسة': prefillDate || '',
+                    });
+                    setShowLocationPrompt(false);
+                    setCustomLocation('');
+                    onClose();
+                  }}
+                  disabled={!customLocation.trim() || isSaving}
+                  className="bg-navy-900 text-amber-300 px-3 py-2 rounded-xl text-xs font-bold hover:bg-navy-800 transition disabled:opacity-50"
+                >
+                  حفظ
+                </button>
+              </div>
+              
+              <button 
+                onClick={() => {
+                  setFormData({
+                    'رقم الدعوى': '', 'السنة': '', 'المدعي': '', 'المدعى_عليه': '', 'الصفة': '', 'القرار': '', 'آخر جلسة': prefillDate || '',
+                  });
+                  setShowLocationPrompt(false);
+                  onClose();
+                }}
+                className="text-slate-400 hover:text-slate-600 text-[11px] font-bold transition mt-2"
+              >
+                تخطي ومتابعة لاحقاً
+              </button>
+            </div>
+          ) : (
+          <form id="quick-add-form" onSubmit={handleSave} className="space-y-4">
 
           {duplicateWarning && (
             <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
@@ -230,8 +302,11 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
             />
           </div>
         </form>
+          )}
+        </div>
 
         {/* Footer */}
+        {!showLocationPrompt && (
         <div className="bg-slate-50 p-4 border-t border-slate-100 shrink-0 flex gap-2">
           <button
             onClick={onClose}
@@ -252,6 +327,7 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
             )}
           </button>
         </div>
+        )}
       </div>
     </div>
   );

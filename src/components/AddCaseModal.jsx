@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
-import { X, Save, Plus } from 'lucide-react';
+import { X, Save, Plus, Check, Trash2, MapPin } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { useNavigate } from 'react-router-dom';
 import SmartAutocomplete from './SmartAutocomplete';
 
 export default function AddCaseModal({ isOpen, onClose }) {
-  const { schema, createNewCase, settings, cases } = useAppContext();
+  const { schema, createNewCase, settings, cases, saveCaseToFirebase } = useAppContext();
   const { toast } = useUI();
   const [formData, setFormData] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(['📌 بيانات أساسية']);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+  const [createdCaseId, setCreatedCaseId] = useState(null);
+  const [customLocation, setCustomLocation] = useState('');
+  const [newDefName, setNewDefName] = useState('');
+  const [activeDefId, setActiveDefId] = useState(null);
   const navigate = useNavigate();
 
   if (!isOpen) return null;
@@ -19,12 +24,12 @@ export default function AddCaseModal({ isOpen, onClose }) {
     e.preventDefault();
     setIsSaving(true);
     try {
-      const success = await createNewCase(formData);
+      const savedCaseId = await createNewCase(formData);
       setIsSaving(false);
-      if (success) {
-        setFormData({});
+      if (savedCaseId) {
+        setCreatedCaseId(savedCaseId);
+        setShowLocationPrompt(true);
         toast("تمت إضافة القضية بنجاح!", "success");
-        onClose();
       } else {
         toast("حدث خطأ أثناء حفظ القضية", "error");
       }
@@ -55,22 +60,89 @@ export default function AddCaseModal({ isOpen, onClose }) {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+          {showLocationPrompt ? (
+            <div className="flex flex-col items-center justify-center py-10 space-y-6 text-center animate-in fade-in zoom-in duration-300">
+              <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center shadow-inner mb-2">
+                <Check className="w-10 h-10" />
+              </div>
+              <h2 className="text-2xl font-black text-navy-900">تم الحفظ بنجاح!</h2>
+              <p className="text-slate-500 font-bold text-lg">{settings?.userTitle === 'المستشارة' ? 'أين الملف الآن معاليكي؟' : 'أين الملف الآن معاليك؟'}</p>
+              
+              <div className="flex flex-wrap justify-center gap-3 mt-4">
+                {Array.from(new Set([...(settings?.fileLocations || []), 'في المكتب', 'بالمحكمة', 'غير موجود', 'مؤقت', 'خارج الاختصاص'])).map(loc => (
+                  <button 
+                    key={loc}
+                    onClick={async () => {
+                      setIsSaving(true);
+                      await saveCaseToFirebase(createdCaseId, { 'مكان الملف': loc });
+                      setIsSaving(false);
+                      toast("تم تحديث مكان الملف بنجاح!", "success");
+                      setFormData({});
+                      setShowLocationPrompt(false);
+                      onClose();
+                    }}
+                    className={`px-4 py-3 rounded-xl font-bold text-sm shadow-sm transition hover:-translate-y-1 ${loc === 'غير موجود' ? 'bg-rose-100 text-rose-700 hover:bg-rose-200' : loc === 'مؤقت' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : loc === 'خارج الاختصاص' ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                  >
+                    {loc}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2 mt-4 w-full max-w-sm">
+                <input 
+                  type="text" 
+                  value={customLocation}
+                  onChange={(e) => setCustomLocation(e.target.value)}
+                  placeholder="مكان آخر..."
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20"
+                />
+                <button
+                  onClick={async () => {
+                    if (!customLocation.trim()) return;
+                    setIsSaving(true);
+                    await saveCaseToFirebase(createdCaseId, { 'مكان الملف': customLocation.trim() });
+                    setIsSaving(false);
+                    toast("تم تحديث مكان الملف بنجاح!", "success");
+                    setFormData({});
+                    setShowLocationPrompt(false);
+                    setCustomLocation('');
+                    onClose();
+                  }}
+                  disabled={!customLocation.trim() || isSaving}
+                  className="bg-navy-900 text-amber-300 px-4 py-3 rounded-xl font-bold hover:bg-navy-800 transition disabled:opacity-50"
+                >
+                  حفظ
+                </button>
+              </div>
+              
+              <button 
+                onClick={() => {
+                  setFormData({});
+                  setShowLocationPrompt(false);
+                  onClose();
+                }}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold transition mt-4"
+              >
+                تخطي ومتابعة لاحقاً
+              </button>
+            </div>
+          ) : (
           <form id="add-case-form" onSubmit={handleSubmit} className="space-y-4">
               {[
                 {
                   title: '📌 بيانات أساسية',
                   colorClass: 'text-blue-700 bg-blue-50/50 border-blue-100',
-                  keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'المحكمة', 'الدائرة']
-                },
-                {
-                  title: '👥 الأطراف والصفة',
-                  colorClass: 'text-emerald-700 bg-emerald-50/50 border-emerald-100',
-                  keys: ['المدعي', 'الطاعن', 'المستأنف', 'المدعى_عليه', 'المدعى عليه', 'المطعون ضده', 'المطعون', 'الصفة', 'صفة', 'موضوع الدعوى']
+                  keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'دعاوى منضمة', 'المحكمة', 'الدائرة', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'مطعون ضدهم آخرين', 'الصفة', 'صفة', 'تصنيف الدعوى', 'موضوع الدعوى']
                 },
                 {
                   title: '⚖️ الجلسة والقرار',
                   colorClass: 'text-amber-700 bg-amber-50/50 border-amber-100',
-                  keys: ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'نوع الجلسة', 'القرار', 'قرار الجلسة', 'مكان الملف', 'ملاحظات']
+                  keys: ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'الرول', 'نوع الجلسة', 'القرار', 'قرار الجلسة', 'مكان الملف', 'ملاحظات']
+                },
+                {
+                  title: '🏛️ بيانات الحكم وأول درجة',
+                  colorClass: 'text-rose-700 bg-rose-50/50 border-rose-100',
+                  keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن']
                 },
                 {
                   title: '📍 بيانات أخرى',
@@ -122,7 +194,7 @@ export default function AddCaseModal({ isOpen, onClose }) {
                             if (field.id === 'المقر المختار' && !isPlaintiffRole) return null;
                             if (field.id === 'عنوان المدعى عليه' && !isPlaintiffRole) return null;
                             if (field.id === 'عنوان المدعي' && !isDefendantRole) return null;
-                            if (['السنة', 'سنة', 'year'].includes(field.id)) return null;
+                            if (['السنة', 'سنة', 'year', 'دعاوى منضمة', 'مطعون ضدهم آخرين'].includes(field.id)) return null;
 
                             return (
                               <div key={field.id} className={`${field.type === 'textarea' ? 'md:col-span-2' : ''}`}>
@@ -134,7 +206,7 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                     rows={3}
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 resize-none transition"
                                   />
-                                ) : field.type === 'date' || field.id.includes('تاريخ') || field.id.includes('جلسة') ? (
+                                ) : (field.type === 'date' && field.id !== 'نوع الجلسة') || field.id === 'آخر جلسة' || field.id === 'تاريخ آخر جلسة' || field.id === 'جلسة حكم أول درجة' ? (
                                   <input 
                                     type="date"
                                     value={val}
@@ -194,6 +266,16 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition relative z-0"
                                             />
                                           </div>
+                                          <div className="flex-[2] relative">
+                                            <span className="absolute -top-6 right-1 text-[10px] font-black text-slate-500 z-10">دعاوى منضمة</span>
+                                            <input
+                                               type="text"
+                                               value={formData['دعاوى منضمة'] || ''}
+                                               onChange={(e) => setFormData({...formData, 'دعاوى منضمة': e.target.value})}
+                                               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition relative z-0"
+                                               placeholder="مثال: 123 لسنة 2024"
+                                            />
+                                          </div>
                                        </div>
                                     ) : (
                                        <SmartAutocomplete
@@ -245,13 +327,120 @@ export default function AddCaseModal({ isOpen, onClose }) {
                          })}
                       </div>
                       )}
+                      
+                      {/* Defendants List inside first group */}
+                      {isExpanded && group.title === '📌 بيانات أساسية' && (
+                        <div className="px-4 pb-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                          <div className="mt-2 border-t border-slate-100 pt-4">
+                            <label className="text-xs font-black text-slate-500 block mb-3">المدعى عليهم / المطعون ضدهم الآخرين</label>
+                            <div className="space-y-3">
+                              {(formData.defendantsList || []).map((def, idx) => (
+                                <div key={def.id || idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 relative group">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div className="flex-1">
+                                      <input 
+                                        type="text" 
+                                        value={def.name} 
+                                        onChange={e => {
+                                          const list = [...(formData.defendantsList || [])];
+                                          list[idx].name = e.target.value;
+                                          setFormData({ ...formData, defendantsList: list });
+                                        }}
+                                        placeholder="اسم المدعى عليه"
+                                        className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none focus:border-indigo-400"
+                                      />
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <button 
+                                        type="button"
+                                        onClick={() => setActiveDefId(activeDefId === def.id ? null : def.id)}
+                                        className="text-[10px] bg-white border border-indigo-200 text-indigo-600 px-2 py-1.5 rounded-lg hover:bg-indigo-50 font-bold flex items-center gap-1"
+                                      >
+                                        <MapPin className="w-3 h-3" /> {activeDefId === def.id ? 'إخفاء العناوين' : 'إضافة/تعديل العناوين'}
+                                      </button>
+                                      <button 
+                                        type="button"
+                                        onClick={() => {
+                                          const list = [...(formData.defendantsList || [])];
+                                          list.splice(idx, 1);
+                                          setFormData({ ...formData, defendantsList: list });
+                                        }}
+                                        className="p-1.5 text-slate-400 hover:text-rose-600 bg-white rounded-lg border border-slate-200"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  
+                                  {activeDefId === def.id && (
+                                    <div className="mt-3 pt-3 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in slide-in-from-top-2">
+                                      <div>
+                                        <label className="text-[10px] font-bold text-slate-400 block mb-1">عنوان المدعى عليه</label>
+                                        <textarea
+                                          value={def.address || ''}
+                                          onChange={e => {
+                                            const list = [...(formData.defendantsList || [])];
+                                            list[idx].address = e.target.value;
+                                            setFormData({ ...formData, defendantsList: list });
+                                          }}
+                                          placeholder="العنوان..."
+                                          rows={2}
+                                          className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-[11px] font-bold focus:outline-none focus:border-indigo-400 resize-none"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] font-bold text-slate-400 block mb-1">المقر المختار</label>
+                                        <textarea
+                                          value={def.chosenAddress || ''}
+                                          onChange={e => {
+                                            const list = [...(formData.defendantsList || [])];
+                                            list[idx].chosenAddress = e.target.value;
+                                            setFormData({ ...formData, defendantsList: list });
+                                          }}
+                                          placeholder="المقر المختار..."
+                                          rows={2}
+                                          className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-[11px] font-bold focus:outline-none focus:border-indigo-400 resize-none"
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+
+                              <div className="flex items-center gap-2 mt-2">
+                                <input 
+                                  type="text" 
+                                  value={newDefName} 
+                                  onChange={e => setNewDefName(e.target.value)} 
+                                  placeholder="اسم المدعى عليه الجديد..." 
+                                  className="flex-1 bg-white border border-indigo-200 shadow-sm rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-400"
+                                />
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    if (!newDefName.trim()) return;
+                                    const newList = [...(formData.defendantsList || []), { id: Date.now().toString(), name: newDefName, address: '', chosenAddress: '' }];
+                                    setFormData({ ...formData, defendantsList: newList });
+                                    setNewDefName('');
+                                  }}
+                                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition whitespace-nowrap"
+                                >
+                                  + إضافة
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                    </div>
                  );
               })}
           </form>
+          )}
         </div>
 
         {/* Footer */}
+        {!showLocationPrompt && (
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-3 shrink-0">
           <button 
             type="button" 
@@ -273,6 +462,7 @@ export default function AddCaseModal({ isOpen, onClose }) {
             )}
           </button>
         </div>
+        )}
 
       </div>
     </div>

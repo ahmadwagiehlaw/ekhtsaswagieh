@@ -1,155 +1,397 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, TrendingUp, Users, CalendarDays, AlertTriangle, Building2, Scale, Info, PieChart, ClipboardList, CheckCircle2, ChevronLeft, CalendarPlus, Activity, Sparkles } from 'lucide-react';
+import {
+  Search, TrendingUp, CalendarDays, AlertTriangle, Building2, Scale,
+  PieChart, ClipboardList, CheckCircle2, ChevronLeft, Activity, Sparkles,
+  Printer, Settings2, Eye, EyeOff, BarChart3, FileText, Clock, Gavel,
+  ChevronRight, Calendar
+} from 'lucide-react';
 import { useAppContext } from '../context/AppState';
-import { getSafeDateObj } from '../utils/dateUtils';
-import { calculateDashboardStats } from '../utils/statsUtils';
+import { calculateDashboardStats, computeMonthStats } from '../utils/statsUtils';
 import { useUI } from '../context/UIContext';
 import AdvancedSearchModal from '../components/AdvancedSearchModal';
 import BulkAssignTaskModal from '../components/BulkAssignTaskModal';
 
+// ─────────────────────────────────────────────────────────────
+// Color helpers
+// ─────────────────────────────────────────────────────────────
+const JUDGMENT_COLORS = {
+  'صالح': '#10b981', 'ضد': '#ef4444', 'وقف جزائي': '#f97316',
+  'وقف تعليقي': '#fb923c', 'خبراء': '#8b5cf6', 'اعتبار': '#eab308',
+  'تمهيدي': '#06b6d4', 'لا شأن بالحكم': '#94a3b8', 'غير مصنف': '#cbd5e1',
+  'غير منه للخصومة': '#64748b', 'حكم منه للخصومة': '#22c55e',
+};
+const getJColor = (name) => {
+  for (const [k, v] of Object.entries(JUDGMENT_COLORS)) {
+    if (name === k || name.includes(k) || k.includes(name)) return v;
+  }
+  return '#94a3b8';
+};
+
+// ─────────────────────────────────────────────────────────────
+// SVG Donut Chart
+// ─────────────────────────────────────────────────────────────
+const DonutChart = ({ segments, size = 130, thickness = 22 }) => {
+  const radius = (size - thickness) / 2;
+  const circum = 2 * Math.PI * radius;
+  const total  = segments.reduce((s, d) => s + (d.value || 0), 0);
+  const cx = size / 2, cy = size / 2;
+  if (total === 0) return null;
+  let cum = 0;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
+      <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#f1f5f9" strokeWidth={thickness} />
+      {segments.filter(s => s.value > 0).map((seg, i) => {
+        const pct = seg.value / total, dash = pct * circum, offset = -(cum * circum);
+        cum += pct;
+        return (
+          <circle key={i} cx={cx} cy={cy} r={radius} fill="none" stroke={seg.color}
+            strokeWidth={thickness} strokeDasharray={`${dash} ${circum}`} strokeDashoffset={offset}
+            style={{ transition: 'stroke-dasharray 0.8s ease' }} />
+        );
+      })}
+    </svg>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// SVG Area trend line
+// ─────────────────────────────────────────────────────────────
+const TrendLine = ({ data, color = '#f59e0b' }) => {
+  if (!data || data.length < 2) return null;
+  const max = Math.max(...data.map(d => d.count), 1);
+  const W = 300, H = 72, P = 10;
+  const gradId = `tg${color.replace('#', '')}`;
+  const pts = data.map((d, i) => ({
+    x: P + (i / (data.length - 1)) * (W - 2 * P),
+    y: H - P - ((d.count / max) * (H - 2 * P))
+  }));
+  const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const area = `${line} L ${pts.at(-1).x.toFixed(1)} ${H} L ${pts[0].x.toFixed(1)} ${H} Z`;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gradId})`} />
+      <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="white" stroke={color} strokeWidth="2" />)}
+    </svg>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// Trend comparison badge
+// ─────────────────────────────────────────────────────────────
+const TrendBadge = ({ current, prev, positiveIsGood = true, className = "mt-0.5" }) => {
+  if (prev === undefined || prev === null) return null;
+  const diff = current - prev;
+  if (diff === 0) return <span className={`text-[10px] text-slate-400 font-bold ${className}`}>—</span>;
+  const isUp = diff > 0;
+  const isGood = positiveIsGood ? isUp : !isUp;
+  return (
+    <span className={`text-[10px] font-black ${className} ${isGood ? 'text-emerald-400' : 'text-rose-400'}`}>
+      {isUp ? '▲' : '▼'} {Math.abs(diff)}
+    </span>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// KPI Card component (gradient, icon, value)
+// ─────────────────────────────────────────────────────────────
+const KPICard = ({ icon: Icon, label, sublabel, value, accentColor, bgFrom, bgTo, iconBg, border, onClick, extra }) => (
+  <button onClick={onClick}
+    className={`group relative overflow-hidden bg-gradient-to-br ${bgFrom} ${bgTo} rounded-2xl p-4 border ${border} shadow-sm
+      flex flex-col gap-1 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200 text-right w-full`}>
+    <div className="absolute -left-5 -top-5 w-20 h-20 rounded-full opacity-10" style={{ backgroundColor: accentColor }} />
+    <div className={`${iconBg} w-10 h-10 rounded-xl flex items-center justify-center shadow-sm mb-1 self-start`}>
+      <Icon className="w-5 h-5" style={{ color: accentColor }} />
+    </div>
+    <p className="text-3xl font-black leading-none" style={{ color: accentColor }}>{value}</p>
+    <p className="text-xs font-black text-slate-700 leading-tight">{label}</p>
+    <p className="text-[10px] font-bold text-slate-400">{sublabel}</p>
+    {extra && <div className="mt-1">{extra}</div>}
+    <div className="absolute bottom-0 left-0 w-full h-0.5 opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: accentColor }} />
+  </button>
+);
+
+// ─────────────────────────────────────────────────────────────
+// Print Report Modal
+// ─────────────────────────────────────────────────────────────
+const PrintReportModal = ({ stats, settings, selectedMonthStats, selectedMonth, selectedYear, onClose }) => {
+  const monthLabel     = new Date(selectedYear, selectedMonth, 1).toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' });
+  const consultantName = settings?.consultantName || 'أحمد وجيه';
+
+  const handlePrint = () => {
+    const content = document.getElementById('dash-print-content');
+    if (!content) return;
+    const pw = window.open('', '_blank', 'width=820,height=700');
+    pw.document.write(`<!DOCTYPE html><html dir="rtl"><head>
+      <meta charset="UTF-8"><title>تقرير - ${monthLabel}</title>
+      <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+      <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Cairo',sans-serif;direction:rtl;padding:28px;color:#0f172a;background:#fff}
+      h1{font-size:22px;font-weight:900}.lbl{color:#64748b;font-size:10px;font-weight:700}
+      .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
+      .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+      .grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:14px 0}
+      .card{border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
+      .val{font-size:26px;font-weight:900}.sec{font-size:13px;font-weight:900;margin:18px 0 8px;padding-bottom:6px;border-bottom:2px solid #0f172a}
+      .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f1f5f9}
+      .bar-w{background:#f1f5f9;border-radius:4px;height:5px;margin-top:3px}.bar{height:100%;border-radius:4px}
+      .footer{text-align:center;font-size:9px;color:#94a3b8;margin-top:22px;padding-top:10px;border-top:1px solid #e2e8f0}
+      </style></head><body>${content.innerHTML}
+      <p class="footer">تم إنشاء هذا التقرير تلقائياً بواسطة منصة اختصاصي — ${new Date().toLocaleString('ar-EG')}</p>
+      </body></html>`);
+    pw.document.close();
+    setTimeout(() => pw.print(), 600);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-amber-600" />
+            <h2 className="font-black text-navy-900">تقرير {monthLabel}</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={handlePrint}
+              className="flex items-center gap-2 bg-[#0f172a] text-amber-400 px-4 py-2 rounded-xl text-sm font-black hover:bg-slate-800 transition shadow-sm">
+              <Printer className="w-4 h-4" /> طباعة / PDF
+            </button>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 text-lg font-black">×</button>
+          </div>
+        </div>
+        <div className="overflow-y-auto flex-1 p-6" id="dash-print-content">
+          <div className="text-center mb-5 pb-4 border-b-2 border-slate-900">
+            <h1 className="text-2xl font-black text-slate-900">تقرير إحصائيات المكتب</h1>
+            <p className="text-sm font-bold text-slate-500 mt-1">شهر {monthLabel}</p>
+            <p className="text-xs font-black text-amber-600 mt-1">مكتب / {consultantName}</p>
+          </div>
+          <p className="text-sm font-black text-slate-900 mb-3 pb-2 border-b-2 border-slate-900">المؤشرات الرئيسية</p>
+          <div className="grid grid-cols-4 gap-3 mb-5">
+            {[
+              { l: 'القضايا النشطة (قادمة)', v: stats.activeCasesCount },
+              { l: 'إجمالي المتداول', v: stats.ongoingCount },
+              { l: 'محجوز للحكم', v: stats.reservedCount },
+              { l: 'المحكوم فيها', v: stats.judgedCount },
+            ].map((s, i) => (
+              <div key={i} className="border border-slate-200 rounded-xl p-3 text-center">
+                <p className="text-2xl font-black text-slate-900">{s.v}</p>
+                <p className="text-[10px] font-bold text-slate-500 mt-1">{s.l}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm font-black text-slate-900 mb-3 pb-2 border-b-2 border-slate-900">إحصائيات {monthLabel}</p>
+          <div className="grid grid-cols-3 gap-3 mb-5">
+            <div className="border border-slate-200 rounded-xl p-3 text-center">
+              <p className="text-2xl font-black text-amber-600">{selectedMonthStats.sessions}</p>
+              <p className="text-[10px] font-bold text-slate-500 mt-1">متداول الشهر</p>
+            </div>
+            <div className="border border-slate-200 rounded-xl p-3 text-center">
+              <p className="text-2xl font-black text-blue-600">{selectedMonthStats.memos}</p>
+              <p className="text-[10px] font-bold text-slate-500 mt-1">مذكرات</p>
+            </div>
+            <div className="border border-slate-200 rounded-xl p-3 text-center">
+              <p className="text-2xl font-black text-emerald-600">{selectedMonthStats.judgments.total}</p>
+              <p className="text-[10px] font-bold text-slate-500 mt-1">أحكام</p>
+            </div>
+          </div>
+          {selectedMonthStats.judgments.total > 0 && (
+            <>
+              <p className="text-sm font-black text-slate-900 mb-3 pb-2 border-b-2 border-slate-900">تفصيل الأحكام</p>
+              <div className="grid grid-cols-5 gap-2 mb-5">
+                {[
+                  { l: 'صالح', v: selectedMonthStats.judgments.good, c: '#10b981', bg: '#dcfce7' },
+                  { l: 'ضد', v: selectedMonthStats.judgments.bad, c: '#ef4444', bg: '#fee2e2' },
+                  { l: 'وقف', v: selectedMonthStats.judgments.stop, c: '#f97316', bg: '#ffedd5' },
+                  { l: 'اعتبار', v: selectedMonthStats.judgments.consideration, c: '#eab308', bg: '#fef9c3' },
+                  { l: 'خبراء', v: selectedMonthStats.judgments.expert, c: '#8b5cf6', bg: '#ede9fe' },
+                ].map((j, i) => (
+                  <div key={i} className="rounded-xl p-3 text-center" style={{ backgroundColor: j.bg }}>
+                    <p className="text-xl font-black" style={{ color: j.c }}>{j.v}</p>
+                    <p className="text-[10px] font-bold text-slate-600 mt-1">{j.l}</p>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {stats.topJudgments.length > 0 && (
+            <>
+              <p className="text-sm font-black text-slate-900 mb-3 pb-2 border-b-2 border-slate-900">تصنيف الأحكام الكلية</p>
+              <div className="space-y-2 mb-5">
+                {stats.topJudgments.map(([name, count]) => {
+                  const total = stats.topJudgments.reduce((s, c) => s + c[1], 0);
+                  return (
+                    <div key={name}>
+                      <div className="flex justify-between text-xs font-bold mb-1">
+                        <span>{name}</span><span>{count} ({Math.round(count / total * 100)}%)</span>
+                      </div>
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${Math.round(count / total * 100)}%`, backgroundColor: getJColor(name) }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          {stats.topOpponents.length > 0 && (
+            <>
+              <p className="text-sm font-black text-slate-900 mb-3 pb-2 border-b-2 border-slate-900">أبرز الجهات رافعة الدعوى</p>
+              <div className="space-y-1.5">
+                {stats.topOpponents.map(([name, count], i) => (
+                  <div key={i} className="flex justify-between items-center border border-slate-100 rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400 font-bold w-4">{i + 1}</span>
+                      <span className="text-sm font-bold text-slate-900">{name}</span>
+                    </div>
+                    <span className="text-xs font-black text-slate-500">{count} ملف</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// Main Dashboard
+// ─────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const { cases, isEmployee, currentUser, saveCaseToFirebase, settings, globalTasks, saveGlobalTask } = useAppContext();
   const navigate = useNavigate();
   const { showPrompt, toast } = useUI();
-  const [searchQuery, setSearchQuery] = useState('');
+
+  const today = new Date();
+  const [searchQuery, setSearchQuery]               = useState('');
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const [isGlobalTaskModalOpen, setIsGlobalTaskModalOpen] = useState(false);
-  const [adminTasksTab, setAdminTasksTab] = useState('pending'); // 'pending' or 'completed'
+  const [adminTasksTab, setAdminTasksTab]           = useState('pending');
+  const [showPrintModal, setShowPrintModal]         = useState(false);
+  const [showCustomize, setShowCustomize]           = useState(false);
+  const [hiddenWidgets, setHiddenWidgets]           = useState(() => {
+    try { return JSON.parse(localStorage.getItem('dash-hidden-v3') || '[]'); } catch { return []; }
+  });
+  
+  // Month selector state
+  const [viewMonth, setViewMonth] = useState({ month: today.getMonth(), year: today.getFullYear() });
 
   const stats = useMemo(() => calculateDashboardStats(cases, settings), [cases, settings]);
 
+  const selectedMonthStats = useMemo(() => computeMonthStats(cases, settings, viewMonth.month, viewMonth.year), [cases, settings, viewMonth]);
+  const prevViewMonth = useMemo(() => ({ month: viewMonth.month === 0 ? 11 : viewMonth.month - 1, year: viewMonth.month === 0 ? viewMonth.year - 1 : viewMonth.year }), [viewMonth]);
+  const prevMonthStats = useMemo(() => computeMonthStats(cases, settings, prevViewMonth.month, prevViewMonth.year), [cases, settings, prevViewMonth]);
+
+  const monthTabs = useMemo(() => {
+    const tabs = [];
+    for (let i = 3; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      tabs.push({ month: d.getMonth(), year: d.getFullYear(), label: d.toLocaleDateString('ar-EG', { month: 'short' }), isCurrent: i === 0 });
+    }
+    return tabs;
+  }, []);
+
+  const toggleWidget = (id) => {
+    const next = hiddenWidgets.includes(id) ? hiddenWidgets.filter(w => w !== id) : [...hiddenWidgets, id];
+    setHiddenWidgets(next);
+    localStorage.setItem('dash-hidden-v3', JSON.stringify(next));
+  };
+  const isVisible = (id) => !hiddenWidgets.includes(id);
+
   const handleSearch = (e) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/files?q=${encodeURIComponent(searchQuery.trim())}`);
-    }
+    if (searchQuery.trim()) navigate(`/files?q=${encodeURIComponent(searchQuery.trim())}`);
   };
 
   const handleAdvancedSearch = (params) => {
-    // Navigate with URL params for advanced search
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([key, val]) => {
-      if (val) query.set(key, val);
-    });
-    navigate(`/files?${query.toString()}`);
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v) q.set(k, v); });
+    navigate(`/files?${q.toString()}`);
   };
 
   const handleCompleteTask = async (taskType, caseId, taskId, notes) => {
     const now = new Date().toISOString();
-    
     if (taskType === 'global') {
-      const taskToUpdate = globalTasks.find(t => t.id === taskId);
-      if (taskToUpdate) {
-        await saveGlobalTask(taskId, { ...taskToUpdate, status: 'completed', notes: notes || '', completedAt: now });
-        toast('تم تسجيل الإجراء بنجاح', 'success');
-      }
+      const t = globalTasks.find(t => t.id === taskId);
+      if (t) { await saveGlobalTask(taskId, { ...t, status: 'completed', notes: notes || '', completedAt: now }); toast('تم تسجيل الإجراء بنجاح', 'success'); }
       return;
     }
-
-    const caseToUpdate = cases.find(c => c.id === caseId);
-    if (!caseToUpdate) return;
-
-    const updatedTasks = caseToUpdate.tasks.map(t => {
-      if (t.id === taskId) {
-        return { ...t, status: 'completed', notes: notes || '', completedAt: now };
-      }
-      return t;
-    });
-
-    await saveCaseToFirebase(caseId, { tasks: updatedTasks });
+    const c = cases.find(c => c.id === caseId);
+    if (!c) return;
+    await saveCaseToFirebase(caseId, { tasks: c.tasks.map(t => t.id === taskId ? { ...t, status: 'completed', notes: notes || '', completedAt: now } : t) });
     toast('تم تسجيل الإجراء بنجاح', 'success');
   };
 
   const handleDeleteTaskAdmin = async (taskType, caseId, taskId) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذه المهمة نهائياً؟')) return;
-    if (taskType === 'global') {
-      await deleteGlobalTask(taskId);
-      toast('تم الحذف بنجاح', 'success');
-      return;
-    }
-    const caseToUpdate = cases.find(c => c.id === caseId);
-    if (!caseToUpdate) return;
-    const updatedTasks = caseToUpdate.tasks.filter(t => t.id !== taskId);
-    await saveCaseToFirebase(caseId, { tasks: updatedTasks });
+    if (!window.confirm('هل أنت متأكد من حذف هذه المهمة؟')) return;
+    const c = cases.find(c => c.id === caseId);
+    if (!c) return;
+    await saveCaseToFirebase(caseId, { tasks: c.tasks.filter(t => t.id !== taskId) });
     toast('تم الحذف بنجاح', 'success');
   };
 
   if (isEmployee) {
+    // ... Employee view code remains the same ...
     const myTasks = [];
     cases.forEach(c => {
-      if (c.tasks) {
-        c.tasks.forEach(t => {
-          if (t.assignee === currentUser) {
-            myTasks.push({ ...t, caseId: c.id, caseNum: c['رقم الدعوى'] || c.id, year: c['السنة'], type: 'case', caseCover: c.coverImage });
-          }
-        });
-      }
+      if (c.tasks) c.tasks.forEach(t => {
+        if (t.assignee === currentUser)
+          myTasks.push({ ...t, caseId: c.id, caseNum: c['رقم الدعوى'] || c.id, year: c['السنة'], type: 'case', caseCover: c.coverImage });
+      });
     });
-
     globalTasks.forEach(t => {
       if (t.assignee === currentUser) {
-        // If linked to cases, find the first case to show cover image or info
-        let caseNum = 'مهمة عامة';
-        let caseCover = null;
-        if (t.linkedCases && t.linkedCases.length > 0) {
-          const firstCase = cases.find(c => c.id === t.linkedCases[0]);
-          if (firstCase) {
-             caseNum = t.linkedCases.length > 1 ? `مرتبطة بـ ${t.linkedCases.length} ملفات` : (firstCase['رقم الدعوى'] || 'ملف');
-             caseCover = firstCase.coverImage;
-          }
+        let caseNum = 'مهمة عامة', caseCover = null;
+        if (t.linkedCases?.length > 0) {
+          const fc = cases.find(c => c.id === t.linkedCases[0]);
+          if (fc) { caseNum = t.linkedCases.length > 1 ? `مرتبطة بـ ${t.linkedCases.length} ملفات` : (fc['رقم الدعوى'] || 'ملف'); caseCover = fc.coverImage; }
         }
         myTasks.push({ ...t, type: 'global', caseNum, caseCover });
       }
     });
-
-    const pendingTasks = myTasks.filter(t => t.status !== 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const pendingTasks   = myTasks.filter(t => t.status !== 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     const completedTasks = myTasks.filter(t => t.status === 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return (
       <div className="space-y-6 animate-fade-in pb-10">
         <div className="bg-emerald-600 rounded-3xl p-6 relative overflow-hidden shadow-sm">
-          <div className="absolute right-0 top-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4"></div>
+          <div className="absolute right-0 top-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
           <div className="relative z-10 text-white">
             <h1 className="text-3xl font-black mb-2">مرحباً، أ. {currentUser} 👋</h1>
             <p className="text-sm font-bold text-emerald-100">إليك المهام المطلوبة منك اليوم</p>
           </div>
         </div>
-
-        {/* Employee Search Bar */}
-        <form onSubmit={handleSearch} className="relative mb-6 animate-fade-in" style={{ animationDelay: '100ms' }}>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="البحث السريع عن الملفات (رقم الدعوى، الخصم، أو السنة)..."
-            className="w-full bg-white border-2 border-slate-200 rounded-2xl py-4 pl-14 pr-6 text-sm sm:text-base font-bold focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition shadow-sm text-navy-900"
-          />
-          <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white hover:bg-emerald-700 transition shadow-sm">
+        <form onSubmit={handleSearch} className="relative">
+          <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+            placeholder="البحث السريع عن الملفات..."
+            className="w-full bg-white border-2 border-slate-200 rounded-2xl py-4 pl-14 pr-6 text-sm font-bold focus:outline-none focus:border-emerald-500 transition shadow-sm text-navy-900" />
+          <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white hover:bg-emerald-700 transition">
             <Search className="w-5 h-5" />
           </button>
         </form>
-
         <div className="space-y-4">
           <h2 className="text-lg font-black text-navy-900 px-2 flex items-center gap-2">
-            <ClipboardList className="w-5 h-5 text-emerald-600" />
-            مهام قيد التنفيذ ({pendingTasks.length})
+            <ClipboardList className="w-5 h-5 text-emerald-600" /> مهام قيد التنفيذ ({pendingTasks.length})
           </h2>
-
           {pendingTasks.length === 0 ? (
-            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center text-slate-500 font-bold text-sm">
-              لا توجد مهام جديدة مطلوبة منك حالياً.
-            </div>
+            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center text-slate-500 font-bold text-sm">لا توجد مهام جديدة مطلوبة منك حالياً.</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {pendingTasks.map(task => (
-                <div key={task.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 flex flex-col">
-                  <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+                <div key={task.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col">
+                  <div className="flex justify-between items-start border-b border-slate-100 pb-3 mb-4 gap-3">
                     <div className="flex gap-3">
                       {task.caseCover && (
-                         <div className="w-12 h-16 shrink-0 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shadow-sm flex items-center justify-center">
-                            <img src={task.caseCover} alt="Cover" className="w-full h-full object-cover" />
-                         </div>
+                        <div className="w-12 h-16 shrink-0 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shadow-sm">
+                          <img src={task.caseCover} alt="Cover" className="w-full h-full object-cover" />
+                        </div>
                       )}
                       <div>
                         <span className={`text-[10px] font-black px-2 py-1 rounded-md mb-2 inline-block ${task.type === 'global' && !task.linkedCases?.length ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
@@ -159,327 +401,427 @@ export default function Dashboard() {
                       </div>
                     </div>
                     {task.type === 'case' && (
-                      <button onClick={() => navigate(`/case/${task.caseId}`)} className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-navy-900 hover:bg-slate-100 transition shrink-0">
+                      <button onClick={() => navigate(`/case/${task.caseId}`)} className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 transition shrink-0">
                         <ChevronLeft className="w-4 h-4" />
                       </button>
                     )}
                   </div>
-                  <button
-                    onClick={async () => {
-                      const notes = await showPrompt('تسجيل إجراء', 'اكتب ملاحظات حول تنفيذ هذه المهمة (اختياري):');
-                      if (notes !== null) {
-                        await handleCompleteTask(task.type, task.caseId, task.id, notes);
-                      }
-                    }}
-                    className="w-full group bg-slate-50 border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-500 text-slate-500 hover:text-white font-black py-3 rounded-xl text-sm transition-all duration-300 flex items-center justify-center gap-3 mt-4 shadow-sm hover:shadow-lg hover:shadow-emerald-500/30 active:scale-[0.98]"
-                  >
-                    <div className="w-6 h-6 rounded-full border-2 border-slate-400 group-hover:border-white bg-white/50 group-hover:bg-transparent flex items-center justify-center transition-all duration-300 group-hover:scale-110">
-                      <CheckCircle2 className="w-4 h-4 text-transparent group-hover:text-white transition-colors" />
-                    </div>
-                    <span className="group-hover:-translate-x-1 transition-transform">تأشير كـ "مُنجز"</span>
+                  <button onClick={async () => { const n = await showPrompt('تسجيل إجراء', 'ملاحظات (اختياري):'); if (n !== null) await handleCompleteTask(task.type, task.caseId, task.id, n); }}
+                    className="w-full group bg-slate-50 border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-500 text-slate-500 hover:text-white font-black py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-3 shadow-sm hover:shadow-lg active:scale-[0.98]">
+                    <CheckCircle2 className="w-4 h-4" /> تأشير كـ "مُنجز"
                   </button>
                 </div>
               ))}
             </div>
           )}
         </div>
-
         {completedTasks.length > 0 && (
-          <div className="space-y-4 pt-6 border-t border-slate-200">
+          <div className="space-y-3 pt-6 border-t border-slate-200">
             <h2 className="text-sm font-black text-slate-400 px-2">مهام تم إنجازها حديثاً</h2>
-            <div className="space-y-2">
-              {completedTasks.slice(0, 5).map(task => (
-                <div key={task.id} className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                  <div>
-                    <h3 className="font-black text-slate-600 text-xs mb-1 line-through">{task.title}</h3>
-                    <p className="text-[10px] font-bold text-slate-400">رقم {task.caseNum}</p>
-                    {task.notes && <p className="text-[10px] font-bold text-emerald-600 mt-1 bg-emerald-50 px-2 py-1 rounded-md inline-block">ملاحظة: {task.notes}</p>}
-                  </div>
-                  <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md shrink-0">
-                    تم التنفيذ
-                  </span>
+            {completedTasks.slice(0, 5).map(task => (
+              <div key={task.id} className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex justify-between items-center gap-3">
+                <div>
+                  <h3 className="font-black text-slate-600 text-xs line-through mb-1">{task.title}</h3>
+                  <p className="text-[10px] font-bold text-slate-400">رقم {task.caseNum}</p>
+                  {task.notes && <p className="text-[10px] font-bold text-emerald-600 mt-1 bg-emerald-50 px-2 py-1 rounded-md inline-block">{task.notes}</p>}
                 </div>
-              ))}
-            </div>
+                <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md shrink-0">تم التنفيذ</span>
+              </div>
+            ))}
           </div>
         )}
       </div>
     );
   }
 
+  const donutSegments = stats.topJudgments.map(([name, value]) => ({ name, value, color: getJColor(name) }));
+  const donutTotal    = donutSegments.reduce((s, d) => s + d.value, 0);
+  const viewMonthLabel = new Date(viewMonth.year, viewMonth.month, 1).toLocaleDateString('ar-EG', { month: 'long' });
+
+  // ─── Consultant / Admin view ────────────────────────────────
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-4 pb-24 animate-fade-in">
 
-      {/* Compact Search Header */}
-      <div className="bg-navy-900 rounded-3xl p-4 sm:p-6 text-center shadow-lg relative overflow-hidden flex flex-col items-center justify-center">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl translate-x-10 -translate-y-10 pointer-events-none"></div>
-        <div className="absolute bottom-0 left-0 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl -translate-x-10 translate-y-10 pointer-events-none"></div>
-
-        <div className="relative z-10 w-full max-w-2xl mx-auto space-y-4">
+      {/* ── Search Bar Section (Darkest) ──────────────────────── */}
+      <div className="bg-[#0a131c] rounded-3xl p-4 sm:p-5 relative overflow-hidden shadow-lg">
+        {/* Decorative lights */}
+        <div className="absolute top-0 right-0 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl translate-x-10 -translate-y-10 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl -translate-x-10 translate-y-10 pointer-events-none" />
+        
+        <div className="relative z-10 max-w-2xl mx-auto space-y-3">
           <form onSubmit={handleSearch} className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               placeholder="ابحث برقم الدعوى أو الخصم..."
-              className="w-full bg-white/10 text-white placeholder-slate-400 border-2 border-white/20 rounded-2xl py-3 pl-14 pr-14 text-sm font-bold focus:outline-none focus:border-amber-400 focus:bg-white/20 transition-all backdrop-blur-sm"
-            />
-            
-            <button type="submit" className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white hover:bg-amber-600 transition">
+              className="w-full bg-slate-800/50 text-white placeholder-slate-400 border border-slate-700/50 rounded-2xl py-3 pl-14 pr-14 text-sm font-bold focus:outline-none focus:border-amber-500/50 focus:bg-slate-800 transition-all" />
+            <button type="submit" className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white hover:bg-amber-600 transition shadow-md">
               <Search className="w-5 h-5" />
             </button>
           </form>
-
-          {/* Quick Filters */}
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <button 
-              onClick={() => setIsAdvancedSearchOpen(true)}
-              className="bg-white/10 hover:bg-white/20 text-amber-300 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-white/10"
-            >
-              <Sparkles className="w-3.5 h-3.5" /> بحث ذكي
+          
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+            <button onClick={() => setIsAdvancedSearchOpen(true)} className="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 border border-slate-700">
+              <Sparkles className="w-3 h-3" /> بحث ذكي
             </button>
-            <button 
-              onClick={() => {
-                navigate(`/files?q=${new Date().getFullYear()}`);
-              }}
-              className="bg-white/5 hover:bg-white/10 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-bold transition border border-white/5"
-            >
-              سنة {new Date().getFullYear()}
+            <button onClick={() => navigate(`/files?q=وقف جزائي&role=appellant`)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[11px] font-bold transition border border-slate-700">
+              موقوفة (طاعن)
             </button>
-            <button 
-              onClick={() => {
-                navigate(`/files?role=appellant`);
-              }}
-              className="bg-white/5 hover:bg-white/10 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-bold transition border border-white/5"
-            >
-              قضايا {settings?.roles?.[0] || 'الطاعنين'}
-            </button>
-            <button 
-              onClick={() => {
-                navigate(`/files?q=وقف`);
-              }}
-              className="bg-white/5 hover:bg-white/10 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-bold transition border border-white/5"
-            >
-              موقوفة
+            <button onClick={() => navigate(`/files?q=اعتبار&role=appellant`)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[11px] font-bold transition border border-slate-700">
+              اعتبار (طاعن)
             </button>
           </div>
         </div>
       </div>
 
-      {/* Dashboard Stats */}
-      <div className="space-y-6 animate-fade-in">
-        {/* Alerts Section */}
-        {stats.alerts.length > 0 && (
-          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 sm:p-5 shadow-sm relative overflow-hidden">
-            <div className="absolute -right-4 -top-4 w-16 h-16 bg-rose-500 rounded-full opacity-10"></div>
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-black text-rose-900 mb-1">تنبيهات هامة!</h3>
-                <p className="text-xs font-bold text-rose-700 leading-relaxed mb-3">
-                  توجد مواعيد إجرائية هامة اقتربت أو انتهت يرجى الانتباه لها:
-                </p>
-                <div className="flex flex-col gap-2">
-                  {stats.alerts.map((a, i) => (
-                    <button
-                      key={`${a.case.id}-${i}`}
-                      onClick={() => navigate(`/case/${a.case.id}`)}
-                      className="bg-white border border-rose-200 text-rose-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-rose-100 transition shadow-sm text-right flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2"
-                    >
-                      <span>رقم {a.case['رقم الدعوى'] || a.case.id} <span className="opacity-70 mx-1">|</span> {a.ruleName || 'تنبيه'}</span>
-                      <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full whitespace-nowrap">
-                        مر {a.daysPassed} يوم (باقي {a.daysLeft} يوم)
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center space-y-2">
-            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-              <Scale className="w-5 h-5" />
-            </div>
-            <p className="text-xs font-bold text-slate-500">صافي القضايا النشطة</p>
-            <p className="text-2xl font-black text-navy-900">{stats.netTotal}</p>
-          </div>
-
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center space-y-2">
-            <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <p className="text-xs font-bold text-slate-500">الجلسات المتداولة</p>
-            <p className="text-2xl font-black text-navy-900">{stats.ongoing}</p>
-          </div>
-
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center space-y-2">
-            <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
-              <CalendarDays className="w-5 h-5" />
-            </div>
-            <p className="text-xs font-bold text-slate-500">جلسات هذا الشهر</p>
-            <p className="text-2xl font-black text-navy-900">{stats.activeThisMonth}</p>
-          </div>
-
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center space-y-2">
-            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <p className="text-xs font-bold text-slate-500">قضايا {settings?.roles?.[0] || 'الطاعنين'}</p>
-            <p className="text-2xl font-black text-navy-900">{stats.appellant}</p>
-          </div>
-        </div>
-
-        {/* Ignored Cases Stats */}
-        <div className="grid grid-cols-2 gap-3">
-           <div className="bg-slate-50/50 rounded-xl p-3 border border-slate-200 border-dashed flex justify-between items-center opacity-70">
-              <span className="text-xs font-bold text-slate-500">لا شأن</span>
-              <span className="text-sm font-black text-slate-700">{stats.noInterest}</span>
-           </div>
-           <div className="bg-slate-50/50 rounded-xl p-3 border border-slate-200 border-dashed flex justify-between items-center opacity-70">
-              <span className="text-xs font-bold text-slate-500">خارج الاختصاص</span>
-              <span className="text-sm font-black text-slate-700">{stats.outOfJurisdiction}</span>
-           </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {/* Status Chart */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center items-center relative overflow-hidden h-full min-h-[90px]">
-            <div className="flex items-end justify-around w-full h-full px-4 border-b border-slate-100 pb-2">
-              <div className="flex flex-col items-center gap-1.5 group w-20">
-                <span className="text-base font-black text-slate-500 group-hover:text-amber-600 transition-colors">{stats.ongoing}</span>
-                <div 
-                  className="w-full bg-amber-200 rounded-t-sm transition-all duration-1000 group-hover:bg-amber-400"
-                  style={{ height: `${(stats.ongoing / Math.max(stats.ongoing, stats.judged, stats.reserved, 1)) * 100}%`, minHeight: '8px' }}
-                ></div>
-                <span className="text-xs font-bold text-slate-600 text-center mt-1 leading-none">متداول</span>
-              </div>
-              
-              <div className="flex flex-col items-center gap-1.5 group w-20">
-                <span className="text-base font-black text-slate-500 group-hover:text-indigo-600 transition-colors">{stats.reserved}</span>
-                <div 
-                  className="w-full bg-indigo-200 rounded-t-sm transition-all duration-1000 group-hover:bg-indigo-400"
-                  style={{ height: `${(stats.reserved / Math.max(stats.ongoing, stats.judged, stats.reserved, 1)) * 100}%`, minHeight: '8px' }}
-                ></div>
-                <span className="text-xs font-bold text-slate-600 text-center mt-1 leading-none">محجوز للحكم</span>
-              </div>
-              
-              <div className="flex flex-col items-center gap-1.5 group w-20">
-                <span className="text-base font-black text-slate-500 group-hover:text-emerald-600 transition-colors">{stats.judged}</span>
-                <div 
-                  className="w-full bg-emerald-200 rounded-t-sm transition-all duration-1000 group-hover:bg-emerald-400"
-                  style={{ height: `${(stats.judged / Math.max(stats.ongoing, stats.judged, stats.reserved, 1)) * 100}%`, minHeight: '8px' }}
-                ></div>
-                <span className="text-xs font-bold text-slate-600 text-center mt-1 leading-none">المحكوم فيه</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Entity Indicator */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center relative overflow-hidden h-full min-h-[90px]">
-            <div className="w-full flex-1 flex flex-col justify-center gap-4 mt-2">
-              <div className="w-full flex h-4 bg-slate-100 rounded-full overflow-hidden shadow-inner relative">
-                <div 
-                  className="bg-emerald-500 h-full flex items-center justify-center text-xs text-white font-bold transition-all duration-1000" 
-                  style={{ width: `${(stats.appellant / (stats.appellant + stats.appellee || 1)) * 100}%` }}
-                ></div>
-                <div 
-                  className="bg-rose-500 h-full flex items-center justify-center text-xs text-white font-bold transition-all duration-1000" 
-                  style={{ width: `${(stats.appellee / (stats.appellant + stats.appellee || 1)) * 100}%` }}
-                ></div>
-              </div>
-              
-              <div className="w-full flex justify-between text-xs font-black">
-                 <span className="text-emerald-700">{settings?.roles?.[0] || 'طاعن'} ({stats.appellant})</span>
-                 <span className="text-rose-700">{settings?.roles?.[1] || 'مطعون ضدنا'} ({stats.appellee})</span>
+      {/* ── Alerts ─────────────────────────────────────────── */}
+      {stats.alerts.length > 0 && (
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="w-full">
+              <h3 className="font-black text-rose-900 mb-2 text-sm">⚠️ تنبيهات إجرائية هامة</h3>
+              <div className="flex flex-col gap-1.5">
+                {stats.alerts.map((a, i) => (
+                  <button key={i} onClick={() => navigate(`/case/${a.case.id}`)}
+                    className="bg-white border border-rose-200 text-rose-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-rose-100 transition text-right flex justify-between items-center">
+                    <span>رقم {a.case['رقم الدعوى'] || a.case.id} | {a.ruleName}</span>
+                    <span className="text-[10px] bg-rose-100 px-2 py-0.5 rounded-full whitespace-nowrap">باقي {a.daysLeft} يوم</span>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Charts / Lists */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Top Opponents */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-slate-400" />
-              <h3 className="font-black text-xs text-slate-600">الجهات رافعة الدعوى (قضايا {settings?.roles?.[0] || 'الطاعنين'})</h3>
-            </div>
-            <div className="space-y-3">
-              {stats.topOpponents.length > 0 ? stats.topOpponents.map(([name, count], i) => (
-                <div key={name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <span className="w-5 h-5 rounded-md bg-slate-50 text-slate-400 flex items-center justify-center text-[10px] font-bold shrink-0">{i + 1}</span>
-                    <p className="text-xs font-bold text-navy-900 truncate" title={name}>{name}</p>
-                  </div>
-                  <span className="text-[10px] font-black text-slate-500 shrink-0 bg-slate-50 px-2 py-0.5 rounded-full mr-2">{count} ملف</span>
-                </div>
-              )) : (
-                <p className="text-xs text-slate-400 font-bold text-center py-2">لا توجد بيانات كافية</p>
-              )}
-            </div>
+      {/* ── Monthly Matrix (Compact, lighter dark) ────────────── */}
+      <div className="bg-[#1e293b] rounded-2xl p-4 shadow-sm border border-slate-700/50">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-amber-400" />
+            <span className="text-sm font-black text-white">إحصائيات {viewMonthLabel}</span>
           </div>
-
-          {/* Active Years */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="w-4 h-4 text-slate-400" />
-              <h3 className="font-black text-xs text-slate-600">توزيع الملفات المتداولة (وفقاً للسنة)</h3>
-            </div>
-            <div className="space-y-3">
-              {stats.topYears.map(([year, count]) => {
-                const max = Math.max(...stats.topYears.map(y => y[1]));
-                const width = `${(count / max) * 100}%`;
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-slate-900/50 border border-slate-700/50 rounded-lg p-1">
+              {monthTabs.map(tab => {
+                const isSelected = tab.month === viewMonth.month && tab.year === viewMonth.year;
                 return (
-                  <div key={year} className="space-y-1">
-                    <div className="flex items-center justify-between text-[11px] font-bold">
-                      <span className="text-navy-900">سنة {year}</span>
-                      <span className="text-slate-500">{count}</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-amber-400 rounded-full" style={{ width }}></div>
-                    </div>
-                  </div>
+                  <button key={`${tab.year}-${tab.month}`}
+                    onClick={() => setViewMonth({ month: tab.month, year: tab.year })}
+                    className={`px-3 py-1 rounded-md text-[11px] font-black transition-all ${isSelected ? 'bg-amber-500 text-[#0f172a] shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                    {tab.label}
+                    {tab.isCurrent && <span className="mr-1 text-[7px] opacity-70">●</span>}
+                  </button>
                 );
               })}
             </div>
+            <button onClick={() => setShowPrintModal(true)}
+              className="flex items-center justify-center w-7 h-7 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition border border-slate-700/50">
+              <Printer className="w-3.5 h-3.5" />
+            </button>
           </div>
+        </div>
 
-          {/* Judgments Breakdown */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2">
-              <PieChart className="w-4 h-4 text-slate-400" />
-              <h3 className="font-black text-xs text-slate-600">تحليل وتصنيف الأحكام</h3>
+        {/* 3 main compact metrics */}
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          {[
+            { icon: Activity, label: 'متداول الشهر', value: selectedMonthStats.sessions, prev: prevMonthStats.sessions, color: 'text-amber-400', iconColor: 'text-amber-500' },
+            { icon: FileText, label: 'مذكرات',       value: selectedMonthStats.memos,    prev: prevMonthStats.memos,    color: 'text-blue-400',  iconColor: 'text-blue-500' },
+            { icon: Gavel,    label: 'أحكام',         value: selectedMonthStats.judgments.total, prev: prevMonthStats.judgments.total, color: 'text-emerald-400', iconColor: 'text-emerald-500' },
+          ].map(item => (
+            <div key={item.label} className="bg-slate-900/40 rounded-xl p-3 border border-slate-700/40 flex items-center gap-3">
+               <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 shadow-inner">
+                 <item.icon className={`w-4 h-4 ${item.iconColor}`} />
+               </div>
+               <div className="flex-1 min-w-0">
+                 <p className="text-[10px] font-bold text-slate-400 mb-0.5 truncate">{item.label}</p>
+                 <div className="flex items-center gap-2">
+                   <p className={`text-xl font-black ${item.color} leading-none`}>{item.value}</p>
+                   <TrendBadge current={item.value} prev={item.prev} className="!mt-0" />
+                 </div>
+               </div>
             </div>
-            <div className="space-y-3">
-              {stats.topJudgments.length > 0 ? stats.topJudgments.map(([name, count]) => {
-                const total = stats.topJudgments.reduce((acc, curr) => acc + curr[1], 0);
-                const width = `${(count / total) * 100}%`;
-                return (
-                  <div key={name} className="space-y-1">
-                    <div className="flex items-center justify-between text-[11px] font-bold">
-                      <span className="text-navy-900">{name}</span>
-                      <span className="text-slate-500">{count}</span>
+          ))}
+        </div>
+
+        {/* Judgment detail chips - compact */}
+        {selectedMonthStats.judgments.total > 0 && (
+          <div className="flex flex-wrap gap-1.5 pt-3 border-t border-slate-700/30">
+            {[
+              { l: 'صالح',   v: selectedMonthStats.judgments.good,          pv: prevMonthStats.judgments.good,          color: 'text-emerald-400', bad: false },
+              { l: 'ضد',     v: selectedMonthStats.judgments.bad,           pv: prevMonthStats.judgments.bad,           color: 'text-rose-400',    bad: true  },
+              { l: 'وقف',    v: selectedMonthStats.judgments.stop,          pv: prevMonthStats.judgments.stop,          color: 'text-orange-400',  bad: true  },
+              { l: 'اعتبار', v: selectedMonthStats.judgments.consideration,  pv: prevMonthStats.judgments.consideration, color: 'text-yellow-400',  bad: true  },
+              { l: 'خبراء',  v: selectedMonthStats.judgments.expert,         pv: prevMonthStats.judgments.expert,        color: 'text-purple-400',  bad: false },
+            ].map(item => (
+              <div key={item.l} className="flex-1 min-w-[45px] bg-slate-900/20 rounded-lg py-1.5 px-2 text-center border border-slate-700/20 flex flex-col items-center justify-center gap-0.5">
+                <p className={`text-sm font-black ${item.color} leading-none`}>{item.v}</p>
+                <p className="text-[9px] font-bold text-slate-400 leading-none">{item.l}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── KPI Cards (4 main judicial metrics) ──────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KPICard
+          icon={Calendar}
+          label="القضايا النشطة"
+          sublabel="جلسات قادمة (بعد اليوم)"
+          value={stats.activeCasesCount}
+          accentColor="#0ea5e9"
+          bgFrom="from-sky-50" bgTo="to-blue-50/40"
+          iconBg="bg-sky-100"
+          border="border-sky-200"
+          onClick={() => navigate('/files')}
+          extra={
+            stats.netTotal > 0 && (
+              <p className="text-[9px] font-bold text-slate-400">
+                {Math.round((stats.activeCasesCount / stats.netTotal) * 100)}% من إجمالي {stats.netTotal} ملف
+              </p>
+            )
+          }
+        />
+        <KPICard
+          icon={TrendingUp}
+          label="إجمالي المتداول"
+          sublabel="نشط · غير محجوز للحكم"
+          value={stats.ongoingCount}
+          accentColor="#d97706"
+          bgFrom="from-amber-50" bgTo="to-orange-50/40"
+          iconBg="bg-amber-100"
+          border="border-amber-200"
+          onClick={() => navigate('/files')}
+        />
+        <KPICard
+          icon={Clock}
+          label="محجوز للحكم"
+          sublabel="قرار الجلسة: للحكم"
+          value={stats.reservedCount}
+          accentColor="#7c3aed"
+          bgFrom="from-violet-50" bgTo="to-purple-50/40"
+          iconBg="bg-violet-100"
+          border="border-violet-200"
+          onClick={() => navigate('/files')}
+        />
+        <KPICard
+          icon={Scale}
+          label="المحكوم فيها"
+          sublabel="حكم مسجل"
+          value={stats.judgedCount}
+          accentColor="#059669"
+          bgFrom="from-emerald-50" bgTo="to-green-50/40"
+          iconBg="bg-emerald-100"
+          border="border-emerald-200"
+          onClick={() => navigate('/files')}
+          extra={
+            stats.judgedCount > 0 && (
+              <p className="text-[9px] font-bold text-slate-400">
+                {Math.round((stats.judgedCount / (stats.netTotal || 1)) * 100)}% من الإجمالي
+              </p>
+            )
+          }
+        />
+      </div>
+
+      {/* لا شأن / خارج الاختصاص — slim row */}
+      <div className="grid grid-cols-2 gap-2">
+        {[['لا شأن', stats.noInterest], ['خارج الاختصاص', stats.outOfJurisdiction]].map(([l, v]) => (
+          <div key={l} className="bg-slate-50/50 rounded-xl p-2.5 border border-dashed border-slate-200 flex justify-between items-center opacity-70">
+            <span className="text-xs font-bold text-slate-500">{l}</span>
+            <span className="text-sm font-black text-slate-700">{v}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Charts Row ────────────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Donut */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <PieChart className="w-4 h-4 text-slate-400" />
+            <h3 className="font-black text-xs text-slate-600">توزيع الأحكام الكلي</h3>
+          </div>
+          {donutSegments.length > 0 ? (
+            <div className="flex items-center gap-4">
+              <div className="relative shrink-0">
+                <DonutChart segments={donutSegments} size={130} thickness={22} />
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-2xl font-black text-navy-900">{donutTotal}</span>
+                  <span className="text-[9px] font-bold text-slate-400">حكم</span>
+                </div>
+              </div>
+              <div className="flex-1 space-y-1.5 overflow-hidden">
+                {donutSegments.slice(0, 7).map(seg => (
+                  <div key={seg.name} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
+                      <span className="text-xs font-bold text-slate-700 truncate">{seg.name}</span>
                     </div>
-                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width }}></div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-xs font-black text-slate-600">{seg.value}</span>
+                      <span className="text-[9px] text-slate-400">({Math.round(seg.value / donutTotal * 100)}%)</span>
                     </div>
                   </div>
-                );
-              }) : (
-                <p className="text-xs text-slate-400 font-bold text-center py-2">لا توجد بيانات كافية</p>
-              )}
+                ))}
+              </div>
             </div>
-          </div>
+          ) : <p className="text-xs text-slate-400 font-bold text-center py-8">لا توجد أحكام مسجلة حتى الآن</p>}
+        </div>
 
+        {/* 6-Month trend */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="w-4 h-4 text-slate-400" />
+            <h3 className="font-black text-xs text-slate-600">مسار الجلسات (آخر 6 أشهر)</h3>
+          </div>
+          <div className="mt-3">
+            <TrendLine data={stats.last6Months} color="#f59e0b" />
+          </div>
+          <div className="flex justify-between mt-1 px-1">
+            {stats.last6Months.map((m, i) => (
+              <div key={i} className="flex flex-col items-center">
+                <span className="text-[9px] font-bold text-slate-400">{m.label}</span>
+                <span className="text-[9px] font-black text-amber-600">{m.count}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Admin Employee Performance Report */}
-      <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm space-y-4 animate-fade-in mt-6">
+      {/* Appellant vs Appellee bar */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-black text-xs text-slate-600">توزيع صفة الموكل</h3>
+          <div className="flex gap-4 text-xs font-black">
+            <span className="text-emerald-600">{settings?.roles?.[0] || 'طاعن'}: {stats.appellant}</span>
+            <span className="text-rose-600">{settings?.roles?.[1] || 'مطعون ضدنا'}: {stats.appellee}</span>
+          </div>
+        </div>
+        <div className="w-full flex h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+          <div className="bg-gradient-to-l from-emerald-400 to-emerald-500 h-full transition-all duration-1000 rounded-r-full"
+            style={{ width: `${(stats.appellant / (stats.appellant + stats.appellee || 1)) * 100}%` }} />
+          <div className="bg-gradient-to-l from-rose-500 to-rose-400 h-full transition-all duration-1000 rounded-l-full"
+            style={{ width: `${(stats.appellee / (stats.appellant + stats.appellee || 1)) * 100}%` }} />
+        </div>
+      </div>
+
+      {/* ── Toggleable Widgets ─────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-black text-slate-400 uppercase tracking-wider">إحصائيات تفصيلية</h2>
+          <button onClick={() => setShowCustomize(!showCustomize)}
+            className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition ${showCustomize ? 'bg-[#0f172a] text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+            <Settings2 className="w-3.5 h-3.5" /> تخصيص
+          </button>
+        </div>
+        {showCustomize && (
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-3 flex flex-wrap gap-2 animate-fade-in">
+            {[
+              { id: 'entities', label: 'الجهات رافعة الدعوى' },
+              { id: 'years', label: 'توزيع الملفات بالسنة' },
+              { id: 'judgment-list', label: 'قائمة تصنيف الأحكام' },
+            ].map(w => (
+              <button key={w.id} onClick={() => toggleWidget(w.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition border ${isVisible(w.id) ? 'bg-white border-slate-200 text-navy-900 shadow-sm' : 'bg-slate-100 border-transparent text-slate-400'}`}>
+                {isVisible(w.id) ? <Eye className="w-3.5 h-3.5 text-emerald-500" /> : <EyeOff className="w-3.5 h-3.5" />}
+                {w.label}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className={`grid gap-3 ${[isVisible('entities'), isVisible('years'), isVisible('judgment-list')].filter(Boolean).length >= 2 ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'}`}>
+
+          {isVisible('entities') && (
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-slate-400" />
+                <h3 className="font-black text-xs text-slate-600">الجهات رافعة الدعوى</h3>
+              </div>
+              {stats.topOpponents.length > 0 ? (
+                <div className="space-y-3">
+                  {stats.topOpponents.map(([name, count], i) => {
+                    const mx = stats.topOpponents[0][1];
+                    return (
+                      <div key={name} className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px] font-bold">
+                          <div className="flex items-center gap-1.5 overflow-hidden">
+                            <span className="w-4 h-4 rounded-md bg-slate-100 text-slate-500 flex items-center justify-center text-[9px] shrink-0">{i + 1}</span>
+                            <span className="truncate text-navy-900">{name}</span>
+                          </div>
+                          <span className="text-slate-500 shrink-0 ml-2">{count}</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-l from-amber-400 to-amber-500 rounded-full" style={{ width: `${(count / mx) * 100}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : <p className="text-xs text-slate-400 font-bold text-center py-4">لا توجد بيانات</p>}
+            </div>
+          )}
+
+          {isVisible('years') && (
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-slate-400" />
+                <h3 className="font-black text-xs text-slate-600">توزيع الملفات (بالسنة)</h3>
+              </div>
+              <div className="space-y-3">
+                {stats.topYears.map(([year, count]) => {
+                  const mx = stats.topYears[0][1];
+                  return (
+                    <div key={year} className="space-y-1">
+                      <div className="flex items-center justify-between text-[11px] font-bold">
+                        <span className="text-navy-900">سنة {year}</span><span className="text-slate-500">{count}</span>
+                      </div>
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-l from-blue-400 to-indigo-500 rounded-full" style={{ width: `${(count / mx) * 100}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {isVisible('judgment-list') && (
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+              <div className="flex items-center gap-2">
+                <PieChart className="w-4 h-4 text-slate-400" />
+                <h3 className="font-black text-xs text-slate-600">تصنيف الأحكام الكلية</h3>
+              </div>
+              {stats.topJudgments.length > 0 ? (
+                <div className="space-y-3">
+                  {stats.topJudgments.map(([name, count]) => {
+                    const total = stats.topJudgments.reduce((s, c) => s + c[1], 0);
+                    const pct   = Math.round((count / total) * 100);
+                    const color = getJColor(name);
+                    return (
+                      <div key={name} className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px] font-bold">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                            <span className="text-navy-900">{name}</span>
+                          </div>
+                          <span className="text-slate-500">{count} ({pct}%)</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : <p className="text-xs text-slate-400 font-bold text-center py-4">لا توجد أحكام مسجلة</p>}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Employee Tasks ────────────────────────────────── */}
+      <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm space-y-4">
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <Activity className="w-6 h-6 text-indigo-600" />
@@ -488,130 +830,78 @@ export default function Dashboard() {
               <p className="text-[11px] font-bold text-slate-500">سجل بجميع المهام المنفذة مؤخراً</p>
             </div>
           </div>
-          <button 
-            onClick={() => setIsGlobalTaskModalOpen(true)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-sm flex items-center gap-2"
-          >
+          <button onClick={() => setIsGlobalTaskModalOpen(true)}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-sm flex items-center gap-2">
             <ClipboardList className="w-4 h-4" /> إنشاء مهمة عامة
           </button>
         </div>
-
         <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit">
-          <button 
-            onClick={() => setAdminTasksTab('pending')}
-            className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${adminTasksTab === 'pending' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-navy-900'}`}
-          >
-            مهام قيد التنفيذ
-          </button>
-          <button 
-            onClick={() => setAdminTasksTab('completed')}
-            className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${adminTasksTab === 'completed' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-navy-900'}`}
-          >
-            مهام تم تنفيذها
-          </button>
+          {[['pending', 'مهام قيد التنفيذ'], ['completed', 'مهام تم تنفيذها']].map(([key, label]) => (
+            <button key={key} onClick={() => setAdminTasksTab(key)}
+              className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${adminTasksTab === key ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-navy-900'}`}>
+              {label}
+            </button>
+          ))}
         </div>
-
-        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
           {(() => {
             const allTasks = [];
-            cases.forEach(c => {
-              if (c.tasks) {
-                c.tasks.forEach(t => {
-                  allTasks.push({
-                    ...t,
-                    caseId: c.id,
-                    caseNum: c['رقم الدعوى'] || c.id,
-                    year: c['السنة'],
-                    type: 'case'
-                  });
-                });
-              }
-            });
-            globalTasks.forEach(t => {
-              allTasks.push({ ...t, type: 'global', caseNum: t.linkedCases?.length ? `مرتبطة بـ ${t.linkedCases.length} ملفات` : 'مهمة عامة' });
-            });
-
-            const displayedTasks = allTasks
+            cases.forEach(c => { if (c.tasks) c.tasks.forEach(t => allTasks.push({ ...t, caseId: c.id, caseNum: c['رقم الدعوى'] || c.id, year: c['السنة'], type: 'case' })); });
+            globalTasks.forEach(t => allTasks.push({ ...t, type: 'global', caseNum: t.linkedCases?.length ? `مرتبطة بـ ${t.linkedCases.length} ملفات` : 'مهمة عامة' }));
+            const displayed = allTasks
               .filter(t => adminTasksTab === 'completed' ? t.status === 'completed' : t.status !== 'completed')
               .sort((a, b) => new Date(b.completedAt || b.createdAt) - new Date(a.completedAt || a.createdAt));
-
-            if (displayedTasks.length === 0) {
-              return (
-                <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
-                  <p className="text-xs font-bold text-slate-500">
-                    {adminTasksTab === 'completed' ? 'لم يتم تنفيذ أي مهام حتى الآن.' : 'لا توجد مهام قيد التنفيذ حالياً.'}
-                  </p>
-                </div>
-              );
-            }
-
-            return displayedTasks.map(task => {
+            if (displayed.length === 0) return (
+              <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
+                <p className="text-xs font-bold text-slate-500">{adminTasksTab === 'completed' ? 'لم يتم تنفيذ أي مهام حتى الآن.' : 'لا توجد مهام قيد التنفيذ حالياً.'}</p>
+              </div>
+            );
+            return displayed.map(task => {
               const d = new Date(task.completedAt || task.createdAt);
-              const dateStr = d.toLocaleDateString('ar-EG');
-              const timeStr = d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-
               return (
-                <div key={`${task.caseId}-${task.id}`} className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col sm:flex-row justify-between gap-4 transition hover:bg-slate-100">
+                <div key={`${task.caseId}-${task.id}`} className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col sm:flex-row justify-between gap-4 hover:bg-slate-100 transition">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="bg-navy-900 text-white px-2 py-0.5 rounded-md text-[10px] font-bold">{task.assignee}</span>
                       <h4 className="font-black text-sm text-navy-900">{task.title}</h4>
                     </div>
                     <p className="text-[11px] font-bold text-slate-500 mb-2">رقم الدعوى: {task.caseNum} {task.year && `لسنة ${task.year}`}</p>
-                    {task.notes && (
-                      <p className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-1.5 rounded-lg border border-indigo-100 inline-block">
-                        ملاحظة: {task.notes}
-                      </p>
-                    )}
+                    {task.notes && <p className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-1.5 rounded-lg border border-indigo-100 inline-block">ملاحظة: {task.notes}</p>}
                   </div>
                   <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 shrink-0">
                     {task.status === 'completed' ? (
                       <>
-                        <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md flex items-center gap-1 border border-emerald-100">
-                          <CheckCircle2 className="w-3 h-3" /> تم التنفيذ
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-400">
-                          {dateStr} - {timeStr}
-                        </span>
+                        <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md flex items-center gap-1 border border-emerald-100"><CheckCircle2 className="w-3 h-3" /> تم التنفيذ</span>
+                        <span className="text-[10px] font-bold text-slate-400">{d.toLocaleDateString('ar-EG')}</span>
                       </>
                     ) : (
                       <>
-                        <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-md flex items-center gap-1 border border-amber-100">
-                          قيد التنفيذ
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-400">
-                          {dateStr} - {timeStr}
-                        </span>
-                        <button 
-                          onClick={() => handleDeleteTaskAdmin(task.type, task.caseId, task.id)}
-                          className="mt-2 text-[10px] font-bold text-rose-500 hover:text-white hover:bg-rose-500 px-2 py-1 rounded-md transition"
-                        >
-                          حذف المهمة
-                        </button>
+                        <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-md border border-amber-100">قيد التنفيذ</span>
+                        <span className="text-[10px] font-bold text-slate-400">{d.toLocaleDateString('ar-EG')}</span>
+                        <button onClick={() => handleDeleteTaskAdmin(task.type, task.caseId, task.id)} className="text-[10px] font-bold text-rose-500 hover:text-white hover:bg-rose-500 px-2 py-1 rounded-md transition">حذف</button>
                       </>
                     )}
                   </div>
                 </div>
-              )
+              );
             });
           })()}
         </div>
-
-        {isAdvancedSearchOpen && (
-          <AdvancedSearchModal
-            isOpen={isAdvancedSearchOpen}
-            onClose={() => setIsAdvancedSearchOpen(false)}
-            onSearch={handleAdvancedSearch}
-          />
-        )}
-
-        <BulkAssignTaskModal
-          isOpen={isGlobalTaskModalOpen}
-          onClose={() => setIsGlobalTaskModalOpen(false)}
-          selectedCases={[]}
-          onClearSelection={() => {}}
-        />
       </div>
+
+      {/* Modals */}
+      {isAdvancedSearchOpen && (
+        <AdvancedSearchModal isOpen={isAdvancedSearchOpen} onClose={() => setIsAdvancedSearchOpen(false)} onSearch={handleAdvancedSearch} />
+      )}
+      <BulkAssignTaskModal isOpen={isGlobalTaskModalOpen} onClose={() => setIsGlobalTaskModalOpen(false)} selectedCases={[]} onClearSelection={() => {}} />
+      {showPrintModal && (
+        <PrintReportModal
+          stats={stats} settings={settings}
+          selectedMonthStats={selectedMonthStats}
+          selectedMonth={viewMonth.month} selectedYear={viewMonth.year}
+          onClose={() => setShowPrintModal(false)}
+        />
+      )}
     </div>
   );
 }

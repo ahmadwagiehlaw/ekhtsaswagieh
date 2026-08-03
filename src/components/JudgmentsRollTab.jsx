@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Edit3, Check, X, ChevronRight, ChevronLeft, AlertCircle,
   CheckSquare, Square, Camera, ExternalLink, Printer, Search, Image,
@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
+import GlobalTemplatePrintModal from './GlobalTemplatePrintModal';
+import CaseDetails from '../pages/CaseDetails';
 import { getSafeDateObj } from '../utils/dateUtils';
 import { uploadToR2 } from '../lib/r2';
 import ExportPDFModal from './ExportPDFModal';
@@ -16,13 +18,34 @@ import BulkSessionRolloverModal from './BulkSessionRolloverModal';
 import BulkJudgmentRegistrationModal from './BulkJudgmentRegistrationModal';
 import QuickAddCaseModal from './QuickAddCaseModal';
 import GlobalRollSearchModal from './GlobalRollSearchModal';
-import GlobalTemplatePrintModal from './GlobalTemplatePrintModal';
 
 const getFieldVal = (obj, keys) => {
   for (const k of keys) {
     if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k];
   }
   return '';
+};
+
+/** Returns Tailwind classes for judgment classification badge */
+const getJudgmentClassBadge = (result) => {
+  if (!result) return 'bg-slate-100 text-slate-500';
+  if (result.includes('ضد')) return 'bg-rose-100 text-rose-700 font-black';
+  if (result.includes('وقف جزائي') || result.includes('اعتبار')) return 'bg-amber-100 text-amber-700 font-black';
+  if (result.includes('وقف تعليقي')) return 'bg-orange-100 text-orange-700';
+  if (result.includes('صالح') || result.includes('لصالح')) return 'bg-emerald-100 text-emerald-700 font-black';
+  if (result.includes('مختلط')) return 'bg-blue-100 text-blue-700';
+  if (result.includes('خبراء')) return 'bg-violet-100 text-violet-700';
+  return 'bg-slate-100 text-slate-600';
+};
+
+/** Returns row background based on file location */
+const getJudgmentRowBg = (fileLocation, isSelected, isEditing) => {
+  if (isEditing) return 'bg-rose-50/40';
+  if (isSelected) return 'bg-rose-100/60';
+  if (fileLocation === 'غير موجود') return 'bg-rose-100 hover:bg-rose-150';
+  if (fileLocation === 'مؤقت') return 'bg-amber-100 hover:bg-amber-150';
+  if (fileLocation === 'خارج الاختصاص') return 'bg-indigo-100 hover:bg-indigo-150';
+  return 'hover:bg-slate-100/80';
 };
 
 const isSessionRecorded = (session) => {
@@ -183,6 +206,8 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
   const [savingId, setSavingId] = useState(null);
   const [judgmentFilter, setJudgmentFilter] = useState('all');
 
+  const [selectedCase, setSelectedCase] = useState(null);
+  const [selectedCaseId, setSelectedCaseId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [isBulkProcedureOpen, setIsBulkProcedureOpen] = useState(false);
   const [isRolloverOpen, setIsRolloverOpen] = useState(false);
@@ -436,7 +461,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
               onChange={e => onDateChange(e.target.value)}
               className="text-sm font-black text-navy-900 bg-transparent border-none outline-none cursor-pointer text-center"
             />
-            <p className="text-[10px] font-bold text-rose-500">⚖️ {filteredCases.length} حكم</p>
+            <p className="text-[10px] font-bold text-rose-500">⚖️ {filteredCases.length} طعن/دعوى</p>
           </div>
           <button
             onClick={() => {
@@ -617,7 +642,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
           <div className="overflow-x-auto">
             <table className="w-full text-right min-w-[900px]" dir="rtl">
               <thead>
-                <tr className="bg-rose-50 border-b border-rose-100">
+                <tr className="bg-rose-100/60 border-b-2 border-rose-200">
                   <th className="px-3 py-2.5 w-10">
                     <button onClick={toggleAll} className="text-rose-400 hover:text-rose-600 transition">
                       {selectedIds.size === filteredCases.length && filteredCases.length > 0
@@ -638,7 +663,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                   <th className="px-2 py-2.5 w-16"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200">
                 {filteredCases.map((cObj, idx) => {
                   const isEditing = editingId === cObj.id;
                   const isSelected = selectedIds.has(cObj.id);
@@ -649,11 +674,15 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                   const session = cObj.sessions?.find(s => s.date === date);
                   const j = session?.judgment || {};
                   const hasJudgment = isSessionRecorded(session);
+                  const fileLocation = getFieldVal(cObj, ['مكان الملف']);
+                  
+                  const rowBgColor = getJudgmentRowBg(fileLocation, isSelected, isEditing);
+                  const stripeClass = idx % 2 !== 0 && !fileLocation && !isSelected && !isEditing ? 'bg-slate-50/60' : '';
 
                   return (
                     <tr
                       key={cObj.id}
-                      className={`transition-colors ${isSelected ? 'bg-rose-50/40' : (isEditing ? 'bg-rose-50/20' : 'hover:bg-slate-50/60')} ${isNoInterest ? 'opacity-40' : ''}`}
+                      className={`transition-colors ${rowBgColor} ${stripeClass} ${isNoInterest ? 'opacity-40 grayscale' : ''}`}
                     >
                       {/* Checkbox */}
                       <td className="px-3 py-2 text-center">
@@ -682,10 +711,10 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                       {/* Case */}
                       {visibleCols.caseName && (
                         <td className="px-2 py-2">
-                          <button onClick={() => navigate(`/case/${cObj.id}`)}
-                            className="text-[11px] font-black text-navy-900 hover:text-amber-600 transition text-right">
+                          <Link to={`/case/${cObj.id}`} target="_blank" rel="noopener noreferrer"
+                            className="text-[11px] font-black text-navy-900 hover:text-amber-600 transition text-right hover:underline">
                             {getFieldVal(cObj, ['رقم الدعوى'])} / {getFieldVal(cObj, ['السنة'])}
-                          </button>
+                          </Link>
                           {hasJudgment && (
                             <span className="block text-[9px] font-bold text-emerald-600">✓ تم تسجيل الحكم</span>
                           )}
@@ -788,9 +817,14 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                               <option value="">- اختر -</option>
                               {judgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
-                          ) : (
-                            <span className="text-[10px] font-bold text-slate-700">{j.result || j._result || session?.judgmentClassification || '-'}</span>
-                          )}
+                          ) : (() => {
+                            const classVal = j.result || j._result || session?.judgmentClassification || '';
+                            return classVal ? (
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full ${getJudgmentClassBadge(classVal)}`}>
+                                {classVal}
+                              </span>
+                            ) : <span className="text-slate-300 text-[9px]">-</span>;
+                          })()}
                         </td>
                       )}
 
@@ -882,7 +916,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
       <ExportPDFModal
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
-        data={filteredCases}
+        data={selectedIds.size > 0 ? filteredCases.filter(c => selectedIds.has(c.id)) : filteredCases}
         defaultTitle={`رول أحكام ${date}`}
       />
       <QuickAddCaseModal
@@ -903,6 +937,13 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
           cases={filteredCases.filter(c => selectedIds.has(c.id))}
           sessionDate={date}
           onClose={() => setIsPrintViewOpen(false)}
+        />
+      )}
+      {selectedCaseId && (
+        <CaseDetails 
+          isModal={true} 
+          modalCaseId={selectedCaseId} 
+          onCloseModal={() => setSelectedCaseId(null)} 
         />
       )}
     </div>

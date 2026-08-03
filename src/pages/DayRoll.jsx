@@ -72,7 +72,7 @@ export default function DayRoll() {
         
         <div className="hidden print:block text-center mb-8 border-b-2 border-navy-900 pb-4">
           <h1 className="font-black text-2xl text-navy-900 mb-2">رول الجلسات</h1>
-          <h2 className="font-bold text-lg text-slate-700">مستشار أحمد وجيه</h2>
+          <h2 className="font-bold text-lg text-slate-700">مستشار {settings?.consultantName || 'أحمد وجيه'}</h2>
           <p className="text-sm font-bold mt-2 bg-slate-100 inline-block px-4 py-1 rounded-lg">تاريخ الجلسة: {date}</p>
         </div>
 

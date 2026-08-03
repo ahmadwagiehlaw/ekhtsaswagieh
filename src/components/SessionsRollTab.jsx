@@ -2,9 +2,12 @@
  * SessionsRollTab - رول الجلسات الكامل
  * يستعرض جلسات يوم محدد مع إمكانية التعديل السريع،
  * الترحيل، وإضافة الإجراءات والمهام جماعياً.
+ *
+ * ✨ v2: Click-to-edit per cell — انقر مباشرة على أي حقل لتعديله
+ *       Enter يحفظ، Escape يلغي، Tab ينتقل للحقل التالي
  */
-import React, { useState, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Edit3, Check, X, ChevronRight, ChevronLeft, Search,
   CheckSquare, Square, ClipboardList, Bell, Eye, CopyPlus,
@@ -27,11 +30,33 @@ const PREDEFINED_DECISIONS = [
   'استبعاد','إحالة للموضوع','آخر أجل','للمستندات','للمذكرات'
 ];
 
+// Editable cell fields in order (for Tab navigation)
+const CELL_FIELDS = ['الرول', 'نوع الجلسة', 'القرار', 'آخر جلسة', 'الملاحظات'];
+
 const getFieldVal = (obj, keys) => {
   for (const k of keys) {
     if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k];
   }
   return '';
+};
+
+/** Returns Tailwind classes for session type badge */
+const getSessionTypeBadge = (type) => {
+  if (!type) return 'bg-slate-100 text-slate-500';
+  if (type.includes('فحص')) return 'bg-blue-100 text-blue-700';
+  if (type.includes('موضوع')) return 'bg-amber-100 text-amber-700';
+  if (type.includes('حكم')) return 'bg-rose-100 text-rose-700';
+  if (type.includes('أول')) return 'bg-emerald-100 text-emerald-700';
+  return 'bg-slate-100 text-slate-600';
+};
+
+/** Returns row background classes based on file location */
+const getRowBg = (fileLocation, isSelected) => {
+  if (isSelected) return 'bg-indigo-100';
+  if (fileLocation === 'غير موجود') return 'bg-rose-100 hover:bg-rose-150';
+  if (fileLocation === 'مؤقت') return 'bg-amber-100 hover:bg-amber-150';
+  if (fileLocation === 'خارج الاختصاص') return 'bg-indigo-100 hover:bg-indigo-150';
+  return 'hover:bg-slate-100/80';
 };
 
 export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
@@ -50,17 +75,25 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState(new Set());
-  const [editingId, setEditingId] = useState(null);
-  const [editData, setEditData] = useState({});
+
+  // ✨ Per-cell editing: { caseId: string, field: string } | null
+  const [editingCell, setEditingCell] = useState(null);
+  // Pending value for the cell being edited
+  const [cellValue, setCellValue] = useState('');
+  // Full row cache so we can save the whole row at once when needed
+  const [rowCache, setRowCache] = useState({}); // { caseId: { ...editData } }
+
   const [searchQ, setSearchQ] = useState('');
+  const [sessionTypeFilter, setSessionTypeFilter] = useState('الكل'); // 'الكل' | 'فحص' | 'موضوع' | ...
+  const searchRef = useRef(null);
   const [isBulkProcedureOpen, setIsBulkProcedureOpen] = useState(false);
-  const [isHoveredSession, setIsHoveredSession] = useState(null);
   const [isPrintViewOpen, setIsPrintViewOpen] = useState(false);
   const [isRolloverOpen, setIsRolloverOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [showColPicker, setShowColPicker] = useState(false);
+  const [savingId, setSavingId] = useState(null);
 
   const [sortConfig, setSortConfig] = useState({ key: 'الرول', direction: 'asc' });
   const [visibleCols, setVisibleCols] = useState({
@@ -80,6 +113,14 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   const filteredCases = useMemo(() => {
     let result = dayCases;
     
+    // Filter by session type
+    if (sessionTypeFilter !== 'الكل') {
+      result = result.filter(c => {
+        const type = getFieldVal(c, ['نوع الجلسة']) || '';
+        return type.includes(sessionTypeFilter);
+      });
+    }
+
     if (searchQ.trim()) {
       const q = searchQ.toLowerCase();
       result = result.filter(c =>
@@ -94,7 +135,6 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
       let valB = getFieldVal(b, [sortConfig.key]) || '';
       
       if (sortConfig.key === 'الرول') {
-        // Numeric sort for roll number
         valA = Number(valA) || 999999;
         valB = Number(valB) || 999999;
       } else {
@@ -108,7 +148,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
     });
 
     return result;
-  }, [dayCases, searchQ, sortConfig]);
+  }, [dayCases, searchQ, sessionTypeFilter, sortConfig]);
 
   const toggleSelect = (id) => {
     const n = new Set(selectedIds);
@@ -121,50 +161,181 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
     else setSelectedIds(new Set(filteredCases.map(c => c.id)));
   };
 
-  const startEdit = (cObj) => {
-    const session = cObj.sessions?.find(s => s.date === date);
-    setEditingId(cObj.id);
-    setEditData({
-      'الرول': getFieldVal(cObj, ['الرول']) || '',
-      'نوع الجلسة': getFieldVal(cObj, ['نوع الجلسة']) || typeFahs,
-      'آخر جلسة': getFieldVal(cObj, ['آخر جلسة', 'تاريخ الجلسة']) || '',
-      'القرار': getFieldVal(cObj, ['القرار']) || session?.decision || '',
-      'الملاحظات': getFieldVal(cObj, ['الملاحظات']) || session?.notes || '',
-    });
-  };
-
-  const saveEdit = async (cObj) => {
-    const newData = { ...editData };
-    const oldDate = getFieldVal(cObj, ['آخر جلسة', 'تاريخ الجلسة']);
-    const newDate = newData['آخر جلسة'];
-
-    if (newDate && oldDate && newDate !== oldDate) {
-      const snapshot = {
-        id: Date.now().toString(),
-        date: oldDate,
-        decision: newData['القرار'] || getFieldVal(cObj, ['القرار']) || 'بدون قرار',
-        type: getFieldVal(cObj, ['نوع الجلسة']) || typeFahs,
-        roll: getFieldVal(cObj, ['الرول']) || '',
-        notes: newData['الملاحظات'] || '',
-      };
-      // Sort existing sessions + new snapshot by date
-      const existingSessions = [...(cObj.sessions || [])];
-      existingSessions.push(snapshot);
-      existingSessions.sort((a, b) => new Date(b.date) - new Date(a.date));
-      newData.sessions = existingSessions;
-      newData['الرول'] = '';
-    }
-
-    await saveCaseToFirebase(cObj.id, newData);
-    setEditingId(null);
-    setEditData({});
-    toast('تم حفظ التعديل بنجاح', 'success');
-  };
-
   const decisionOptions = settings?.decisions || PREDEFINED_DECISIONS;
   const sessionTypes = settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة'];
   const typeFahs = sessionTypes[0] || 'فحص';
-  const typeMawdoo = sessionTypes[1] || 'موضوع';
+
+  // '/' keyboard shortcut → focus search
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === '/' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
+        e.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
+  // ─── Click-to-Edit helpers ────────────────────────────────────────────────
+
+  /** Get the current live value for a field (from rowCache or from cObj) */
+  const getLiveVal = useCallback((cObj, field) => {
+    const cached = rowCache[cObj.id];
+    if (cached && cached[field] !== undefined) return cached[field];
+    if (field === 'آخر جلسة') return getFieldVal(cObj, ['آخر جلسة', 'تاريخ الجلسة']);
+    return getFieldVal(cObj, [field]);
+  }, [rowCache]);
+
+  /** Open a specific cell for editing */
+  const openCell = useCallback((cObj, field) => {
+    // If another cell is open for a different case, save it first silently
+    if (editingCell && editingCell.caseId !== cObj.id) {
+      commitCell(editingCell.caseId, editingCell.field, cellValue, true);
+    }
+    const val = getLiveVal(cObj, field);
+    setEditingCell({ caseId: cObj.id, field });
+    setCellValue(field === 'آخر جلسة' ? (val || '') : (val || ''));
+  }, [editingCell, cellValue, getLiveVal]);
+
+  /** Commit a cell's value to rowCache (no Firebase call yet) */
+  const commitCell = useCallback((caseId, field, value, silent = false) => {
+    setRowCache(prev => ({
+      ...prev,
+      [caseId]: { ...(prev[caseId] || {}), [field]: value }
+    }));
+    setEditingCell(null);
+    setCellValue('');
+  }, []);
+
+  /** Save entire row to Firebase */
+  const saveRow = useCallback(async (cObj) => {
+    const caseId = cObj.id;
+    const pending = { ...(rowCache[caseId] || {}) };
+    
+    // Include current open cell value too
+    if (editingCell && editingCell.caseId === caseId) {
+      pending[editingCell.field] = cellValue;
+      setEditingCell(null);
+      setCellValue('');
+    }
+
+    if (Object.keys(pending).length === 0) return;
+
+    setSavingId(caseId);
+    try {
+      const newData = { ...pending };
+      const oldDate = getFieldVal(cObj, ['آخر جلسة', 'تاريخ الجلسة']);
+      const newDate = newData['آخر جلسة'];
+
+      // If session date changed, archive old session
+      if (newDate && oldDate && newDate !== oldDate) {
+        const snapshot = {
+          id: Date.now().toString(),
+          date: oldDate,
+          decision: newData['القرار'] || getFieldVal(cObj, ['القرار']) || 'بدون قرار',
+          type: newData['نوع الجلسة'] || getFieldVal(cObj, ['نوع الجلسة']) || typeFahs,
+          roll: newData['الرول'] || getFieldVal(cObj, ['الرول']) || '',
+          notes: newData['الملاحظات'] || '',
+        };
+        const existingSessions = [...(cObj.sessions || [])];
+        existingSessions.push(snapshot);
+        existingSessions.sort((a, b) => new Date(b.date) - new Date(a.date));
+        newData.sessions = existingSessions;
+        newData['الرول'] = '';
+      }
+
+      await saveCaseToFirebase(caseId, newData);
+      // Clear row cache after successful save
+      setRowCache(prev => { const n = { ...prev }; delete n[caseId]; return n; });
+      toast('تم الحفظ ✓', 'success');
+    } catch (err) {
+      console.error(err);
+      toast('فشل الحفظ', 'error');
+    } finally {
+      setSavingId(null);
+    }
+  }, [rowCache, editingCell, cellValue, saveCaseToFirebase, toast, typeFahs]);
+
+  /** Handle key events in an editable cell */
+  const handleCellKey = useCallback((e, cObj, field) => {
+    if (e.key === 'Enter' && field !== 'الملاحظات') {
+      e.preventDefault();
+      // Commit current cell then save row
+      commitCell(cObj.id, field, cellValue);
+      // Save row immediately
+      setTimeout(() => saveRow(cObj), 0);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setEditingCell(null);
+      setCellValue('');
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      commitCell(cObj.id, field, cellValue);
+      // Move to next field in same row
+      const idx = CELL_FIELDS.indexOf(field);
+      const nextField = CELL_FIELDS[idx + (e.shiftKey ? -1 : 1)];
+      if (nextField) {
+        setTimeout(() => openCell(cObj, nextField), 0);
+      } else {
+        setTimeout(() => saveRow(cObj), 0);
+      }
+    }
+  }, [cellValue, commitCell, saveRow, openCell]);
+
+  /** Handle blur on a cell — auto-save to Firebase immediately */
+  const handleCellBlur = useCallback((cObj, field) => {
+    // Small delay to allow Tab/Enter keydown to fire first (avoid double-save)
+    setTimeout(async () => {
+      // If another cell is now active (Tab moved focus), skip
+      if (editingCell && !(editingCell.caseId === cObj.id && editingCell.field === field)) return;
+
+      // Build the pending data
+      const pending = {
+        ...(rowCache[cObj.id] || {}),
+        [field]: cellValue,
+      };
+
+      setEditingCell(null);
+      setCellValue('');
+
+      if (Object.keys(pending).length === 0) return;
+
+      // Save to Firebase automatically
+      setSavingId(cObj.id);
+      try {
+        const newData = { ...pending };
+        const oldDate = getFieldVal(cObj, ['آخر جلسة', 'تاريخ الجلسة']);
+        const newDate = newData['آخر جلسة'];
+
+        if (newDate && oldDate && newDate !== oldDate) {
+          const snapshot = {
+            id: Date.now().toString(),
+            date: oldDate,
+            decision: newData['القرار'] || getFieldVal(cObj, ['القرار']) || 'بدون قرار',
+            type: newData['نوع الجلسة'] || getFieldVal(cObj, ['نوع الجلسة']) || typeFahs,
+            roll: newData['الرول'] || getFieldVal(cObj, ['الرول']) || '',
+            notes: newData['الملاحظات'] || '',
+          };
+          const existingSessions = [...(cObj.sessions || [])];
+          existingSessions.push(snapshot);
+          existingSessions.sort((a, b) => new Date(b.date) - new Date(a.date));
+          newData.sessions = existingSessions;
+          newData['الرول'] = '';
+        }
+
+        await saveCaseToFirebase(cObj.id, newData);
+        setRowCache(prev => { const n = { ...prev }; delete n[cObj.id]; return n; });
+        // Silent save — no toast for single cell auto-save
+      } catch (err) {
+        console.error(err);
+        toast('فشل الحفظ', 'error');
+      } finally {
+        setSavingId(null);
+      }
+    }, 120);
+  }, [cellValue, editingCell, rowCache, saveCaseToFirebase, toast, typeFahs]);
 
   if (!date) {
     return (
@@ -196,7 +367,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
               onChange={e => onDateChange(e.target.value)}
               className="text-sm font-black text-navy-900 bg-transparent border-none outline-none cursor-pointer text-center"
             />
-            <p className="text-[10px] font-bold text-slate-400">{filteredCases.length} جلسة</p>
+            <p className="text-[10px] font-bold text-slate-400">{filteredCases.length} دعوى</p>
           </div>
           <button
             onClick={() => {
@@ -209,16 +380,43 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
           </button>
         </div>
 
+        {/* Session type filter (replaces tooltip hint) */}
+        <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl">
+          {['الكل', ...sessionTypes.slice(0, 3)].map(t => (
+            <button
+              key={t}
+              onClick={() => setSessionTypeFilter(t)}
+              className={`px-2.5 py-1 text-[10px] font-black rounded-lg transition-all ${
+                sessionTypeFilter === t
+                  ? t === 'الكل' ? 'bg-navy-900 text-white shadow-sm'
+                    : t.includes('فحص') ? 'bg-blue-500 text-white shadow-sm'
+                    : t.includes('موضوع') ? 'bg-amber-500 text-white shadow-sm'
+                    : 'bg-indigo-500 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {t === 'الكل' ? 'الكل' : t}
+            </button>
+          ))}
+        </div>
+
         {/* Search */}
         <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 flex-1 min-w-[160px]">
           <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           <input
+            ref={searchRef}
             type="text"
-            placeholder="بحث في الرول..."
+            placeholder="بحث... (اضغط / للوصول السريع)"
             value={searchQ}
             onChange={e => setSearchQ(e.target.value)}
+            onFocus={e => e.target.select()}
             className="bg-transparent text-xs font-bold text-navy-900 outline-none flex-1 w-full"
           />
+          {searchQ && (
+            <button onClick={() => setSearchQ('')} className="text-slate-300 hover:text-slate-500 transition">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Actions */}
@@ -332,7 +530,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
         <div className="overflow-x-auto">
           <table className="w-full text-right" dir="rtl">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
+              <tr className="bg-slate-100 border-b-2 border-slate-200">
                 <th className="px-3 py-2.5 w-10">
                   <button onClick={toggleAll} className="text-slate-400 hover:text-navy-900 transition">
                     {selectedIds.size === filteredCases.length && filteredCases.length > 0
@@ -344,14 +542,14 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                 {visibleCols.caseName && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="رقم الدعوى" label="الدعوى" />}
                 {visibleCols.plaintiff && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="المدعي" label="المدعي" />}
                 {visibleCols.defendant && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="المدعى_عليه" label="ضد" />}
-                {visibleCols.type && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="نوع الجلسة" label="نوع الجلسة" width="w-20" />}
-                {visibleCols.decision && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="القرار" label="القرار" width="w-28" />}
-                {visibleCols.nextDate && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="آخر جلسة" label="الجلسة القادمة" width="w-28" />}
+                {visibleCols.type && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="نوع الجلسة" label="نوع الجلسة" width="w-24" />}
+                {visibleCols.decision && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="القرار" label="القرار" width="w-32" />}
+                {visibleCols.nextDate && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="آخر جلسة" label="الجلسة القادمة" width="w-32" />}
                 {visibleCols.notes && <SortHeader sortConfig={sortConfig} onSort={handleSort} sortKey="الملاحظات" label="الملاحظات" />}
                 <th className="px-2 py-2.5 w-20"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-200">
               {filteredCases.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="px-4 py-12 text-center">
@@ -367,15 +565,41 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                   </td>
                 </tr>
               ) : filteredCases.map((cObj, idx) => {
-                const isEditing = editingId === cObj.id;
                 const isSelected = selectedIds.has(cObj.id);
                 const role = String(getFieldVal(cObj, ['الصفة', 'صفة']) || '');
                 const isNoInterest = role === 'لا شأن';
+                const fileLocation = getFieldVal(cObj, ['مكان الملف']);
+                const isSaving = savingId === cObj.id;
+                const hasPending = !!rowCache[cObj.id] && Object.keys(rowCache[cObj.id]).length > 0;
+
+                const rowBg = getRowBg(fileLocation, isSelected);
+
+                // Helper: is this cell currently being edited?
+                const isCell = (field) => editingCell?.caseId === cObj.id && editingCell?.field === field;
+
+                // Helper: get display value (from cache or live data)
+                const displayVal = (field) => {
+                  const cached = rowCache[cObj.id];
+                  if (cached && cached[field] !== undefined) return cached[field];
+                  if (field === 'آخر جلسة') return getFieldVal(cObj, ['آخر جلسة', 'تاريخ الجلسة']);
+                  return getFieldVal(cObj, [field]);
+                };
+
+                // Shared cell wrapper (makes any cell clickable to edit)
+                const EditableCell = ({ field, children, className = '' }) => (
+                  <td
+                    className={`px-2 py-2 cursor-text ${className}`}
+                    onClick={() => !isCell(field) && openCell(cObj, field)}
+                    title="انقر للتعديل"
+                  >
+                    {children}
+                  </td>
+                );
 
                 return (
                   <tr
                     key={cObj.id}
-                    className={`transition-colors ${isSelected ? 'bg-indigo-50/40' : 'hover:bg-slate-50/60'} ${isNoInterest ? 'opacity-50' : ''}`}
+                    className={`transition-colors ${rowBg} ${isNoInterest ? 'opacity-50 grayscale' : ''} ${idx % 2 === 0 ? '' : 'bg-slate-50/40'}`}
                   >
                     {/* Checkbox */}
                     <td className="px-3 py-2">
@@ -384,27 +608,34 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                       </button>
                     </td>
 
-                    {/* Roll number */}
+                    {/* Roll number — editable */}
                     {visibleCols.roll && (
-                      <td className="px-2 py-2">
-                        {isEditing ? (
-                          <input type="text" value={editData['الرول']} onChange={e => setEditData({...editData, 'الرول': e.target.value})}
-                            className="w-14 text-[11px] font-bold p-1 rounded border border-slate-300 text-center" />
+                      <EditableCell field="الرول" className="w-16">
+                        {isCell('الرول') ? (
+                          <input
+                            autoFocus
+                            type="text"
+                            value={cellValue}
+                            onChange={e => setCellValue(e.target.value)}
+                            onKeyDown={e => handleCellKey(e, cObj, 'الرول')}
+                            onBlur={() => handleCellBlur(cObj, 'الرول')}
+                            className="w-14 text-[11px] font-bold p-1 rounded border-2 border-indigo-400 text-center outline-none bg-white shadow-sm"
+                          />
                         ) : (
-                          <span className="text-xs font-black text-slate-600">
-                            {getFieldVal(cObj, ['الرول']) || <span className="text-slate-300">-</span>}
+                          <span className={`text-xs font-black ${hasPending && rowCache[cObj.id]?.['الرول'] !== undefined ? 'text-indigo-600' : 'text-slate-600'}`}>
+                            {displayVal('الرول') || <span className="text-slate-300">—</span>}
                           </span>
                         )}
-                      </td>
+                      </EditableCell>
                     )}
 
                     {/* Case number */}
                     {visibleCols.caseName && (
                       <td className="px-2 py-2">
                         <div className="flex flex-col">
-                          <span className="text-xs font-black text-navy-900" dir="rtl">
+                          <Link to={`/case/${cObj.id}`} target="_blank" rel="noopener noreferrer" className="text-xs font-black text-navy-900 hover:text-indigo-600 hover:underline transition" dir="rtl" title="فتح تفاصيل الدعوى في نافذة جديدة">
                             {cObj['رقم الدعوى']} <span className="text-slate-400 mx-0.5">/</span> {cObj['السنة']}
-                          </span>
+                          </Link>
                         </div>
                       </td>
                     )}
@@ -426,32 +657,41 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                       </td>
                     )}
 
-                    {/* Session type */}
+                    {/* Session type — editable, colored badge */}
                     {visibleCols.type && (
-                      <td className="px-2 py-2">
-                        {isEditing ? (
-                          <select value={editData['نوع الجلسة']} onChange={e => setEditData({...editData, 'نوع الجلسة': e.target.value})}
-                            className="text-[10px] font-bold p-1 rounded border border-slate-300 w-full">
+                      <EditableCell field="نوع الجلسة" className="w-24">
+                        {isCell('نوع الجلسة') ? (
+                          <select
+                            autoFocus
+                            value={cellValue}
+                            onChange={e => setCellValue(e.target.value)}
+                            onKeyDown={e => handleCellKey(e, cObj, 'نوع الجلسة')}
+                            onBlur={() => handleCellBlur(cObj, 'نوع الجلسة')}
+                            className="text-[10px] font-bold p-1 rounded border-2 border-indigo-400 w-full outline-none bg-white shadow-sm"
+                          >
                             {sessionTypes.map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
                         ) : (
-                          <span className="text-[11px] font-bold text-slate-600">
-                            {getFieldVal(cObj, ['نوع الجلسة']) || '-'}
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${getSessionTypeBadge(displayVal('نوع الجلسة'))}`}>
+                            {displayVal('نوع الجلسة') || <span className="text-slate-300 font-normal text-[9px]">انقر</span>}
                           </span>
                         )}
-                      </td>
+                      </EditableCell>
                     )}
 
-                    {/* Decision */}
+                    {/* Decision — editable */}
                     {visibleCols.decision && (
-                      <td className="px-2 py-2">
-                        {isEditing ? (
+                      <EditableCell field="القرار" className="w-32">
+                        {isCell('القرار') ? (
                           <div>
                             <input
+                              autoFocus
                               list={`dec-${cObj.id}`}
-                              value={editData['القرار']}
-                              onChange={e => setEditData({...editData, 'القرار': e.target.value})}
-                              className="w-full text-[10px] font-bold p-1 rounded border border-amber-300"
+                              value={cellValue}
+                              onChange={e => setCellValue(e.target.value)}
+                              onKeyDown={e => handleCellKey(e, cObj, 'القرار')}
+                              onBlur={() => handleCellBlur(cObj, 'القرار')}
+                              className="w-full text-[10px] font-bold p-1 rounded border-2 border-amber-400 outline-none bg-white shadow-sm"
                               placeholder="القرار..."
                             />
                             <datalist id={`dec-${cObj.id}`}>
@@ -459,76 +699,99 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                             </datalist>
                           </div>
                         ) : (
-                          <span className="text-[11px] font-bold text-amber-700">
-                            {getFieldVal(cObj, ['القرار']) || '-'}
+                          <span className={`text-[11px] font-bold ${displayVal('القرار') ? 'text-amber-700' : 'text-slate-300 text-[9px] font-normal'}`}>
+                            {displayVal('القرار') || 'انقر'}
                           </span>
                         )}
-                      </td>
+                      </EditableCell>
                     )}
 
-                    {/* Next session date */}
+                    {/* Next session date — editable */}
                     {visibleCols.nextDate && (
-                      <td className="px-2 py-2">
-                        {isEditing ? (
-                          <input type="date" value={editData['آخر جلسة']}
-                            onChange={e => setEditData({...editData, 'آخر جلسة': e.target.value})}
-                            className="text-[10px] font-bold p-1 rounded border border-slate-300 w-full" />
+                      <EditableCell field="آخر جلسة" className="w-32">
+                        {isCell('آخر جلسة') ? (
+                          <input
+                            autoFocus
+                            type="date"
+                            value={cellValue}
+                            onChange={e => setCellValue(e.target.value)}
+                            onKeyDown={e => handleCellKey(e, cObj, 'آخر جلسة')}
+                            onBlur={() => handleCellBlur(cObj, 'آخر جلسة')}
+                            className="text-[10px] font-bold p-1 rounded border-2 border-indigo-400 w-full outline-none bg-white shadow-sm"
+                          />
                         ) : (
-                          <span className="text-[11px] font-bold text-slate-600">
-                            {getFieldVal(cObj, ['آخر جلسة', 'تاريخ الجلسة']) || '-'}
+                          <span className={`text-[11px] font-bold ${displayVal('آخر جلسة') ? 'text-slate-600' : 'text-slate-300 text-[9px] font-normal'}`}>
+                            {displayVal('آخر جلسة') || 'انقر'}
                           </span>
                         )}
-                      </td>
+                      </EditableCell>
                     )}
 
-                    {/* Notes */}
+                    {/* Notes — editable */}
                     {visibleCols.notes && (
-                      <td className="px-2 py-2">
-                        {isEditing ? (
-                          <input type="text" value={editData['الملاحظات']}
-                            onChange={e => setEditData({...editData, 'الملاحظات': e.target.value})}
-                            className="w-full text-[10px] font-bold p-1 rounded border border-slate-300"
-                            placeholder="ملاحظات..." />
+                      <EditableCell field="الملاحظات">
+                        {isCell('الملاحظات') ? (
+                          <input
+                            autoFocus
+                            type="text"
+                            value={cellValue}
+                            onChange={e => setCellValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { e.preventDefault(); commitCell(cObj.id, 'الملاحظات', cellValue); setTimeout(() => saveRow(cObj), 0); }
+                              else if (e.key === 'Escape') { setEditingCell(null); setCellValue(''); }
+                              else if (e.key === 'Tab') { e.preventDefault(); commitCell(cObj.id, 'الملاحظات', cellValue); setTimeout(() => saveRow(cObj), 0); }
+                            }}
+                            onBlur={() => handleCellBlur(cObj, 'الملاحظات')}
+                            className="w-full text-[10px] font-bold p-1 rounded border-2 border-indigo-400 outline-none bg-white shadow-sm"
+                            placeholder="ملاحظات..."
+                          />
                         ) : (
                           <span className="text-[10px] text-slate-500 line-clamp-1">
-                            {getFieldVal(cObj, ['الملاحظات']) || ''}
+                            {displayVal('الملاحظات') || ''}
                           </span>
                         )}
-                      </td>
+                      </EditableCell>
                     )}
 
                     {/* Actions */}
                     <td className="px-2 py-2">
                       <div className="flex items-center gap-1">
-                        {isEditing ? (
+                        {hasPending ? (
                           <>
-                            <button onClick={() => saveEdit(cObj)}
-                              className="w-7 h-7 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg flex items-center justify-center transition">
-                              <Check className="w-3.5 h-3.5" />
+                            <button
+                              onClick={() => saveRow(cObj)}
+                              disabled={isSaving}
+                              className="w-7 h-7 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg flex items-center justify-center transition disabled:opacity-50"
+                              title="حفظ"
+                            >
+                              {isSaving
+                                ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                : <Check className="w-3.5 h-3.5" />}
                             </button>
-                            <button onClick={() => { setEditingId(null); setEditData({}); }}
-                              className="w-7 h-7 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-lg flex items-center justify-center transition">
+                            <button
+                              onClick={() => {
+                                setRowCache(prev => { const n = { ...prev }; delete n[cObj.id]; return n; });
+                                if (editingCell?.caseId === cObj.id) { setEditingCell(null); setCellValue(''); }
+                              }}
+                              className="w-7 h-7 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-lg flex items-center justify-center transition"
+                              title="إلغاء"
+                            >
                               <X className="w-3.5 h-3.5" />
                             </button>
                           </>
                         ) : (
                           <>
-                            <button onClick={() => startEdit(cObj)}
-                              className="w-7 h-7 bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-700 rounded-lg flex items-center justify-center transition">
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            {/* Copy from previous */}
+                            {/* Copy from previous row */}
                             {idx > 0 && (
                               <button
                                 onClick={() => {
-                                  startEdit(cObj);
                                   const prev = filteredCases[idx - 1];
-                                  setTimeout(() => setEditData(d => ({
-                                    ...d,
+                                  const copied = {
                                     'نوع الجلسة': getFieldVal(prev, ['نوع الجلسة']) || typeFahs,
                                     'آخر جلسة': getFieldVal(prev, ['آخر جلسة', 'تاريخ الجلسة']) || '',
                                     'القرار': getFieldVal(prev, ['القرار']) || '',
-                                  })), 0);
+                                  };
+                                  setRowCache(p => ({ ...p, [cObj.id]: { ...(p[cObj.id] || {}), ...copied } }));
                                 }}
                                 className="w-7 h-7 bg-slate-100 hover:bg-indigo-100 text-slate-500 hover:text-indigo-600 rounded-lg flex items-center justify-center transition"
                                 title="نسخ من السابق"
@@ -565,7 +828,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
       <ExportPDFModal
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
-        data={dayCases}
+        data={selectedIds.size > 0 ? filteredCases.filter(c => selectedIds.has(c.id)) : filteredCases}
         defaultTitle={`رول جلسات ${date}`}
       />
       <QuickAddCaseModal

@@ -17,7 +17,7 @@ export default function SmartDocumentsTab() {
     <div class="flex flex-col gap-2 font-bold text-lg w-[55%]">
        <div class="flex items-start"><span class="w-24 shrink-0">الطعن رقم:</span> <span>{{رقم_الدعوى}} لسنة {{السنة}} ق</span></div>
        <div class="flex items-start"><span class="w-24 shrink-0">المقامة من:</span> <span class="flex-1">{{المدعي}}</span></div>
-       <div class="flex items-start"><span class="w-24 shrink-0">ضـــــــد:</span> <span class="flex-1">{{ضد}}</span></div>
+       <div class="flex items-start"><span class="w-24 shrink-0">ضـــــــد:</span> <span class="flex-1">{{المدعى_عليه}}</span></div>
        <div class="flex items-start"><span class="w-24 shrink-0">جلــــسة:</span> <span>{{الجلسة_الحالية}}</span></div>
     </div>
     
@@ -97,10 +97,12 @@ export default function SmartDocumentsTab() {
 
   const handleSaveActive = () => {
     if (!activeTemplate || !editorRef.current) return;
+    const newContent = editorRef.current.innerHTML;
     const updated = templates.map(t => 
-      t.id === activeTemplate.id ? { ...t, content: editorRef.current.innerHTML } : t
+      t.id === activeTemplate.id ? { ...t, content: newContent } : t
     );
     saveTemplates(updated);
+    setActiveTemplate(prev => ({ ...prev, content: newContent }));
   };
 
   const handleDelete = (id) => {
@@ -151,12 +153,17 @@ export default function SmartDocumentsTab() {
     { label: 'رقم الدعوى', val: '{{رقم_الدعوى}}' },
     { label: 'السنة', val: '{{السنة}}' },
     { label: 'المدعي', val: '{{المدعي}}' },
-    { label: 'ضد', val: '{{ضد}}' },
+    { label: 'المدعى عليه', val: '{{المدعى_عليه}}' },
     { label: 'الجلسة الحالية', val: '{{الجلسة_الحالية}}' },
     { label: 'القرار', val: '{{القرار}}' },
   ];
 
   const moreVariables = [
+    { label: 'عنوان المدعي', val: '{{عنوان_المدعي}}' },
+    { label: 'عنوان المدعى عليه', val: '{{عنوان_المدعى_عليه}}' },
+    { label: 'المقر المختار', val: '{{المقر_المختار}}' },
+    { label: 'تصنيف الدعوى', val: '{{تصنيف_الدعوى}}' },
+    { label: 'مكان الملف', val: '{{مكان_الملف}}' },
     { label: 'نوع الجلسة', val: '{{نوع_الجلسة}}' },
     { label: 'اسم المستشار', val: '{{اسم_المستشار}}' },
     { label: 'المحكمة', val: '{{المحكمة}}' },
@@ -335,7 +342,10 @@ export default function SmartDocumentsTab() {
                     dir="rtl"
                     style={{ minHeight: '100%', fontFamily: 'Cairo, sans-serif' }}
                     onBlur={handleSaveActive}
-                    dangerouslySetInnerHTML={{ __html: activeTemplate.content }}
+                    onPaste={(e) => {
+                      // Optionally we can prevent default and insert text/html manually, 
+                      // but just letting browser handle it is usually fine.
+                    }}
                   />
                </div>
             </div>

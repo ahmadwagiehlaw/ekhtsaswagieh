@@ -6,6 +6,7 @@ import { useUI } from '../context/UIContext';
 import { uploadToR2 } from '../lib/r2';
 import QuickEditCaseModal from './QuickEditCaseModal';
 import GlobalTemplatePrintModal from './GlobalTemplatePrintModal';
+import CaseDetails from '../pages/CaseDetails';
 
 const ALL_COLUMNS = [
   { id: 'الرول', label: 'الرول', defaultVisible: true },
@@ -58,6 +59,7 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
   const [isManageDecisionsOpen, setIsManageDecisionsOpen] = useState(false);
   const [newDecisionOption, setNewDecisionOption] = useState('');
   const [isPrintViewOpen, setIsPrintViewOpen] = useState(false);
+  const [selectedCaseId, setSelectedCaseId] = useState(null);
 
   // View state
   const [filterDecision, setFilterDecision] = useState(null); // 'للحكم' or null
@@ -610,10 +612,19 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
               const isSelected = selectedCaseIds.has(cObj.id);
               const isEditing = editingCaseId === cObj.id;
               
+              const role = String(cObj['الصفة'] || cObj['صفة'] || '');
+              const isNoInterest = role === 'لا شأن';
+              const fileLocation = cObj['مكان الملف'];
+              
+              let rowBgColor = 'even:bg-slate-50/50 odd:bg-white hover:bg-indigo-50/30';
+              if (fileLocation === 'غير موجود') rowBgColor = 'bg-rose-50/80 hover:bg-rose-100/80';
+              else if (fileLocation === 'مؤقت') rowBgColor = 'bg-amber-50/80 hover:bg-amber-100/80';
+              else if (fileLocation === 'خارج الاختصاص') rowBgColor = 'bg-indigo-50/80 hover:bg-indigo-100/80';
+              
               return (
                 <tr 
                   key={cObj.id} 
-                  className={`group transition-colors border-b border-slate-100 even:bg-slate-50/50 odd:bg-white hover:bg-indigo-50/30 ${isSelected ? 'bg-indigo-50/50' : ''}`}
+                  className={`group transition-colors border-b border-slate-100 ${isSelected ? 'bg-indigo-100/80' : rowBgColor} ${isNoInterest ? 'opacity-50 grayscale' : ''}`}
                 >
                   <td className="px-3 py-2.5 text-center align-middle no-print">
                     <button onClick={() => toggleSelection(cObj.id)} className="text-slate-300 hover:text-indigo-600 transition">
@@ -636,7 +647,7 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
                   )}
                   
                   {visibleColumns['رقم الدعوى'] && (
-                    <td className="px-3 py-2.5 text-xs font-black text-navy-900 cursor-pointer hover:text-indigo-600" onClick={() => !isEditing && navigate(`/case/${cObj.id}`)}>
+                    <td className="px-3 py-2.5 text-xs font-black text-navy-900 cursor-pointer hover:text-indigo-600" onClick={() => !isEditing && setSelectedCaseId(cObj.id)}>
                       {getFieldValueLocal(cObj, ['رقم الدعوى'])} / {getFieldValueLocal(cObj, ['السنة'])}
                     </td>
                   )}
@@ -929,6 +940,14 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
             </div>
           </div>
         </div>
+      )}
+
+      {selectedCaseId && (
+        <CaseDetails 
+          isModal={true} 
+          modalCaseId={selectedCaseId} 
+          onCloseModal={() => setSelectedCaseId(null)} 
+        />
       )}
     </div>
   );

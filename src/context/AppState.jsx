@@ -16,6 +16,8 @@ export const AppProvider = ({ children }) => {
   
   const defaultSettings = { 
     consultantName: "أحمد وجيه", 
+    courtDegree: "ثان درجة",
+    courtSpecialization: "الإدارية العليا",
     decisions: ['للحكم', 'تصريح', 'للإطلاع', 'للإعلان', 'آخر أجل', 'للمستندات', 'للمذكرات', 'لورود التقرير', 'استبعاد', 'لتنفيذ قرار الإعادة'],
     judgmentCategories: ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي'],
     judgmentClassifications: ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء'],
@@ -81,15 +83,25 @@ export const AppProvider = ({ children }) => {
         const essentialFields = [
           { id: 'تصنيف الدعوى', label: 'تصنيف الدعوى', type: 'text', visible: true },
           { id: 'موضوع الدعوى', label: 'موضوع الدعوى', type: 'textarea', visible: true },
-          { id: 'المقر المختار', label: 'المقر المختار', type: 'text', visible: true },
+          { id: 'المقر المختار', label: 'المقر المختار', type: 'textarea', visible: true },
           { id: 'عنوان المدعي', label: 'عنوان المدعي / الطاعن', type: 'text', visible: true },
-          { id: 'عنوان المدعى عليه', label: 'عنوان المدعى عليه / المطعون ضده', type: 'text', visible: true },
-          { id: 'مكان الملف', label: 'مكان الملف', type: 'text', visible: true }
+          { id: 'عنوان المدعى عليه', label: 'عنوان المدعى عليه / المطعون ضده', type: 'textarea', visible: true },
+          { id: 'مكان الملف', label: 'مكان الملف', type: 'text', visible: true },
+          { id: 'حكم محكمة أول درجة', label: 'حكم محكمة أول درجة (الرقم والسنة)', type: 'text', visible: true },
+          { id: 'محكمة أول درجة', label: 'محكمة أول درجة', type: 'text', visible: true },
+          { id: 'جلسة حكم أول درجة', label: 'جلسة حكم أول درجة', type: 'date', visible: true },
+          { id: 'منطوق حكم أول درجة', label: 'منطوق حكم أول درجة', type: 'textarea', visible: true },
+          { id: 'ملخص الطعن', label: 'ملخص الطعن وتفاصيله', type: 'textarea', visible: true },
+          { id: 'طلبات الطاعن', label: 'طلبات الطاعن', type: 'textarea', visible: true }
         ];
 
         essentialFields.forEach(ef => {
-           if (!cleanSchema.find(s => s.id === ef.id)) {
+           const existing = cleanSchema.find(s => s.id === ef.id);
+           if (!existing) {
               cleanSchema.push(ef);
+           } else if (existing.type !== ef.type && (ef.id === 'المقر المختار' || ef.id === 'عنوان المدعى عليه')) {
+              // Convert specific fields to textarea to allow multiple lines
+              existing.type = 'textarea';
            }
         });
 
@@ -105,11 +117,17 @@ export const AppProvider = ({ children }) => {
           { id: 'الصفة', label: 'الصفة', type: 'text', visible: true },
           { id: 'تصنيف الدعوى', label: 'تصنيف الدعوى', type: 'text', visible: true },
           { id: 'موضوع الدعوى', label: 'موضوع الدعوى', type: 'textarea', visible: true },
-          { id: 'المقر المختار', label: 'المقر المختار', type: 'text', visible: true },
+          { id: 'المقر المختار', label: 'المقر المختار', type: 'textarea', visible: true },
           { id: 'عنوان المدعي', label: 'عنوان المدعي / الطاعن', type: 'text', visible: true },
-          { id: 'عنوان المدعى عليه', label: 'عنوان المدعى عليه / المطعون ضده', type: 'text', visible: true },
+          { id: 'عنوان المدعى عليه', label: 'عنوان المدعى عليه / المطعون ضده', type: 'textarea', visible: true },
           { id: 'مكان الملف', label: 'مكان الملف', type: 'text', visible: true },
-          { id: 'دعاوى منضمة', label: 'دعاوى منضمة', type: 'text', visible: true }
+          { id: 'دعاوى منضمة', label: 'دعاوى منضمة', type: 'text', visible: true },
+          { id: 'حكم محكمة أول درجة', label: 'حكم محكمة أول درجة (الرقم والسنة)', type: 'text', visible: true },
+          { id: 'محكمة أول درجة', label: 'محكمة أول درجة', type: 'text', visible: true },
+          { id: 'جلسة حكم أول درجة', label: 'جلسة حكم أول درجة', type: 'date', visible: true },
+          { id: 'منطوق حكم أول درجة', label: 'منطوق حكم أول درجة', type: 'textarea', visible: true },
+          { id: 'ملخص الطعن', label: 'ملخص الطعن وتفاصيله', type: 'textarea', visible: true },
+          { id: 'طلبات الطاعن', label: 'طلبات الطاعن', type: 'textarea', visible: true }
         ]);
       }
     });
@@ -206,7 +224,8 @@ export const AppProvider = ({ children }) => {
 
       const rawId = `${caseNo}-${year}-${Date.now()}`;
       const safeId = sanitizeId(rawId);
-      return await saveCaseToFirebase(safeId, caseData);
+      await saveCaseToFirebase(safeId, caseData);
+      return safeId;
     } catch (error) {
       console.error("Error creating new case: ", error);
       if (error.message === 'DUPLICATE_CASE') throw error;

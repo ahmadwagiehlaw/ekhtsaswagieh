@@ -39,6 +39,7 @@ export default function Files() {
   const [showPastSessionsOnly, setShowPastSessionsOnly] = useSessionState('files_showPastSessionsOnly', false);
   const [showRecentlyModifiedOnly, setShowRecentlyModifiedOnly] = useSessionState('files_showRecentlyModifiedOnly', false);
   const [showRecentlyViewedOnly, setShowRecentlyViewedOnly] = useSessionState('files_showRecentlyViewedOnly', false);
+  const [showRecentlyAddedOnly, setShowRecentlyAddedOnly] = useSessionState('files_showRecentlyAddedOnly', false);
   const [isSelectionReportModalOpen, setIsSelectionReportModalOpen] = useState(false);
   const [isPrintViewOpen, setIsPrintViewOpen] = useState(false);
 
@@ -63,6 +64,7 @@ export default function Files() {
         setShowPastSessionsOnly(pinned.showPastSessionsOnly ?? false);
         setShowRecentlyModifiedOnly(pinned.showRecentlyModifiedOnly ?? false);
         setShowRecentlyViewedOnly(pinned.showRecentlyViewedOnly ?? false);
+        setShowRecentlyAddedOnly(pinned.showRecentlyAddedOnly ?? false);
         setSortBy(pinned.sortBy ?? 'none');
       }
     } catch (e) {}
@@ -78,7 +80,7 @@ export default function Files() {
       const toSave = {
         roleFilter, showOngoingOnly, showWithAttachmentsOnly,
         showImportantOnly, showSessionlessOnly, showPastSessionsOnly, 
-        showRecentlyModifiedOnly, showRecentlyViewedOnly, sortBy
+        showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly, sortBy
       };
       localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
       setIsPinned(true);
@@ -90,12 +92,17 @@ export default function Files() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const q = params.get('q');
+    const role = params.get('role');
+
+    if (role && (role === 'appellant' || role === 'appellee' || role === 'all')) {
+      setRoleFilter(role);
+    }
 
     // Check if it's an advanced search
     if (params.get('caseNo') || params.get('year') || params.get('opponentName') || params.get('decision') || params.get('sessionDateStart') || params.get('court') || params.get('location')) {
       const adv = {};
       for (const [key, value] of params.entries()) {
-        if (key !== 'q') adv[key] = value;
+        if (key !== 'q' && key !== 'role') adv[key] = value;
       }
       setAdvancedParams(adv);
       setSearchQuery(''); // Clear general search if advanced is used
@@ -193,9 +200,11 @@ export default function Files() {
     }
 
     if (showRecentlyViewedOnly) {
-      const viewedStr = localStorage.getItem('recentlyViewedCases');
-      const viewed = viewedStr ? JSON.parse(viewedStr) : [];
-      result = result.filter(c => viewed.includes(c.id));
+      result = result.filter(c => {
+        if (!c.lastViewedAt) return false;
+        const diffDays = (new Date() - new Date(c.lastViewedAt)) / (1000 * 60 * 60 * 24);
+        return diffDays <= 7;
+      });
     }
     
     if (showRecentlyModifiedOnly) {
@@ -204,6 +213,14 @@ export default function Files() {
       result = result.filter(c => {
          if (!c.updatedAt) return false;
          return new Date(c.updatedAt) >= sevenDaysAgo;
+      });
+    }
+
+    if (showRecentlyAddedOnly) {
+      result = result.filter(c => {
+        if (!c.createdAt) return false;
+        const diffDays = (new Date() - new Date(c.createdAt)) / (1000 * 60 * 60 * 24);
+        return diffDays <= 7;
       });
     }
 
@@ -271,11 +288,11 @@ export default function Files() {
     }
 
     return result;
-  }, [cases, searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, activeShoba, settings]);
+  }, [cases, searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly, activeShoba, settings]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, sortBy, activeShoba]);
+  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly, sortBy, activeShoba]);
 
   const getPrimaryValue = (cObj, possibleKeys) => {
     for (let k of possibleKeys) {
@@ -545,9 +562,10 @@ export default function Files() {
                       setShowSessionlessOnly(false);
                       setShowRecentlyModifiedOnly(false);
                       setShowRecentlyViewedOnly(false);
+                      setShowRecentlyAddedOnly(false);
                       if (isPinned) {
                         // Update pin to reflect cleared state
-                        const toSave = { roleFilter: 'all', showOngoingOnly: false, showWithAttachmentsOnly: false, showImportantOnly: false, showSessionlessOnly: false, showPastSessionsOnly: false, showRecentlyModifiedOnly: false, showRecentlyViewedOnly: false, sortBy };
+                        const toSave = { roleFilter: 'all', showOngoingOnly: false, showWithAttachmentsOnly: false, showImportantOnly: false, showSessionlessOnly: false, showPastSessionsOnly: false, showRecentlyModifiedOnly: false, showRecentlyViewedOnly: false, showRecentlyAddedOnly: false, sortBy };
                         localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
                       }
                     }}
@@ -613,6 +631,14 @@ export default function Files() {
               >
                 <Clock className="w-3.5 h-3.5" />
                 <span>عدلتها مؤخراً</span>
+              </button>
+
+              <button
+                onClick={() => setShowRecentlyAddedOnly(!showRecentlyAddedOnly)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showRecentlyAddedOnly ? 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>أُضيفت مؤخراً</span>
               </button>
 
               <button
@@ -750,6 +776,21 @@ export default function Files() {
             return diffDays <= 3;
           });
 
+          const isMissing = fileLocation === 'غير موجود';
+          const isTemp = fileLocation === 'مؤقت';
+          const isOut = fileLocation === 'خارج الاختصاص';
+
+          let ribbon = null;
+          if (!isNoInterest) {
+             if (isMissing) {
+                ribbon = { text: 'غير موجود', color: 'bg-rose-600', textColor: 'text-white' };
+             } else if (isTemp) {
+                ribbon = { text: 'مؤقت', color: 'bg-amber-500', textColor: 'text-white' };
+             } else if (isOut) {
+                ribbon = { text: 'خارج الاختصاص', color: 'bg-indigo-600', textColor: 'text-white' };
+             }
+          }
+
           return (
             <div
               key={c.id}
@@ -777,6 +818,12 @@ export default function Files() {
 
               {/* Card Body */}
               <div className={`relative ${bgClass} border ${borderClass} rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all duration-300 z-20 h-full flex flex-col group-hover:-translate-y-1 overflow-hidden ${cardOpacity} ${grayscale}`}>
+
+                {ribbon && (
+                  <div className={`absolute top-4 -left-8 w-32 -rotate-45 text-center py-1 text-[10px] font-black shadow-md z-40 ${ribbon.color} ${ribbon.textColor}`}>
+                    {ribbon.text}
+                  </div>
+                )}
 
                 {/* Top Accent Line */}
                 <div className={`absolute top-0 left-0 w-full h-1 z-10 bg-gradient-to-r from-${roleColor}-400 to-${roleColor}-500`}></div>

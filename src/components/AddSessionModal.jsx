@@ -6,13 +6,18 @@ import { uploadToR2 } from '../lib/r2';
 import imageCompression from 'browser-image-compression';
 
 export default function AddSessionModal({ isOpen, onClose, caseData }) {
-  const { saveCaseToFirebase, settings, isAdmin, currentUserPermissions } = useAppContext();
+  const { saveCaseToFirebase, saveGlobalTask, settings, isAdmin, currentUserPermissions, currentUser } = useAppContext();
   const canEditData = isAdmin || currentUserPermissions?.canEditData;
   const { toast, showPrompt } = useUI();
   const [sessionDate, setSessionDate] = useState('');
   const [decision, setDecision] = useState('');
   const [notes, setNotes] = useState('');
+  const [roll, setRoll] = useState('');
+  const [sessionType, setSessionType] = useState('فحص');
   
+  // Viewing Task State
+  const [createViewingTask, setCreateViewingTask] = useState(false);
+  const [viewingTaskNotes, setViewingTaskNotes] = useState('');
   // Procedure States
   const [showProcedureForm, setShowProcedureForm] = useState(false);
   const [procedureTitle, setProcedureTitle] = useState('');
@@ -39,6 +44,8 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
       id: Date.now().toString(),
       date: sessionDate,
       decision: decision,
+      roll: roll,
+      type: sessionType,
       notes: notes,
       createdAt: new Date().toISOString()
     };
@@ -83,11 +90,39 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
     // Find the schema keys used for lastSession and decision
     const sessionKey = Object.keys(caseData).find(k => k === 'آخر جلسة' || k === 'تاريخ الجلسة' || k === 'أخر جلسة') || 'آخر جلسة';
     const decisionKey = Object.keys(caseData).find(k => k === 'القرار' || k === 'قرار الجلسة' || k === 'المنطوق') || 'القرار';
+    const rollKey = Object.keys(caseData).find(k => k === 'الرول') || 'الرول';
+    const typeKey = Object.keys(caseData).find(k => k === 'نوع الجلسة' || k === 'نوع_الجلسة') || 'نوع الجلسة';
 
     if (updatedSessions.length > 0) {
       const latestSession = updatedSessions[0];
       updateData[sessionKey] = latestSession.date;
       updateData[decisionKey] = latestSession.decision || '';
+      updateData[rollKey] = latestSession.roll || '';
+      updateData[typeKey] = latestSession.type || '';
+    }
+
+    if (createViewingTask && saveGlobalTask) {
+      const caseNumber = caseData['رقم الدعوى'] || caseData['رقم القضية'] || '';
+      const caseYear = caseData['السنة'] || caseData['سنة'] || '';
+      const taskObj = {
+        id: `viewing-${Date.now()}`,
+        title: `مهمة اطلاع: دعوى ${caseNumber} لسنة ${caseYear}`,
+        notes: viewingTaskNotes || 'يرجى مراجعة وتصوير المستندات المطلوبة لهذه الدعوى',
+        dueDate: sessionDate, // usually relates to session
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+        priority: 'normal',
+        type: 'viewing',
+        assignee: '', // let them assign in Tasks screen if needed, or leave unassigned
+        createdBy: currentUser || 'مجهول',
+        linkedCases: [caseData.id],
+        caseContext: {
+          roll: roll,
+          date: sessionDate,
+          decision: decision
+        }
+      };
+      await saveGlobalTask(taskObj);
     }
 
     const success = await saveCaseToFirebase(caseData.id, updateData);
@@ -96,11 +131,15 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
     if (success) {
       setSessionDate('');
       setDecision('');
+      setRoll('');
+      setSessionType('فحص');
       setNotes('');
       setProcedureTitle('');
       setProcedureNotes('');
       setProcedureAttachment(null);
       setShowProcedureForm(false);
+      setCreateViewingTask(false);
+      setViewingTaskNotes('');
       toast("تمت إضافة الجلسة بنجاح", "success");
       onClose();
     } else {
@@ -127,26 +166,53 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
         <div className="flex-1 p-6">
           <form id="add-session-form" onSubmit={handleSubmit} className="space-y-4">
             
-            <div>
-              <label className="text-[11px] font-black text-slate-500 block mb-1.5">تاريخ الجلسة *</label>
-              <input 
-                type="date"
-                required
-                value={sessionDate}
-                onChange={(e) => setSessionDate(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
-              />
+            <div className="flex gap-3">
+              <div className="flex-[2]">
+                <label className="text-[11px] font-black text-slate-500 block mb-1.5">تاريخ الجلسة *</label>
+                <input 
+                  type="date"
+                  required
+                  value={sessionDate}
+                  onChange={(e) => setSessionDate(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-[11px] font-black text-slate-500 block mb-1.5">الرول</label>
+                <input 
+                  type="text"
+                  value={roll}
+                  onChange={(e) => setRoll(e.target.value)}
+                  placeholder="مثال: 15"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition text-center"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="text-[11px] font-black text-slate-500 block mb-1.5">القرار</label>
-              <input 
-                list="decisions-list"
-                value={decision}
-                onChange={(e) => setDecision(e.target.value)}
-                placeholder="مثال: التأجيل للاطلاع، للحكم، إلخ"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
-              />
+            <div className="flex gap-3">
+              <div className="flex-[2]">
+                <label className="text-[11px] font-black text-slate-500 block mb-1.5">القرار</label>
+                <input 
+                  list="decisions-list"
+                  value={decision}
+                  onChange={(e) => setDecision(e.target.value)}
+                  placeholder="مثال: التأجيل للاطلاع..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-[11px] font-black text-slate-500 block mb-1.5">نوع الجلسة</label>
+                <select 
+                  value={sessionType}
+                  onChange={(e) => setSessionType(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                >
+                  <option value="فحص">فحص</option>
+                  <option value="موضوع">موضوع</option>
+                  <option value="تحقيق">تحقيق</option>
+                  <option value="خبراء">خبراء</option>
+                </select>
+              </div>
             </div>
 
             <div>
@@ -158,6 +224,31 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
                 placeholder="أي ملاحظات حول الجلسة..."
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none transition"
               />
+            </div>
+
+            {/* Viewing Task Integration */}
+            <div className="pt-2 border-t border-slate-100">
+              <label className="flex items-center gap-2 cursor-pointer mb-2">
+                <input 
+                  type="checkbox" 
+                  checked={createViewingTask} 
+                  onChange={(e) => setCreateViewingTask(e.target.checked)} 
+                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                />
+                <span className="text-[11px] font-black text-indigo-700">إنشاء مهمة إطلاع/تصوير مستندات مرتبطة بالجلسة</span>
+              </label>
+              
+              {createViewingTask && (
+                <div className="mt-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <input 
+                    type="text" 
+                    value={viewingTaskNotes} 
+                    onChange={e => setViewingTaskNotes(e.target.value)} 
+                    placeholder="المطلوب (مثال: تصوير محضر الجلسة السابقة ومذكرة الخصوم...)" 
+                    className="w-full bg-indigo-50/50 border border-indigo-100 rounded-xl px-3 py-2 text-[11px] font-bold text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Optional Procedure Form */}

@@ -12,7 +12,7 @@ export default function Reports() {
   const [targetMonth, setTargetMonth] = useState(new Date().getMonth() + 1);
   const [targetYear, setTargetYear] = useState(new Date().getFullYear());
   const [targetDate, setTargetDate] = useState('');
-  const [consultantName, setConsultantName] = useState(settings?.consultantName || 'م. أحمد وجيه');
+  const [consultantName, setConsultantName] = useState(settings?.consultantName || 'أحمد وجيه');
   const [judgmentResultFilter, setJudgmentResultFilter] = useState(''); // '' = all
   
   const [generatedData, setGeneratedData] = useState([]);
