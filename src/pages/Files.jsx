@@ -42,6 +42,7 @@ export default function Files() {
   const [showRecentlyAddedOnly, setShowRecentlyAddedOnly] = useSessionState('files_showRecentlyAddedOnly', false);
   const [isSelectionReportModalOpen, setIsSelectionReportModalOpen] = useState(false);
   const [isPrintViewOpen, setIsPrintViewOpen] = useState(false);
+  const [hideNoInterest, setHideNoInterest] = useSessionState('files_hideNoInterest', true);
 
   // Sorting and collapsible states
   const [sortBy, setSortBy] = useSessionState('files_sortBy', 'none');
@@ -141,6 +142,13 @@ export default function Files() {
       result = result.filter(c => {
          const loc = String(c['مكان الملف'] || '').trim();
          return archiveLocations.includes(loc);
+      });
+    }
+
+    if (hideNoInterest) {
+      result = result.filter(c => {
+        const role = String(c['الصفة'] || c['صفة'] || '').trim();
+        return role !== 'لا شأن';
       });
     }
 
@@ -468,6 +476,18 @@ export default function Files() {
               )}
             </button>
 
+            {/* Hide 'No Interest' Toggle */}
+            <button
+              onClick={() => setHideNoInterest(!hideNoInterest)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${
+                hideNoInterest ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+              title="إخفاء أو إظهار ملفات (لا شأن)"
+            >
+              {hideNoInterest ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+              <span>إخفاء (لا شأن)</span>
+            </button>
+
             {/* Sort Toggle Button */}
             <button
               onClick={() => {
@@ -776,18 +796,39 @@ export default function Files() {
             return diffDays <= 3;
           });
 
+          const latestJudgmentSession = (c.sessions || [])
+            .filter(s => s.hasJudgment && s.judgment)
+            .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+          const finalStampData = latestJudgmentSession ? latestJudgmentSession.judgment : null;
+          let stampColor = 'indigo';
+          if (finalStampData) {
+            const res = finalStampData.result || '';
+            // Determine stamp color based on result and role classification
+            if (res.includes('ضد') || res.includes('إجرائي خطير') || (isAppellant && (res.includes('وقف جزائي') || res.includes('اعتبار')))) {
+              stampColor = 'rose';
+            } else if (res.includes('صالح') || (isAppellee && (res.includes('وقف جزائي') || res.includes('اعتبار')))) {
+              stampColor = 'emerald';
+            } else if (res.includes('مختلط')) {
+              stampColor = 'amber';
+            } else if (res.includes('لا شأن') || isNoInterest) {
+              stampColor = 'slate';
+            }
+          }
+
           const isMissing = fileLocation === 'غير موجود';
           const isTemp = fileLocation === 'مؤقت';
           const isOut = fileLocation === 'خارج الاختصاص';
 
-          let ribbon = null;
-          if (!isNoInterest) {
+          let locationRibbon = null;
+          if (!isNoInterest && fileLocation && fileLocation !== 'في المكتب') {
              if (isMissing) {
-                ribbon = { text: 'غير موجود', color: 'bg-rose-600', textColor: 'text-white' };
+                locationRibbon = { text: 'غير موجود', color: 'bg-rose-600', textColor: 'text-white' };
              } else if (isTemp) {
-                ribbon = { text: 'مؤقت', color: 'bg-amber-500', textColor: 'text-white' };
+                locationRibbon = { text: 'مؤقت', color: 'bg-amber-500', textColor: 'text-white' };
              } else if (isOut) {
-                ribbon = { text: 'خارج الاختصاص', color: 'bg-indigo-600', textColor: 'text-white' };
+                locationRibbon = { text: 'خارج الاختصاص', color: 'bg-indigo-600', textColor: 'text-white' };
+             } else {
+                locationRibbon = { text: fileLocation, color: 'bg-slate-700', textColor: 'text-white' };
              }
           }
 
@@ -819,9 +860,17 @@ export default function Files() {
               {/* Card Body */}
               <div className={`relative ${bgClass} border ${borderClass} rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all duration-300 z-20 h-full flex flex-col group-hover:-translate-y-1 overflow-hidden ${cardOpacity} ${grayscale}`}>
 
-                {ribbon && (
-                  <div className={`absolute top-4 -left-8 w-32 -rotate-45 text-center py-1 text-[10px] font-black shadow-md z-40 ${ribbon.color} ${ribbon.textColor}`}>
-                    {ribbon.text}
+                {/* Judgment Ribbon (Top Left physically) */}
+                {finalStampData && !isNoInterest && (
+                  <div className={`absolute top-4 -left-8 w-32 -rotate-45 text-center py-1.5 shadow-md z-40 bg-${stampColor}-600 text-white`}>
+                    <div className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5 mt-0.5">{finalStampData.type || 'حكم'}</div>
+                  </div>
+                )}
+
+                {/* File Location Ribbon (Top Right physically) */}
+                {locationRibbon && (
+                  <div className={`absolute top-4 -right-8 w-32 rotate-45 text-center py-1.5 text-[10px] font-black shadow-md z-40 ${locationRibbon.color} ${locationRibbon.textColor}`}>
+                    {locationRibbon.text}
                   </div>
                 )}
 
@@ -840,10 +889,20 @@ export default function Files() {
                       </span>
                       <button 
                         onClick={(e) => { e.stopPropagation(); setQuickLocationEditId(c.id); }}
-                        className="flex items-center gap-1.5 text-[10px] font-bold text-white bg-black/50 px-2 py-1 rounded-lg backdrop-blur-md hover:bg-black/70 transition"
-                        title="تغيير مكان الملف"
+                        className={`w-7 h-7 flex items-center justify-center rounded-lg border backdrop-blur-md shadow-sm transition ${
+                          fileLocation === 'غير موجود' ? 'bg-rose-500/90 text-white border-rose-400' :
+                          fileLocation === 'مؤقت' ? 'bg-amber-500/90 text-white border-amber-400' :
+                          fileLocation === 'في المكتب' ? 'bg-emerald-500/90 text-white border-emerald-400' :
+                          fileLocation?.includes('شعبة') ? 'bg-slate-700/90 text-white border-slate-600' :
+                          'bg-black/50 text-white border-white/20 hover:bg-black/70'
+                        }`}
+                        title={`مكان الملف: ${fileLocation || 'لم يحدد'} (انقر للتغيير)`}
                       >
-                        <MapPin className="w-3.5 h-3.5" /> {fileLocation || 'حدد المكان'} <span className="opacity-50 ml-0.5">▼</span>
+                        {fileLocation === 'غير موجود' ? <AlertTriangle className="w-3.5 h-3.5" /> :
+                         fileLocation === 'مؤقت' ? <FilesIcon className="w-3.5 h-3.5" /> :
+                         fileLocation === 'في المكتب' ? <CheckSquare className="w-3.5 h-3.5" /> :
+                         fileLocation?.includes('شعبة') ? <FolderClosed className="w-3.5 h-3.5" /> :
+                         <MapPin className="w-3.5 h-3.5" />}
                       </button>
                     </div>
                   </div>
@@ -876,10 +935,20 @@ export default function Files() {
                             </span>
                             <button 
                               onClick={(e) => { e.stopPropagation(); setQuickLocationEditId(c.id); }}
-                              className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border transition hover:bg-slate-100 ${fileLocation ? 'text-slate-500 bg-slate-50 border-slate-200' : 'text-amber-600 bg-amber-50 border-amber-200'}`}
-                              title="تغيير مكان الملف"
+                              className={`w-6 h-6 flex items-center justify-center rounded border shadow-sm transition ${
+                                fileLocation === 'غير موجود' ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100' :
+                                fileLocation === 'مؤقت' ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100' :
+                                fileLocation === 'في المكتب' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' :
+                                fileLocation?.includes('شعبة') ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' :
+                                'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'
+                              }`}
+                              title={`مكان الملف: ${fileLocation || 'لم يحدد'} (انقر للتغيير)`}
                             >
-                              <MapPin className="w-3 h-3" /> {fileLocation || 'حدد المكان'} <span className="opacity-50 ml-0.5">▼</span>
+                              {fileLocation === 'غير موجود' ? <AlertTriangle className="w-3.5 h-3.5" /> :
+                               fileLocation === 'مؤقت' ? <FilesIcon className="w-3.5 h-3.5" /> :
+                               fileLocation === 'في المكتب' ? <CheckSquare className="w-3.5 h-3.5" /> :
+                               fileLocation?.includes('شعبة') ? <FolderClosed className="w-3.5 h-3.5" /> :
+                               <MapPin className="w-3.5 h-3.5" />}
                             </button>
                           </div>
                         )}

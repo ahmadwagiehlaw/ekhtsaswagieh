@@ -31,7 +31,9 @@ const PREDEFINED_DECISIONS = [
 ];
 
 // Editable cell fields in order (for Tab navigation)
-const CELL_FIELDS = ['الرول', 'نوع الجلسة', 'القرار', 'آخر جلسة', 'الملاحظات'];
+const CELL_FIELDS = ['الرول', 'نوع الجلسة', 'القرار', 'آخر جلسة', 'مكان الملف', 'الملاحظات'];
+
+const FILE_LOCATION_OPTIONS = ['في المكتب', 'شعبة المحكمة', 'غير موجود', 'مؤقت', 'خارج الاختصاص'];
 
 const getFieldVal = (obj, keys) => {
   for (const k of keys) {
@@ -94,6 +96,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [showColPicker, setShowColPicker] = useState(false);
   const [savingId, setSavingId] = useState(null);
+  const [slidePanelCaseId, setSlidePanelCaseId] = useState(null); // سلايد تفاصيل الدعوى
 
   const [sortConfig, setSortConfig] = useState({ key: 'الرول', direction: 'asc' });
   const [visibleCols, setVisibleCols] = useState({
@@ -690,6 +693,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                             autoFocus
                             type="text"
                             value={cellValue}
+                            onFocus={e => e.target.select()}
                             onChange={e => setCellValue(e.target.value)}
                             onKeyDown={e => handleCellKey(e, cObj, 'الرول')}
                             onBlur={() => handleCellBlur(cObj, 'الرول')}
@@ -703,13 +707,18 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                       </EditableCell>
                     )}
 
-                    {/* Case number */}
+                    {/* Case number — opens slide panel */}
                     {visibleCols.caseName && (
                       <td className="px-2 py-2">
                         <div className="flex flex-col">
-                          <Link to={`/case/${cObj.id}`} target="_blank" rel="noopener noreferrer" className="text-xs font-black text-navy-900 hover:text-indigo-600 hover:underline transition" dir="rtl" title="فتح تفاصيل الدعوى في نافذة جديدة">
+                          <button
+                            onClick={() => setSlidePanelCaseId(cObj.id)}
+                            className="text-xs font-black text-navy-900 hover:text-indigo-600 hover:underline transition text-right"
+                            dir="rtl"
+                            title="عرض تفاصيل الدعوى"
+                          >
                             {cObj['رقم الدعوى']} <span className="text-slate-400 mx-0.5">/</span> {cObj['السنة']}
-                          </Link>
+                          </button>
                         </div>
                       </td>
                     )}
@@ -776,6 +785,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                               autoFocus
                               list={`dec-${cObj.id}`}
                               value={cellValue}
+                              onFocus={e => e.target.select()}
                               onChange={e => setCellValue(e.target.value)}
                               onKeyDown={e => handleCellKey(e, cObj, 'القرار')}
                               onBlur={() => handleCellBlur(cObj, 'القرار')}
@@ -802,6 +812,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                             autoFocus
                             type="date"
                             value={cellValue}
+                            onFocus={e => e.target.select()}
                             onChange={e => setCellValue(e.target.value)}
                             onKeyDown={e => handleCellKey(e, cObj, 'آخر جلسة')}
                             onBlur={() => handleCellBlur(cObj, 'آخر جلسة')}
@@ -823,6 +834,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                             autoFocus
                             type="text"
                             value={cellValue}
+                            onFocus={e => e.target.select()}
                             onChange={e => setCellValue(e.target.value)}
                             onKeyDown={e => {
                               if (e.key === 'Enter') { e.preventDefault(); commitCell(cObj.id, 'الملاحظات', cellValue); setTimeout(() => saveRow(cObj), 0); }
@@ -841,16 +853,30 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                       </EditableCell>
                     )}
 
-                    {/* مكان الملف — extra optional col */}
+                    {/* مكان الملف — extra optional col, editable */}
                     {visibleCols.fileLocation && (
-                      <td className="px-2 py-2 w-24">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          fileLocation === 'غير موجود' ? 'bg-rose-100 text-rose-700' :
-                          fileLocation === 'مؤقت' ? 'bg-amber-100 text-amber-700' :
-                          fileLocation === 'خارج الاختصاص' ? 'bg-indigo-100 text-indigo-700' :
-                          fileLocation ? 'bg-emerald-100 text-emerald-700' : 'text-slate-300'
-                        }`}>{fileLocation || '-'}</span>
-                      </td>
+                      <EditableCell field="مكان الملف" className="w-28">
+                        {isCell('مكان الملف') ? (
+                          <select
+                            autoFocus
+                            value={cellValue}
+                            onChange={e => setCellValue(e.target.value)}
+                            onKeyDown={e => handleCellKey(e, cObj, 'مكان الملف')}
+                            onBlur={() => handleCellBlur(cObj, 'مكان الملف')}
+                            className="text-[10px] font-bold p-1 rounded border-2 border-indigo-400 w-full outline-none bg-white shadow-sm"
+                          >
+                            <option value="">— اختر —</option>
+                            {(settings?.fileLocationOptions || FILE_LOCATION_OPTIONS).map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        ) : (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full cursor-pointer ${
+                            fileLocation === 'غير موجود' ? 'bg-rose-100 text-rose-700' :
+                            fileLocation === 'مؤقت' ? 'bg-amber-100 text-amber-700' :
+                            fileLocation === 'خارج الاختصاص' ? 'bg-indigo-100 text-indigo-700' :
+                            fileLocation ? 'bg-emerald-100 text-emerald-700' : 'text-slate-300 font-normal'
+                          }`}>{fileLocation || 'انقر'}</span>
+                        )}
+                      </EditableCell>
                     )}
 
                     {/* تصنيف الدعوى — extra optional col */}
@@ -962,6 +988,45 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
           sessionDate={date}
           onClose={() => setIsPrintViewOpen(false)}
         />
+      )}
+
+      {/* ── Slide Panel: تفاصيل الدعوى ── */}
+      {slidePanelCaseId && (
+        <div className="fixed inset-0 z-50 flex" dir="rtl">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setSlidePanelCaseId(null)}
+          />
+          {/* Panel */}
+          <div className="absolute top-0 left-0 h-full w-full max-w-xl bg-white shadow-2xl flex flex-col animate-in slide-in-from-left-4 duration-300">
+            {/* Panel header */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-slate-50">
+              <button
+                onClick={() => setSlidePanelCaseId(null)}
+                className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center hover:bg-slate-100 transition"
+              >
+                <X className="w-4 h-4 text-slate-500" />
+              </button>
+              <span className="text-sm font-black text-slate-700">تفاصيل الدعوى</span>
+              <a
+                href={`/case/${slidePanelCaseId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mr-auto text-[11px] font-bold text-indigo-600 hover:underline flex items-center gap-1"
+              >
+                <ExternalLink className="w-3 h-3" /> فتح في صفحة جديدة
+              </a>
+            </div>
+            {/* Embedded case via iframe */}
+            <iframe
+              key={slidePanelCaseId}
+              src={`/case/${slidePanelCaseId}`}
+              className="flex-1 w-full border-none"
+              title="تفاصيل الدعوى"
+            />
+          </div>
+        </div>
       )}
     </div>
   );

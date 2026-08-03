@@ -395,25 +395,17 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
   }
 
   let stampColor = 'indigo';
-  let isDangerStamp = false;
 
   if (finalStampData) {
     const res = finalStampData.result || '';
-    if (res.includes('لا شأن')) {
-      stampColor = 'slate';
-    } else if (res.includes('ضد')) {
+    if (res.includes('ضد') || res.includes('إجرائي خطير') || (isAppellant && (res.includes('وقف جزائي') || res.includes('اعتبار')))) {
       stampColor = 'rose';
-      isDangerStamp = true;
-    } else if (res.includes('صالح')) {
+    } else if (res.includes('صالح') || (isAppellee && (res.includes('وقف جزائي') || res.includes('اعتبار')))) {
       stampColor = 'emerald';
     } else if (res.includes('مختلط')) {
       stampColor = 'amber';
-    } else if (isAppellant && (res.includes('وقف جزائي') || res.includes('اعتبار'))) {
-      stampColor = 'rose';
-      isDangerStamp = true;
-    } else if (res === 'إجرائي خطير') {
-      stampColor = 'rose';
-      isDangerStamp = true;
+    } else if (res.includes('لا شأن') || isNoInterest) {
+      stampColor = 'slate';
     }
   }
   const content = (
@@ -521,16 +513,22 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
           <div className={`h-2 w-full ${accentLineClass}`}></div>
         )}
 
-        {finalStampData && (
-          <div className={`absolute top-4 left-4 z-10 opacity-90 select-none pointer-events-none transform -rotate-6`}>
-            <div className={`border-[3px] border-${stampColor}-600 rounded-lg p-2 bg-white/90 backdrop-blur-sm shadow-xl flex flex-col items-center justify-center ${isDangerStamp ? 'animate-pulse ring-4 ring-rose-500/30' : ''}`}>
-              <span className={`text-[15px] font-black text-${stampColor}-700 uppercase tracking-widest leading-none`}>
-                {finalStampData.type || 'حكم'}
-              </span>
-              <span className={`text-[11px] font-black text-${stampColor}-600 mt-1 border-t-2 border-${stampColor}-600/30 pt-1 w-full text-center truncate max-w-[120px]`}>
-                {finalStampData.result || '---'}
-              </span>
-            </div>
+        {/* Judgment Ribbon (Top Left physically) */}
+        {finalStampData && !isNoInterest && (
+          <div className={`absolute top-5 -left-9 w-36 -rotate-45 text-center py-1.5 shadow-md z-40 bg-${stampColor}-600 text-white`}>
+            <div className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5 mt-0.5">{finalStampData.type || 'حكم'}</div>
+          </div>
+        )}
+
+        {/* File Location Ribbon (Top Right physically) */}
+        {fileLocation && fileLocation !== 'في المكتب' && (
+          <div className={`absolute top-5 -right-9 w-36 rotate-45 text-center py-1.5 shadow-md z-40 ${
+            fileLocation === 'غير موجود' ? 'bg-rose-600 text-white' :
+            fileLocation === 'مؤقت' ? 'bg-amber-500 text-white' :
+            fileLocation === 'خارج الاختصاص' ? 'bg-indigo-600 text-white' :
+            'bg-slate-700 text-white'
+          }`}>
+            <div className="text-[11px] font-black leading-none">{fileLocation}</div>
           </div>
         )}
 
@@ -561,26 +559,32 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
               <CheckCircle2 className="w-3 h-3" />
               {litigationStage}
             </div>
+            {/* Small File Location Icon Button */}
             {fileLocation ? (
               <button
                 onClick={() => { setNewLocation(fileLocation); setIsChangeLocationModalOpen(true); }}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-black border transition cursor-pointer shadow-sm ${
-                  fileLocation === 'غير موجود' ? 'bg-rose-100 text-rose-700 border-rose-300 hover:bg-rose-200 animate-pulse' :
-                  fileLocation === 'مؤقت' ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200' :
-                  fileLocation === 'خارج الاختصاص' ? 'bg-indigo-100 text-indigo-700 border-indigo-300 hover:bg-indigo-200' :
-                  'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                className={`w-7 h-7 flex items-center justify-center rounded-lg border shadow-sm transition ${
+                  fileLocation === 'غير موجود' ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100 animate-pulse' :
+                  fileLocation === 'مؤقت' ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100' :
+                  fileLocation === 'في المكتب' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' :
+                  fileLocation.includes('شعبة') ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' :
+                  'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'
                 }`}
-                title="تغيير مكان الملف"
+                title={`مكان الملف: ${fileLocation} (انقر للتغيير)`}
               >
-                📁 {fileLocation} <span className="opacity-50 ml-1">▼</span>
+                {fileLocation === 'غير موجود' ? <AlertTriangle className="w-3.5 h-3.5" /> :
+                 fileLocation === 'مؤقت' ? <Files className="w-3.5 h-3.5" /> :
+                 fileLocation === 'في المكتب' ? <CheckCircle2 className="w-3.5 h-3.5" /> :
+                 fileLocation.includes('شعبة') ? <FolderOpen className="w-3.5 h-3.5" /> :
+                 <MapPin className="w-3.5 h-3.5" />}
               </button>
             ) : (
               <button
                 onClick={() => { setNewLocation(''); setIsChangeLocationModalOpen(true); }}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-black border bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-200 transition cursor-pointer shadow-sm`}
+                className="w-7 h-7 flex items-center justify-center rounded-lg border bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100 hover:text-slate-600 transition shadow-sm"
                 title="تحديد مكان الملف"
               >
-                تحديد مكان الملف <span className="opacity-50 ml-1">▼</span>
+                <MapPin className="w-3.5 h-3.5" />
               </button>
             )}
             {isJudgment && (
