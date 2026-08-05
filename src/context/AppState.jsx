@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo } from '
 import { onSnapshot, setDoc, doc, writeBatch, getDocs, deleteDoc } from 'firebase/firestore';
 import { db, getSettingsRef, getSchemaRef, getCasesRef, getRollsRef, getTasksRef } from '../lib/firebase';
 import { useAuth } from './AuthContext';
+import { getSafeDateObj } from '../utils/dateUtils';
 
 const AppContext = createContext();
 
@@ -47,6 +48,23 @@ export const AppProvider = ({ children }) => {
     }
     return rawCases;
   }, [rawCases, globalHideNoInterest]);
+
+  const plaintiffsList = useMemo(() => {
+    const set = new Set();
+    rawCases.forEach(c => {
+      if (c['المدعي']) set.add(c['المدعي']);
+    });
+    return Array.from(set);
+  }, [rawCases]);
+
+  const defendantsList = useMemo(() => {
+    const set = new Set();
+    rawCases.forEach(c => {
+      const def = c['المدعى_عليه'] || c['المدعى عليه'] || c['المطعون ضده'] || c['المطعون ضدها'];
+      if (def) set.add(def);
+    });
+    return Array.from(set);
+  }, [rawCases]);
 
   const tenantId = userData?.tenantId;
   const isAdmin = userData?.role === 'super_admin' || userData?.role === 'consultant';
@@ -99,7 +117,7 @@ export const AppProvider = ({ children }) => {
     const unsubSchema = onSnapshot(getSchemaRef(tenantId), (docSnap) => {
       if (docSnap.exists() && docSnap.data().fields) {
         const obsoleteFields = ['الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي'];
-        let cleanSchema = docSnap.data().fields.filter(f => !obsoleteFields.includes(f.id));
+        let cleanSchema = docSnap.data().fields.filter(f => f && !obsoleteFields.includes(f.id));
         
         const essentialFields = [
           { id: 'تصنيف الدعوى', label: 'تصنيف الدعوى', type: 'text', visible: true },
@@ -179,7 +197,7 @@ export const AppProvider = ({ children }) => {
       snapshot.forEach(doc => {
         rollsData.push({ id: doc.id, ...doc.data() });
       });
-      rollsData.sort((a, b) => new Date(b.date) - new Date(a.date));
+      rollsData.sort((a, b) => getSafeDateObj(b.date) - getSafeDateObj(a.date));
       setRolls(rollsData);
     });
 
@@ -188,7 +206,7 @@ export const AppProvider = ({ children }) => {
       snapshot.forEach(doc => {
         tasksData.push({ id: doc.id, ...doc.data() });
       });
-      tasksData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      tasksData.sort((a, b) => getSafeDateObj(b.createdAt) - getSafeDateObj(a.createdAt));
       setGlobalTasks(tasksData);
     });
 
@@ -514,6 +532,8 @@ export const AppProvider = ({ children }) => {
       cases,
       rawCases,
       deletedCases,
+      plaintiffsList,
+      defendantsList,
       rolls,
       schema,
       settings,
@@ -542,7 +562,7 @@ export const AppProvider = ({ children }) => {
       PREDEFINED_TASKS,
       completeGlobalTask
   }), [
-    cases, rawCases, deletedCases, rolls, schema, settings, isAdmin, isEmployee, 
+    cases, rawCases, deletedCases, plaintiffsList, defendantsList, rolls, schema, settings, isAdmin, isEmployee, 
     currentUser, currentUserPermissions, loading, globalHideNoInterest
   ]);
 

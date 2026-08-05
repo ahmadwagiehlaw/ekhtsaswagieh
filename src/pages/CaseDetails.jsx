@@ -316,7 +316,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
     const newSessions = [...caseData.sessions];
     newSessions[idx] = { ...newSessions[idx], ...editSessionData };
     // Sort descending by date
-    newSessions.sort((a, b) => new Date(b.date) - new Date(a.date));
+    newSessions.sort((a, b) => getSafeDateObj(b.date) - getSafeDateObj(a.date));
 
     const updateData = { sessions: newSessions };
 
@@ -388,7 +388,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
 
   const latestJudgmentSession = [...(caseData.sessions || [])]
     .filter(s => s.hasJudgment && s.judgment)
-    .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+    .sort((a, b) => getSafeDateObj(b.date) - getSafeDateObj(a.date))[0];
 
   const litigationStage = calculateLitigationStage(caseData, caseData.sessions || []);
   const caseDecision = caseData['القرار'] || '';

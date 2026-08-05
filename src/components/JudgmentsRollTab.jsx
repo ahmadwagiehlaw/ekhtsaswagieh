@@ -199,7 +199,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
   const roles = settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص'];
 
   const [searchQ, setSearchQ] = useState('');
-  const [sessionTypeFilter, setSessionTypeFilter] = useState('موضوع');
+  const [sessionTypeFilter, setSessionTypeFilter] = useState('الكل');
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
   const [isExportOpen, setIsExportOpen] = useState(false);

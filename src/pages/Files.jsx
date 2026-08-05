@@ -852,13 +852,13 @@ export default function Files() {
 
           const activeAlerts = (c.alerts || []).filter(a => !a.isDone);
           const hasUrgentAlert = activeAlerts.some(a => {
-            const diffDays = Math.ceil((new Date(a.date) - new Date()) / (1000 * 60 * 60 * 24));
+            const diffDays = Math.ceil((getSafeDateObj(a.date) - new Date()) / (1000 * 60 * 60 * 24));
             return diffDays <= 3;
           });
 
           const latestJudgmentSession = (c.sessions || [])
             .filter(s => s.hasJudgment && s.judgment)
-            .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+            .sort((a, b) => getSafeDateObj(b.date) - getSafeDateObj(a.date))[0];
           const finalStampData = latestJudgmentSession ? latestJudgmentSession.judgment : null;
           let stampColor = 'indigo';
           if (finalStampData) {

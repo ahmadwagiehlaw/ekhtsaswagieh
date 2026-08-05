@@ -6,7 +6,7 @@ import { useUI } from '../context/UIContext';
 const currentYear = new Date().getFullYear();
 
 export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
-  const { createNewCase, checkDuplicateCase, settings, cases, saveCaseToFirebase } = useAppContext();
+  const { createNewCase, checkDuplicateCase, settings, cases, saveCaseToFirebase, plaintiffsList, defendantsList } = useAppContext();
   const { toast } = useUI();
 
   const [formData, setFormData] = useState({
@@ -28,23 +28,6 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
   const roles = settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص'];
   const decisions = settings?.decisions || ['للحكم', 'تصريح', 'للإعلان', 'للاطلاع', 'آخر أجل'];
 
-  const plaintiffsList = React.useMemo(() => {
-    if (!cases) return [];
-    const set = new Set();
-    cases.forEach(c => {
-      if (c['المدعي']) set.add(c['المدعي']);
-    });
-    return Array.from(set);
-  }, [cases]);
-
-  const defendantsList = React.useMemo(() => {
-    if (!cases) return [];
-    const set = new Set();
-    cases.forEach(c => {
-      if (c['المدعى_عليه']) set.add(c['المدعى_عليه']);
-    });
-    return Array.from(set);
-  }, [cases]);
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -80,6 +63,7 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
           id: Date.now().toString(),
           date: formData['آخر جلسة'],
           decision: formData['القرار'],
+          type: formData['نوع الجلسة'],
           createdAt: new Date().toISOString(),
         }];
       }
@@ -281,14 +265,14 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 block">نوع الجلسة</label>
-              <select
-                value={formData['نوع الجلسة']}
-                onChange={e => handleChange('نوع الجلسة', e.target.value)}
-                className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
-              >
-                <option value="">-- اختر --</option>
-                {(settings?.courtDegree === 'إدارية عليا' || settings?.courtDegree === 'عليا' || settings?.courtDegree === 'ثان درجة' ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة', 'حكم']).map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <div className="flex bg-slate-100 p-1 rounded-xl w-full">
+                {(settings?.courtDegree === 'إدارية عليا' || settings?.courtDegree === 'عليا' || settings?.courtDegree === 'ثان درجة' ? ['فحص', 'موضوع', 'حكم'] : ['مفوضين', 'مرافعة', 'حكم']).map((t, i) => (
+                  <button
+                    key={t} type="button" onClick={() => handleChange('نوع الجلسة', t)}
+                    className={`flex-1 py-1.5 px-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${formData['نوع الجلسة'] === t ? (i === 0 ? 'bg-amber-500 text-white' : i === 1 ? 'bg-emerald-500 text-white' : 'bg-navy-900 text-white') : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
+                  >{t}</button>
+                ))}
+              </div>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 block">قرار الجلسة</label>

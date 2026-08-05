@@ -86,7 +86,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   const [rowCache, setRowCache] = useState({}); // { caseId: { ...editData } }
 
   const [searchQ, setSearchQ] = useState('');
-  const [sessionTypeFilter, setSessionTypeFilter] = useState('موضوع'); // الوضع الافتراضي: موضوع
+  const [sessionTypeFilter, setSessionTypeFilter] = useState('الكل'); // الوضع الافتراضي: الكل
   const searchRef = useRef(null);
   const [isBulkProcedureOpen, setIsBulkProcedureOpen] = useState(false);
   const [isPrintViewOpen, setIsPrintViewOpen] = useState(false);

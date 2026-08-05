@@ -485,14 +485,22 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                             </div>
                                           </div>
                                         </div>
-                                    ) : ['القرار', 'مكان الملف', 'نوع الجلسة', 'تصنيف الحكم', 'نوع الحكم'].includes(field.id) ? (
+                                    ) : field.id === 'نوع الجلسة' ? (
+                                        <div className="flex bg-slate-100 p-1 rounded-xl w-full mt-1">
+                                          {(settings?.courtDegree === 'إدارية عليا' || settings?.courtDegree === 'عليا' || settings?.courtDegree === 'ثان درجة' ? ['فحص', 'موضوع', 'حكم'] : ['مفوضين', 'مرافعة', 'حكم']).map((t, i) => (
+                                            <button
+                                              key={t} type="button" onClick={() => setFormData({...formData, [field.id]: t})}
+                                              className={`flex-1 py-2 px-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${val === t ? (i === 0 ? 'bg-amber-500 text-white' : i === 1 ? 'bg-emerald-500 text-white' : 'bg-navy-900 text-white') : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
+                                            >{t}</button>
+                                          ))}
+                                        </div>
+                                    ) : ['القرار', 'مكان الملف', 'تصنيف الحكم', 'نوع الحكم'].includes(field.id) ? (
                                         <StrictSelectField
                                           label={field.label}
                                           value={val}
                                           options={
                                             field.id === 'القرار' ? (settings?.decisions || []) :
                                             field.id === 'مكان الملف' ? (settings?.fileLocations || []) :
-                                            field.id === 'نوع الجلسة' ? (settings?.sessionTypes || ['فحص', 'موضوع']) :
                                             field.id === 'تصنيف الحكم' ? (settings?.judgmentCategories || ['قطعي', 'تمهيدي']) :
                                             field.id === 'نوع الحكم' ? (settings?.judgmentTypes || ['قبول', 'رفض']) : []
                                           }
@@ -501,7 +509,6 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                             const keyMap = { 
                                               'القرار': 'decisions', 
                                               'مكان الملف': 'fileLocations', 
-                                              'نوع الجلسة': 'sessionTypes',
                                               'تصنيف الحكم': 'judgmentCategories',
                                               'نوع الحكم': 'judgmentTypes'
                                             };
