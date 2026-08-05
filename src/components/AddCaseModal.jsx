@@ -1,30 +1,57 @@
-import React, { useState } from 'react';
-import { X, Save, Plus, Check, Trash2, MapPin } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { X, Save, Plus, Check, Trash2, MapPin, Settings2 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { useNavigate } from 'react-router-dom';
 import SmartAutocomplete from './SmartAutocomplete';
+import FieldOptionsManager from './FieldOptionsManager';
+import StrictSelectField from './StrictSelectField';
 
 export default function AddCaseModal({ isOpen, onClose }) {
   const { schema, createNewCase, settings, cases, saveCaseToFirebase } = useAppContext();
   const { toast } = useUI();
-  const [formData, setFormData] = useState({});
+  const [formData, setFormData] = useState({
+    joinedCasesList: [],
+    defendantsList: []
+  });
   const [isSaving, setIsSaving] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState(['📌 بيانات أساسية']);
+  const [activeTab, setActiveTab] = useState('📌 بيانات أساسية');
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
   const [createdCaseId, setCreatedCaseId] = useState(null);
   const [customLocation, setCustomLocation] = useState('');
   const [newDefName, setNewDefName] = useState('');
   const [activeDefId, setActiveDefId] = useState(null);
+  const [newJoinedNo, setNewJoinedNo] = useState('');
+  const [newJoinedYear, setNewJoinedYear] = useState('');
+  const [managingField, setManagingField] = useState(null);
   const navigate = useNavigate();
+
+  const currentCourtDegree = settings?.courtDegree || 'أول درجة';
+  const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
+  const sessionTypeOptions = isSupreme ? ['فحص', 'موضوع', 'حكم'] : ['مفوضين', 'مرافعة', 'حكم'];
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSaving(true);
+    
+    const dataToSave = { ...formData };
+    
+    if (dataToSave.defendantsList && dataToSave.defendantsList.length > 0) {
+      dataToSave['المدعى_عليه'] = dataToSave.defendantsList.map(d => d.name).join(' وآخرين');
+      const firstWithAddress = dataToSave.defendantsList.find(d => d.address);
+      if (firstWithAddress) dataToSave['عنوان المدعى عليه'] = firstWithAddress.address;
+      const firstWithChosenAddress = dataToSave.defendantsList.find(d => d.chosenAddress);
+      if (firstWithChosenAddress) dataToSave['المقر المختار'] = firstWithChosenAddress.chosenAddress;
+    }
+    
+    if (dataToSave.joinedCasesList && dataToSave.joinedCasesList.length > 0) {
+       dataToSave['دعاوى منضمة'] = dataToSave.joinedCasesList.map(jc => `${jc.no} لسنة ${jc.year}`).join('، ');
+    }
+
     try {
-      const savedCaseId = await createNewCase(formData);
+      const savedCaseId = await createNewCase(dataToSave);
       setIsSaving(false);
       if (savedCaseId) {
         setCreatedCaseId(savedCaseId);
@@ -128,61 +155,84 @@ export default function AddCaseModal({ isOpen, onClose }) {
             </div>
           ) : (
           <form id="add-case-form" onSubmit={handleSubmit} className="space-y-4">
-              {[
-                {
-                  title: '📌 بيانات أساسية',
-                  colorClass: 'text-blue-700 bg-blue-50/50 border-blue-100',
-                  keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'دعاوى منضمة', 'المحكمة', 'الدائرة', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'مطعون ضدهم آخرين', 'الصفة', 'صفة', 'تصنيف الدعوى', 'موضوع الدعوى']
-                },
-                {
-                  title: '⚖️ الجلسة والقرار',
-                  colorClass: 'text-amber-700 bg-amber-50/50 border-amber-100',
-                  keys: ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'الرول', 'نوع الجلسة', 'القرار', 'قرار الجلسة', 'مكان الملف', 'ملاحظات']
-                },
-                {
-                  title: '🏛️ بيانات الحكم وأول درجة',
-                  colorClass: 'text-rose-700 bg-rose-50/50 border-rose-100',
-                  keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن']
-                },
-                {
-                  title: '📍 بيانات أخرى',
-                  colorClass: 'text-slate-700 bg-slate-50/50 border-slate-200',
-                  keys: ['المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي', 'تصنيف الدعوى']
-                }
-              ].map((group, idx, arr) => {
-                 const excludedFields = ['الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي'];
-                 let groupFields = schema.filter(f => f.visible && group.keys.includes(f.id) && !excludedFields.includes(f.id));
-                 if (idx === arr.length - 1) {
-                    const allConfiguredKeys = arr.flatMap(g => g.keys);
-                    const unmappedFields = schema.filter(f => f.visible && !allConfiguredKeys.includes(f.id) && !excludedFields.includes(f.id));
-                    groupFields = [...groupFields, ...unmappedFields];
-                 }
-                 
-                 if (groupFields.length === 0) return null;
-                 
-                 const isExpanded = expandedGroups.includes(group.title);
-                 const toggleGroup = () => {
-                   if (isExpanded) {
-                     setExpandedGroups(expandedGroups.filter(g => g !== group.title));
-                   } else {
-                     setExpandedGroups([...expandedGroups, group.title]);
-                   }
-                 };
+              {/* Tabs Header */}
+              <div className="flex overflow-x-auto gap-2 pb-2 mb-4 scrollbar-hide">
+                {[
+                  {
+                    title: '📌 بيانات أساسية',
+                    colorClass: 'text-blue-700 bg-blue-50/50 border-blue-100',
+                    keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'دعاوى منضمة', 'المحكمة', 'الدائرة', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'مطعون ضدهم آخرين', 'الصفة', 'صفة']
+                  },
+                  {
+                    title: '⚖️ الجلسة والقرار',
+                    colorClass: 'text-amber-700 bg-amber-50/50 border-amber-100',
+                    keys: ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'الرول', 'نوع الجلسة', 'القرار', 'قرار الجلسة', 'مكان الملف', 'ملاحظات']
+                  },
+                  {
+                    title: '📑 بيانات فنية',
+                    colorClass: 'text-indigo-700 bg-indigo-50/50 border-indigo-100',
+                    keys: ['تصنيف الدعوى', 'موضوع الدعوى', 'طلبات المدعي']
+                  },
+                  {
+                    title: '🏛️ بيانات الحكم وأخرى',
+                    colorClass: 'text-rose-700 bg-rose-50/50 border-rose-100',
+                    keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي']
+                  }
+                ].map((group) => (
+                  <button
+                    key={group.title}
+                    type="button"
+                    onClick={() => setActiveTab(group.title)}
+                    className={`whitespace-nowrap px-4 py-2.5 rounded-xl font-black text-xs transition-all border ${
+                      activeTab === group.title
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-md scale-[1.02]'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {group.title}
+                  </button>
+                ))}
+              </div>
 
-                 return (
-                   <div key={idx} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-200">
-                      <button 
-                        type="button"
-                        onClick={toggleGroup}
-                        className={`w-full px-4 py-3 font-black text-xs flex items-center justify-between gap-2 hover:opacity-90 transition-opacity ${group.colorClass} ${isExpanded ? 'border-b' : 'border-b-0'}`}
-                      >
-                         <div className="flex items-center gap-2">
-                            {group.title}
-                         </div>
-                         <span className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
-                      </button>
-                      {isExpanded && (
-                      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 gap-y-5 animate-in fade-in slide-in-from-top-2 duration-200">
+              {/* Active Tab Content */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 animate-in fade-in zoom-in duration-200 min-h-[400px]">
+                {[
+                  {
+                    title: '📌 بيانات أساسية',
+                    colorClass: 'text-blue-700 bg-blue-50/50 border-blue-100',
+                    keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'دعاوى منضمة', 'المحكمة', 'الدائرة', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'مطعون ضدهم آخرين', 'الصفة', 'صفة']
+                  },
+                  {
+                    title: '⚖️ الجلسة والقرار',
+                    colorClass: 'text-amber-700 bg-amber-50/50 border-amber-100',
+                    keys: ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'الرول', 'نوع الجلسة', 'القرار', 'قرار الجلسة', 'مكان الملف', 'ملاحظات']
+                  },
+                  {
+                    title: '📑 بيانات فنية',
+                    colorClass: 'text-indigo-700 bg-indigo-50/50 border-indigo-100',
+                    keys: ['تصنيف الدعوى', 'موضوع الدعوى', 'طلبات المدعي']
+                  },
+                  {
+                    title: '🏛️ بيانات الحكم وأخرى',
+                    colorClass: 'text-rose-700 bg-rose-50/50 border-rose-100',
+                    keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي']
+                  }
+                ].map((group, idx, arr) => {
+                  if (group.title !== activeTab) return null;
+
+                  const excludedFields = ['الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي'];
+                  let groupFields = schema.filter(f => f.visible && group.keys.includes(f.id));
+                  
+                  if (idx === arr.length - 1) {
+                     const allConfiguredKeys = arr.flatMap(g => g.keys);
+                     const unmappedFields = schema.filter(f => f.visible && !allConfiguredKeys.includes(f.id));
+                     groupFields = [...groupFields, ...unmappedFields];
+                  }
+                  
+                  if (groupFields.length === 0) return null;
+
+                  return (
+                    <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-4 gap-y-5">
                          {groupFields.map(field => {
                             const val = formData[field.id] || '';
                             
@@ -194,11 +244,17 @@ export default function AddCaseModal({ isOpen, onClose }) {
                             if (field.id === 'المقر المختار' && !isPlaintiffRole) return null;
                             if (field.id === 'عنوان المدعى عليه' && !isPlaintiffRole) return null;
                             if (field.id === 'عنوان المدعي' && !isDefendantRole) return null;
-                            if (['السنة', 'سنة', 'year', 'دعاوى منضمة', 'مطعون ضدهم آخرين'].includes(field.id)) return null;
-
+                            if (['السنة', 'سنة', 'year', 'دعاوى منضمة', 'مطعون ضدهم آخرين', 'المدعى_عليه', 'المدعى عليه', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي', 'المدعي', 'الصفة', 'صفة'].includes(field.id)) return null;
+                            
+                            const isFullWidthField = field.type === 'textarea' || ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى'].includes(field.id);
+                            
                             return (
-                              <div key={field.id} className={`${field.type === 'textarea' ? 'md:col-span-2' : ''}`}>
-                                <label className="text-[11px] font-black text-slate-500 block mb-1.5">{field.label}</label>
+                              <div key={field.id} className={`${isFullWidthField ? 'md:col-span-2' : ''}`}>
+                                {!['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'القرار', 'الصفة', 'مكان الملف', 'نوع الجلسة', 'تصنيف الحكم', 'نوع الحكم'].includes(field.id) && (
+                                  <div className="flex items-center gap-2 mb-1.5">
+                                    <label className="text-[11px] font-black text-slate-500 block">{field.label}</label>
+                                  </div>
+                                )}
                                 {field.type === 'textarea' ? (
                                   <textarea 
                                     value={val}
@@ -206,7 +262,7 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                     rows={3}
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 resize-none transition"
                                   />
-                                ) : (field.type === 'date' && field.id !== 'نوع الجلسة') || field.id === 'آخر جلسة' || field.id === 'تاريخ آخر جلسة' || field.id === 'جلسة حكم أول درجة' ? (
+                                ) : (field.type === 'date') || field.id === 'آخر جلسة' || field.id === 'تاريخ آخر جلسة' || field.id === 'جلسة حكم أول درجة' ? (
                                   <input 
                                     type="date"
                                     value={val}
@@ -236,47 +292,222 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                 ) : (
                                   <div>
                                     {['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى'].includes(field.id) ? (
-                                       <div className="flex items-center gap-2 mb-2">
-                                          <div className="flex-[2] relative">
-                                            <SmartAutocomplete
-                                              id={field.id}
-                                              value={val}
-                                              onChange={(v) => {
-                                                  let finalV = v;
-                                                  if (field.type === 'number') finalV = finalV.replace(/[^\d]/g, '');
-                                                  setFormData({...formData, [field.id]: finalV});
-                                              }}
-                                              cases={cases}
-                                              fieldPaths={[field.id]}
-                                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition"
-                                            />
+                                        <div className="w-full pt-5">
+                                          <div className="grid grid-cols-12 gap-2 w-full">
+                                            <div className="col-span-4 sm:col-span-3 relative">
+                                              <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">رقم الدعوى</span>
+                                              <SmartAutocomplete
+                                                id={field.id}
+                                                value={val}
+                                                onChange={(v) => {
+                                                    let finalV = v;
+                                                    if (field.type === 'number') finalV = finalV.replace(/[^\d]/g, '');
+                                                    setFormData({...formData, [field.id]: finalV});
+                                                }}
+                                                cases={cases}
+                                                fieldPaths={[field.id]}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition"
+                                              />
+                                            </div>
+                                            <div className="col-span-3 sm:col-span-2 relative">
+                                              <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">السنة</span>
+                                              <SmartAutocomplete
+                                                id="السنة"
+                                                value={formData['السنة'] || formData['سنة'] || formData['year'] || ''}
+                                                onChange={(v) => {
+                                                    let finalV = v;
+                                                    if (schema.find(f => f.id === 'السنة' || f.id === 'سنة' || f.id === 'year')?.type === 'number') finalV = finalV.replace(/[^\d]/g, '');
+                                                    setFormData({...formData, ['السنة']: finalV});
+                                                }}
+                                                cases={cases}
+                                                fieldPaths={['السنة', 'سنة', 'year']}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition z-0"
+                                              />
+                                            </div>
+                                            <div className="col-span-5 sm:col-span-7 relative">
+                                              <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">المدعي</span>
+                                              <SmartAutocomplete
+                                                id="المدعي"
+                                                value={formData['المدعي'] || ''}
+                                                onChange={(v) => setFormData({...formData, 'المدعي': v})}
+                                                cases={cases}
+                                                fieldPaths={['المدعي']}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition z-0"
+                                              />
+                                            </div>
                                           </div>
-                                          <div className="flex-[1] relative">
-                                            <span className="absolute -top-6 right-1 text-[10px] font-black text-slate-500 z-10">السنة</span>
-                                            <SmartAutocomplete
-                                              id="السنة"
-                                              value={formData['السنة'] || formData['سنة'] || formData['year'] || ''}
-                                              onChange={(v) => {
-                                                  let finalV = v;
-                                                  if (schema.find(f => f.id === 'السنة' || f.id === 'سنة' || f.id === 'year')?.type === 'number') finalV = finalV.replace(/[^\d]/g, '');
-                                                  setFormData({...formData, ['السنة']: finalV});
-                                              }}
-                                              cases={cases}
-                                              fieldPaths={['السنة', 'سنة', 'year']}
-                                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition relative z-0"
-                                            />
+                                          
+                                          {/* Defendants List */}
+                                          <div className="mt-2 border-t border-slate-100 pt-4">
+                                            <label className="text-xs font-black text-slate-500 block mb-3">المدعى عليهم / المطعون ضدهم الآخرين</label>
+                                            <div className="space-y-3">
+                                              {(formData.defendantsList || []).map((def, idx) => (
+                                                <div key={def.id || idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 relative group">
+                                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                                    <div className="flex-1">
+                                                      <input 
+                                                        type="text" 
+                                                        value={def.name} 
+                                                        onChange={e => {
+                                                          const list = [...(formData.defendantsList || [])];
+                                                          list[idx].name = e.target.value;
+                                                          setFormData({ ...formData, defendantsList: list });
+                                                        }}
+                                                        placeholder="اسم المدعى عليه"
+                                                        className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none focus:border-indigo-400"
+                                                      />
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                      <button 
+                                                        type="button"
+                                                        onClick={() => setActiveDefId(activeDefId === def.id ? null : def.id)}
+                                                        className="text-[10px] bg-white border border-indigo-200 text-indigo-600 px-2 py-1.5 rounded-lg hover:bg-indigo-50 font-bold flex items-center gap-1"
+                                                      >
+                                                        <MapPin className="w-3 h-3" /> {activeDefId === def.id ? 'إخفاء العناوين' : 'إضافة/تعديل العناوين'}
+                                                      </button>
+                                                      <button 
+                                                        type="button"
+                                                        onClick={() => {
+                                                          const list = [...(formData.defendantsList || [])];
+                                                          list.splice(idx, 1);
+                                                          setFormData({ ...formData, defendantsList: list });
+                                                        }}
+                                                        className="p-1.5 text-slate-400 hover:text-rose-600 bg-white rounded-lg border border-slate-200"
+                                                      >
+                                                        <Trash2 className="w-4 h-4" />
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                  
+                                                  {activeDefId === def.id && (
+                                                    <div className="mt-3 pt-3 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in slide-in-from-top-2">
+                                                      <div>
+                                                        <label className="text-[10px] font-bold text-slate-400 block mb-1">عنوان المدعى عليه</label>
+                                                        <textarea
+                                                          value={def.address || ''}
+                                                          onChange={e => {
+                                                            const list = [...(formData.defendantsList || [])];
+                                                            list[idx].address = e.target.value;
+                                                            setFormData({ ...formData, defendantsList: list });
+                                                          }}
+                                                          placeholder="العنوان..."
+                                                          rows={2}
+                                                          className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-[11px] font-bold focus:outline-none focus:border-indigo-400 resize-none"
+                                                        />
+                                                      </div>
+                                                      <div>
+                                                        <label className="text-[10px] font-bold text-slate-400 block mb-1">المقر المختار</label>
+                                                        <textarea
+                                                          value={def.chosenAddress || ''}
+                                                          onChange={e => {
+                                                            const list = [...(formData.defendantsList || [])];
+                                                            list[idx].chosenAddress = e.target.value;
+                                                            setFormData({ ...formData, defendantsList: list });
+                                                          }}
+                                                          placeholder="المقر المختار..."
+                                                          rows={2}
+                                                          className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-[11px] font-bold focus:outline-none focus:border-indigo-400 resize-none"
+                                                        />
+                                                      </div>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              ))}
+
+                                              <div className="flex items-center gap-2 mt-2">
+                                                <input 
+                                                  type="text" 
+                                                  value={newDefName} 
+                                                  onChange={e => setNewDefName(e.target.value)} 
+                                                  placeholder="اسم المدعى عليه الجديد..." 
+                                                  className="flex-1 bg-white border border-indigo-200 shadow-sm rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-400"
+                                                />
+                                                <button 
+                                                  type="button"
+                                                  onClick={() => {
+                                                    if (!newDefName.trim()) return;
+                                                    const newList = [...(formData.defendantsList || []), { id: Date.now().toString(), name: newDefName, address: '', chosenAddress: '' }];
+                                                    setFormData({ ...formData, defendantsList: newList });
+                                                    setNewDefName('');
+                                                  }}
+                                                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition whitespace-nowrap"
+                                                >
+                                                  + إضافة
+                                                </button>
+                                              </div>
+                                            </div>
                                           </div>
-                                          <div className="flex-[2] relative">
-                                            <span className="absolute -top-6 right-1 text-[10px] font-black text-slate-500 z-10">دعاوى منضمة</span>
-                                            <input
-                                               type="text"
-                                               value={formData['دعاوى منضمة'] || ''}
-                                               onChange={(e) => setFormData({...formData, 'دعاوى منضمة': e.target.value})}
-                                               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition relative z-0"
-                                               placeholder="مثال: 123 لسنة 2024"
-                                            />
+                                          
+                                          {/* Joined Cases and Role (الصفة) */}
+                                          <div className="grid grid-cols-12 gap-2 w-full mt-3">
+                                            {/* Joined Cases */}
+                                            <div className="col-span-12 sm:col-span-7 md:col-span-8 bg-indigo-50/40 rounded-xl p-3 border border-indigo-100 relative">
+                                              <label className="text-[10px] font-black text-indigo-800 mb-2 block">الدعاوى المنضمة</label>
+                                              <div className="flex flex-wrap items-center gap-2">
+                                                {(formData.joinedCasesList || []).map((jc, jcIdx) => (
+                                                  <div key={jcIdx} className="bg-white border border-indigo-200 shadow-sm text-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5">
+                                                    {jc.no} <span className="text-[10px] text-slate-400">/</span> {jc.year}
+                                                    <button type="button" onClick={() => {
+                                                      const list = [...(formData.joinedCasesList || [])];
+                                                      list.splice(jcIdx, 1);
+                                                      setFormData({ ...formData, joinedCasesList: list });
+                                                    }} className="text-rose-400 hover:text-rose-600 transition ml-1">
+                                                      <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                  </div>
+                                                ))}
+
+                                                <div className="flex items-center gap-1.5">
+                                                  <input type="number" placeholder="رقم" value={newJoinedNo} onChange={e => setNewJoinedNo(e.target.value)} className="w-16 bg-white border border-indigo-200 shadow-sm rounded-lg px-2 py-1.5 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400" />
+                                                  <input type="number" placeholder="سنة" value={newJoinedYear} onChange={e => setNewJoinedYear(e.target.value)} className="w-14 bg-white border border-indigo-200 shadow-sm rounded-lg px-2 py-1.5 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400" />
+                                                  <button type="button" onClick={() => {
+                                                    if (!newJoinedNo || !newJoinedYear) return;
+                                                    const list = [...(formData.joinedCasesList || []), { no: newJoinedNo, year: newJoinedYear }];
+                                                    setFormData({ ...formData, joinedCasesList: list });
+                                                    setNewJoinedNo('');
+                                                    setNewJoinedYear('');
+                                                  }} className="bg-indigo-600 hover:bg-indigo-700 shadow-sm text-white px-2.5 py-1.5 rounded-lg text-xs font-black transition">
+                                                    + إضافة
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            {/* Role (الصفة) */}
+                                            <div className="col-span-12 sm:col-span-5 md:col-span-4 bg-slate-50 border border-slate-200 rounded-xl p-3 relative">
+                                              <StrictSelectField
+                                                label="الصفة"
+                                                value={formData['الصفة'] || formData['صفة'] || ''}
+                                                options={settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل']}
+                                                onChange={(v) => setFormData({...formData, 'الصفة': v})}
+                                                onManage={() => setManagingField({ key: 'roles', title: 'الصفة' })}
+                                              />
+                                            </div>
                                           </div>
-                                       </div>
+                                        </div>
+                                    ) : ['القرار', 'مكان الملف', 'نوع الجلسة', 'تصنيف الحكم', 'نوع الحكم'].includes(field.id) ? (
+                                        <StrictSelectField
+                                          label={field.label}
+                                          value={val}
+                                          options={
+                                            field.id === 'القرار' ? (settings?.decisions || []) :
+                                            field.id === 'مكان الملف' ? (settings?.fileLocations || []) :
+                                            field.id === 'نوع الجلسة' ? (settings?.sessionTypes || ['فحص', 'موضوع']) :
+                                            field.id === 'تصنيف الحكم' ? (settings?.judgmentCategories || ['قطعي', 'تمهيدي']) :
+                                            field.id === 'نوع الحكم' ? (settings?.judgmentTypes || ['قبول', 'رفض']) : []
+                                          }
+                                          onChange={(v) => setFormData({...formData, [field.id]: v})}
+                                          onManage={() => {
+                                            const keyMap = { 
+                                              'القرار': 'decisions', 
+                                              'مكان الملف': 'fileLocations', 
+                                              'نوع الجلسة': 'sessionTypes',
+                                              'تصنيف الحكم': 'judgmentCategories',
+                                              'نوع الحكم': 'judgmentTypes'
+                                            };
+                                            setManagingField({ key: keyMap[field.id], title: field.label });
+                                          }}
+                                        />
                                     ) : (
                                        <SmartAutocomplete
                                          id={field.id}
@@ -291,150 +522,16 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition"
                                        />
                                     )}
-
-                                    {field.id === 'القرار' && settings?.decisions && (
-                                       <div className="flex flex-wrap gap-1 mt-2">
-                                         {settings.decisions.slice(0, 5).map(dec => (
-                                           <button key={dec} type="button" onClick={() => setFormData({...formData, [field.id]: dec})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{dec}</button>
-                                         ))}
-                                       </div>
-                                    )}
-                                    {(field.id === 'الصفة' || field.id === 'صفة') && (
-                                       <div className="flex flex-wrap gap-1 mt-2">
-                                         {(settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل']).map(s => (
-                                           <button key={s} type="button" onClick={() => setFormData({...formData, [field.id]: s})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{s}</button>
-                                         ))}
-                                       </div>
-                                    )}
-                                    {field.id === 'نوع الجلسة' && (
-                                       <div className="flex flex-wrap gap-1 mt-2">
-                                         {(settings?.sessionTypes || ['موضوع', 'فحص', 'للحكم', 'أول جلسة']).map(s => (
-                                           <button key={s} type="button" onClick={() => setFormData({...formData, [field.id]: s})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{s}</button>
-                                         ))}
-                                       </div>
-                                    )}
-                                    {field.id === 'مكان الملف' && (
-                                       <div className="flex flex-wrap gap-1 mt-2">
-                                         {(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']).map(s => (
-                                           <button key={s} type="button" onClick={() => setFormData({...formData, [field.id]: s})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{s}</button>
-                                         ))}
-                                       </div>
-                                    )}
                                   </div>
                                 )}
                               </div>
                             );
-                         })}
-                      </div>
-                      )}
-                      
-                      {/* Defendants List inside first group */}
-                      {isExpanded && group.title === '📌 بيانات أساسية' && (
-                        <div className="px-4 pb-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                          <div className="mt-2 border-t border-slate-100 pt-4">
-                            <label className="text-xs font-black text-slate-500 block mb-3">المدعى عليهم / المطعون ضدهم الآخرين</label>
-                            <div className="space-y-3">
-                              {(formData.defendantsList || []).map((def, idx) => (
-                                <div key={def.id || idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 relative group">
-                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                    <div className="flex-1">
-                                      <input 
-                                        type="text" 
-                                        value={def.name} 
-                                        onChange={e => {
-                                          const list = [...(formData.defendantsList || [])];
-                                          list[idx].name = e.target.value;
-                                          setFormData({ ...formData, defendantsList: list });
-                                        }}
-                                        placeholder="اسم المدعى عليه"
-                                        className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none focus:border-indigo-400"
-                                      />
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                      <button 
-                                        type="button"
-                                        onClick={() => setActiveDefId(activeDefId === def.id ? null : def.id)}
-                                        className="text-[10px] bg-white border border-indigo-200 text-indigo-600 px-2 py-1.5 rounded-lg hover:bg-indigo-50 font-bold flex items-center gap-1"
-                                      >
-                                        <MapPin className="w-3 h-3" /> {activeDefId === def.id ? 'إخفاء العناوين' : 'إضافة/تعديل العناوين'}
-                                      </button>
-                                      <button 
-                                        type="button"
-                                        onClick={() => {
-                                          const list = [...(formData.defendantsList || [])];
-                                          list.splice(idx, 1);
-                                          setFormData({ ...formData, defendantsList: list });
-                                        }}
-                                        className="p-1.5 text-slate-400 hover:text-rose-600 bg-white rounded-lg border border-slate-200"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                  
-                                  {activeDefId === def.id && (
-                                    <div className="mt-3 pt-3 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in slide-in-from-top-2">
-                                      <div>
-                                        <label className="text-[10px] font-bold text-slate-400 block mb-1">عنوان المدعى عليه</label>
-                                        <textarea
-                                          value={def.address || ''}
-                                          onChange={e => {
-                                            const list = [...(formData.defendantsList || [])];
-                                            list[idx].address = e.target.value;
-                                            setFormData({ ...formData, defendantsList: list });
-                                          }}
-                                          placeholder="العنوان..."
-                                          rows={2}
-                                          className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-[11px] font-bold focus:outline-none focus:border-indigo-400 resize-none"
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="text-[10px] font-bold text-slate-400 block mb-1">المقر المختار</label>
-                                        <textarea
-                                          value={def.chosenAddress || ''}
-                                          onChange={e => {
-                                            const list = [...(formData.defendantsList || [])];
-                                            list[idx].chosenAddress = e.target.value;
-                                            setFormData({ ...formData, defendantsList: list });
-                                          }}
-                                          placeholder="المقر المختار..."
-                                          rows={2}
-                                          className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-[11px] font-bold focus:outline-none focus:border-indigo-400 resize-none"
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
+                          })}
 
-                              <div className="flex items-center gap-2 mt-2">
-                                <input 
-                                  type="text" 
-                                  value={newDefName} 
-                                  onChange={e => setNewDefName(e.target.value)} 
-                                  placeholder="اسم المدعى عليه الجديد..." 
-                                  className="flex-1 bg-white border border-indigo-200 shadow-sm rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-400"
-                                />
-                                <button 
-                                  type="button"
-                                  onClick={() => {
-                                    if (!newDefName.trim()) return;
-                                    const newList = [...(formData.defendantsList || []), { id: Date.now().toString(), name: newDefName, address: '', chosenAddress: '' }];
-                                    setFormData({ ...formData, defendantsList: newList });
-                                    setNewDefName('');
-                                  }}
-                                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition whitespace-nowrap"
-                                >
-                                  + إضافة
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                    </div>
-                 );
-              })}
+                  );
+                })}
+              </div>
           </form>
           )}
         </div>
@@ -463,7 +560,12 @@ export default function AddCaseModal({ isOpen, onClose }) {
           </button>
         </div>
         )}
-
+        <FieldOptionsManager 
+          isOpen={!!managingField} 
+          onClose={() => setManagingField(null)} 
+          fieldKey={managingField?.key} 
+          title={managingField?.title} 
+        />
       </div>
     </div>
   );

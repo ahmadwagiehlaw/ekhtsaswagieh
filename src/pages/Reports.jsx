@@ -5,7 +5,7 @@ import { formatDateString } from '../utils/dateUtils';
 import SmartDocumentsTab from '../components/SmartDocumentsTab';
 
 export default function Reports() {
-  const { cases, settings } = useAppContext();
+  const { cases, settings, globalTasks, PREDEFINED_TASKS } = useAppContext();
   
   const [activeTab, setActiveTab] = useState('documents');
   const [reportType, setReportType] = useState('memos'); // 'memos', 'judgments', 'prep'
@@ -14,6 +14,7 @@ export default function Reports() {
   const [targetDate, setTargetDate] = useState('');
   const [consultantName, setConsultantName] = useState(settings?.consultantName || 'أحمد وجيه');
   const [judgmentResultFilter, setJudgmentResultFilter] = useState(''); // '' = all
+  const [taskTypeFilter, setTaskTypeFilter] = useState('');
   
   const [generatedData, setGeneratedData] = useState([]);
 
@@ -123,6 +124,36 @@ export default function Reports() {
         }
       });
       setGeneratedData(results);
+    // Tasks report
+    } else if (reportType === 'tasks') {
+      if (!taskTypeFilter) return setGeneratedData([]);
+      cases.forEach(c => {
+        // filter by session date if provided
+        const sessionDate = c['تاريخ الجلسة'] || c['أخر جلسة'] || c['آخر جلسة'] || '';
+        if (targetDate && sessionDate !== targetDate) return;
+
+        // check if this case has the required task
+        const hasTask = globalTasks?.some(t => t.title === taskTypeFilter && t.linkedCases?.includes(c.id) && t.status === 'pending');
+        if (hasTask) {
+          results.push({
+            id: c.id,
+            caseNumber: `${c['رقم الدعوى'] || c.id} لسنة ${c['السنة']}`,
+            plaintiff: c['المدعي'] || '',
+            defendant: c['المطعون ضده'] || c['المطعون ضدنا'] || c['المدعى عليه'] || c['مدعى علينا'] || '',
+            sessionDate: formatDateString(sessionDate),
+            decision: c['القرار'] || '',
+            notes: globalTasks?.find(t => t.title === taskTypeFilter && t.linkedCases?.includes(c.id) && t.status === 'pending')?.assignee || ''
+          });
+        }
+      });
+      // Sort by session date then by case number
+      results.sort((a, b) => {
+        if (a.sessionDate && b.sessionDate && a.sessionDate !== b.sessionDate) {
+          return new Date(a.sessionDate) - new Date(b.sessionDate);
+        }
+        return a.caseNumber.localeCompare(b.caseNumber);
+      });
+      setGeneratedData(results);
     }
   };
 
@@ -130,7 +161,7 @@ export default function Reports() {
 
   useEffect(() => {
     generateReport();
-  }, [reportType, targetMonth, targetYear, targetDate, cases, judgmentResultFilter]);
+  }, [reportType, targetMonth, targetYear, targetDate, cases, judgmentResultFilter, taskTypeFilter, globalTasks]);
 
   const handlePrint = () => {
     window.print();
@@ -182,6 +213,7 @@ export default function Reports() {
               <option value="memos">كشف المذكرات المحررة</option>
               <option value="prep">كشف تحضير جلسة</option>
               <option value="judgments">كشف أحكام الشهر</option>
+              <option value="tasks">كشف مهام الملفات</option>
             </select>
           </div>
 
@@ -229,7 +261,7 @@ export default function Reports() {
             </div>
           )}
 
-          {reportType === 'prep' && (
+          {(reportType === 'prep' || reportType === 'tasks') && (
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500">تاريخ الجلسة</label>
               <input 
@@ -238,6 +270,22 @@ export default function Reports() {
                 onChange={(e) => setTargetDate(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
+            </div>
+          )}
+
+          {reportType === 'tasks' && (
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500">نوع المهمة المطلوبة</label>
+              <select
+                value={taskTypeFilter}
+                onChange={e => setTaskTypeFilter(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="">اختر المهمة...</option>
+                {PREDEFINED_TASKS?.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
           )}
 
@@ -276,6 +324,7 @@ export default function Reports() {
              {reportType === 'memos' && `كشف المذكرات المحررة عن شهر ${getMonthName(targetMonth)} سنة ${targetYear}`}
              {reportType === 'prep' && `كشف تحضير جلسة ${formatDateString(targetDate) || '---'}`}
              {reportType === 'judgments' && `كشف أحكام شهر ${getMonthName(targetMonth)} سنة ${targetYear}`}
+             {reportType === 'tasks' && `كشف مهام (${taskTypeFilter || 'الكل'}) ${targetDate ? `لجلسة ${formatDateString(targetDate)}` : ''}`}
            </h1>
            
            <p className="text-lg font-bold text-slate-700">
@@ -317,8 +366,8 @@ export default function Reports() {
                   <th className="border border-slate-800 p-2 font-black text-sm">المدعي</th>
                   <th className="border border-slate-800 p-2 font-black text-sm">المدعى عليه</th>
                   <th className="border border-slate-800 p-2 font-black text-sm w-28 text-center">تاريخ الجلسة</th>
-                  <th className="border border-slate-800 p-2 font-black text-sm w-36">{reportType === 'judgments' ? 'نوع الحكم' : 'القرار'}</th>
-                  <th className="border border-slate-800 p-2 font-black text-sm w-28">{reportType === 'judgments' ? 'النتيجة' : 'ملاحظات'}</th>
+                  <th className="border border-slate-800 p-2 font-black text-sm w-36">{reportType === 'judgments' ? 'نوع الحكم' : reportType === 'tasks' ? 'القرار' : 'القرار'}</th>
+                  <th className="border border-slate-800 p-2 font-black text-sm w-28">{reportType === 'judgments' ? 'النتيجة' : reportType === 'tasks' ? 'المكلف بها' : 'ملاحظات'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -331,10 +380,9 @@ export default function Reports() {
                     <td className="border border-slate-800 p-2 text-sm font-bold text-center">{row.sessionDate}</td>
                     <td className="border border-slate-800 p-2 text-sm font-bold">{row.decision}</td>
                     <td className={`border border-slate-800 p-2 text-sm font-black text-center ${
-                      row.computeAs === 'صالح' ? 'text-emerald-700 bg-emerald-50' :
-                      row.computeAs === 'ضد' ? 'text-rose-700 bg-rose-50' :
-                      row.computeAs === 'تمهيدي' ? 'text-indigo-700 bg-indigo-50' :
-                      'text-amber-700 bg-amber-50'
+                      reportType === 'judgments' 
+                        ? (row.computeAs === 'صالح' ? 'text-emerald-700 bg-emerald-50' : row.computeAs === 'ضد' ? 'text-rose-700 bg-rose-50' : row.computeAs === 'تمهيدي' ? 'text-indigo-700 bg-indigo-50' : 'text-amber-700 bg-amber-50')
+                        : ''
                     }`}>{row.notes}</td>
                   </tr>
                 ))}

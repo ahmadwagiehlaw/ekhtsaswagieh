@@ -202,7 +202,9 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
   };
 
   const roleOptions = settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل'];
-  const sessionTypeOptions = settings?.sessionTypes || ['موضوع', 'فحص', 'للحكم', 'أول جلسة'];
+  const currentCourtDegree = settings?.courtDegree || 'أول درجة';
+  const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
+  const sessionTypeOptions = settings?.sessionTypes || (isSupreme ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة', 'حكم']);
   const fileLocationOptions = settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي'];
   const decisionOptions = settings?.decisions || ['للحكم', 'تصريح', 'للإطلاع', 'للإعلان', 'آخر أجل'];
   const JUDGMENT_CATEGORIES = settings?.judgmentCategories || ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];

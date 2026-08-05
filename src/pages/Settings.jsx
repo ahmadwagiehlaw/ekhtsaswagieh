@@ -33,7 +33,7 @@ export default function Settings() {
   const [localNumberFormat, setLocalNumberFormat] = useState(settings?.numberFormat || 'en');
   const [localDateFormat, setLocalDateFormat] = useState(settings?.dateFormat || 'dd/MM/yyyy');
   const [localRoles, setLocalRoles] = useState(settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص']);
-  const [localSessionTypes, setLocalSessionTypes] = useState(settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة']);
+  const [localSessionTypes, setLocalSessionTypes] = useState(settings?.sessionTypes || []);
   const [localFileLocations, setLocalFileLocations] = useState(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
   const [localCommonProcedures, setLocalCommonProcedures] = useState(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
   const [localCaseClassifications, setLocalCaseClassifications] = useState(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
@@ -171,7 +171,7 @@ export default function Settings() {
     setLocalNumberFormat(settings?.numberFormat || 'en');
     setLocalDateFormat(settings?.dateFormat || 'dd/MM/yyyy');
     setLocalRoles(settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص']);
-    setLocalSessionTypes(settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة']);
+    setLocalSessionTypes(settings?.sessionTypes || []);
     setLocalFileLocations(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
     setLocalCommonProcedures(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
     setLocalCaseClassifications(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);

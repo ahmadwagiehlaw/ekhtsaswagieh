@@ -7,7 +7,7 @@ import SessionTable from '../components/SessionTable';
 
 export default function DayRoll() {
   const { date } = useParams();
-  const { cases } = useAppContext();
+  const { cases, settings } = useAppContext();
   const navigate = useNavigate();
 
   const getFieldValue = (obj, keys) => {

@@ -4,10 +4,11 @@ import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 
 export default function BulkAssignTaskModal({ isOpen, onClose, selectedCases, onClearSelection }) {
-  const { settings, saveGlobalTask, cases } = useAppContext();
+  const { settings, saveGlobalTask, PREDEFINED_TASKS } = useAppContext();
   const { toast } = useUI();
   
   const [selectedTaskType, setSelectedTaskType] = useState('');
+  const [customTaskType, setCustomTaskType] = useState('');
   const [selectedAssignee, setSelectedAssignee] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -21,13 +22,15 @@ export default function BulkAssignTaskModal({ isOpen, onClose, selectedCases, on
         setSelectedAssignee('');
       }
       setSelectedTaskType('');
+      setCustomTaskType('');
     }
   }, [isOpen, settings]);
 
   if (!isOpen) return null;
 
   const handleAssign = async () => {
-    if (!selectedAssignee || !selectedTaskType) {
+    const finalTaskTitle = selectedTaskType === 'أخرى' ? customTaskType : selectedTaskType;
+    if (!selectedAssignee || !finalTaskTitle) {
       toast('يرجى اختيار الموظف ونوع المهمة.', 'error');
       return;
     }
@@ -38,7 +41,7 @@ export default function BulkAssignTaskModal({ isOpen, onClose, selectedCases, on
       const globalTaskObj = {
         id: taskId,
         assignee: selectedAssignee,
-        title: selectedTaskType,
+        title: finalTaskTitle,
         status: 'pending',
         notes: '',
         createdAt: new Date().toISOString(),
@@ -98,7 +101,7 @@ export default function BulkAssignTaskModal({ isOpen, onClose, selectedCases, on
           <div className="space-y-2">
             <label className="text-xs font-black text-navy-900">نوع المهمة</label>
             <div className="grid grid-cols-2 gap-2">
-              {(settings?.reviewTasks || []).map(task => (
+              {PREDEFINED_TASKS?.map(task => (
                 <button
                   key={task}
                   onClick={() => setSelectedTaskType(task)}
@@ -111,17 +114,29 @@ export default function BulkAssignTaskModal({ isOpen, onClose, selectedCases, on
                   {task}
                 </button>
               ))}
+              <button
+                onClick={() => setSelectedTaskType('أخرى')}
+                className={`p-3 rounded-xl border text-xs font-bold transition-all text-center ${
+                  selectedTaskType === 'أخرى'
+                  ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' 
+                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-100'
+                }`}
+              >
+                أخرى...
+              </button>
             </div>
             
-            <div className="mt-2 pt-2 border-t border-slate-100">
-               <input 
-                 type="text"
-                 placeholder="أو اكتب مهمة أخرى هنا..."
-                 value={selectedTaskType}
-                 onChange={e => setSelectedTaskType(e.target.value)}
-                 className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-               />
-            </div>
+            {selectedTaskType === 'أخرى' && (
+              <div className="mt-3">
+                <input 
+                   type="text" 
+                   placeholder="اكتب المهمة المخصصة هنا..."
+                   value={customTaskType}
+                   onChange={e => setCustomTaskType(e.target.value)}
+                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            )}
           </div>
 
         </div>

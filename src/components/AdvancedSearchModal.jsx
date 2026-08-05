@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { X, Search, CalendarDays, User, Scale, Hash, MapPin, Building2, Sparkles } from 'lucide-react';
+import { X, Search, CalendarDays, User, Scale, Hash, MapPin, Building2, Sparkles, ClipboardList } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 
 export default function AdvancedSearchModal({ isOpen, onClose, onSearch }) {
-  const { settings, cases } = useAppContext();
+  const { settings, cases, PREDEFINED_TASKS } = useAppContext();
   
   const [formData, setFormData] = useState({
     caseNo: '',
@@ -14,7 +14,8 @@ export default function AdvancedSearchModal({ isOpen, onClose, onSearch }) {
     sessionDateStart: '',
     sessionDateEnd: '',
     court: '',
-    location: ''
+    location: '',
+    requiredTask: ''
   });
 
   if (!isOpen) return null;
@@ -44,7 +45,8 @@ export default function AdvancedSearchModal({ isOpen, onClose, onSearch }) {
       sessionDateStart: '',
       sessionDateEnd: '',
       court: '',
-      location: ''
+      location: '',
+      requiredTask: ''
     });
   };
 
@@ -189,7 +191,23 @@ export default function AdvancedSearchModal({ isOpen, onClose, onSearch }) {
             <hr className="border-slate-200" />
 
             {/* Advanced Categorical */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-black text-navy-900 flex items-center gap-1.5">
+                  <ClipboardList className="w-4 h-4 text-slate-400" /> المهام المطلوبة
+                </label>
+                <select 
+                  name="requiredTask"
+                  value={formData.requiredTask}
+                  onChange={handleChange}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                >
+                  <option value="">الكل</option>
+                  {PREDEFINED_TASKS?.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
               <div className="space-y-2">
                 <label className="text-xs font-black text-navy-900 flex items-center gap-1.5">
                   <Scale className="w-4 h-4 text-slate-400" /> القرار / الحكم

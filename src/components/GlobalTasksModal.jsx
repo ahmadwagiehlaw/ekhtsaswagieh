@@ -5,7 +5,7 @@ import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
 
 export default function GlobalTasksModal({ isOpen, onClose }) {
-  const { globalTasks, saveGlobalTask, deleteGlobalTask, settings, isAdmin, currentUser, currentUserPermissions } = useAppContext();
+  const { globalTasks, saveGlobalTask, completeGlobalTask, PREDEFINED_TASKS, deleteGlobalTask, settings, isAdmin, currentUser, currentUserPermissions } = useAppContext();
   const canManageTasks = isAdmin || currentUserPermissions?.canManageTasks;
   const { toast, showConfirm } = useUI();
   const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'completed'
@@ -44,11 +44,15 @@ export default function GlobalTasksModal({ isOpen, onClose }) {
 
   const handleToggleStatus = async (task) => {
     try {
-      await saveGlobalTask({
-         ...task,
-         status: task.status === 'completed' ? 'pending' : 'completed',
-         completedAt: task.status !== 'completed' ? new Date().toISOString() : null
-      }, task.id);
+      if (task.status !== 'completed') {
+        await completeGlobalTask(task.id, '');
+      } else {
+        await saveGlobalTask({
+          ...task,
+          status: 'pending',
+          completedAt: null
+        }, task.id);
+      }
     } catch (e) {
       toast('حدث خطأ', 'error');
     }
@@ -104,13 +108,19 @@ export default function GlobalTasksModal({ isOpen, onClose }) {
           <div className="bg-indigo-50/50 p-5 border-b border-indigo-100 shrink-0 space-y-3">
             <h3 className="font-black text-indigo-900 text-sm">مهمة جديدة</h3>
             <div className="flex flex-col sm:flex-row gap-3">
-              <input 
-                 type="text" 
-                 placeholder="وصف المهمة (مثال: إعلان صحيفة...)" 
-                 value={newTask.title}
-                 onChange={e => setNewTask({...newTask, title: e.target.value})}
-                 className="flex-[2] bg-white border border-indigo-200 rounded-xl px-4 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+              <div className="flex-[2] relative">
+                <input 
+                   type="text" 
+                   list="global-predefined-tasks"
+                   placeholder="وصف المهمة (مثال: إعلان صحيفة...)" 
+                   value={newTask.title}
+                   onChange={e => setNewTask({...newTask, title: e.target.value})}
+                   className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <datalist id="global-predefined-tasks">
+                  {PREDEFINED_TASKS?.map(t => <option key={t} value={t} />)}
+                </datalist>
+              </div>
               <select 
                  value={newTask.assignee}
                  onChange={e => setNewTask({...newTask, assignee: e.target.value})}

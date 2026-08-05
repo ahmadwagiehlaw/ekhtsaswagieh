@@ -1,15 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Edit3 } from 'lucide-react';
+import { X, Save, Edit3, Settings2 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { useNavigate } from 'react-router-dom';
+import FieldOptionsManager from './FieldOptionsManager';
+import StrictSelectField from './StrictSelectField';
 
 export default function QuickEditCaseModal({ isOpen, onClose, caseData }) {
   const { schema, saveCaseToFirebase, settings, cases } = useAppContext();
   const { toast } = useUI();
   const [formData, setFormData] = useState({});
   const [isSaving, setIsSaving] = useState(false);
+  const [managingField, setManagingField] = useState(null);
   const navigate = useNavigate();
+
+  const currentCourtDegree = settings?.courtDegree || 'أول درجة';
+  const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
+  const sessionTypeOptions = isSupreme ? ['فحص', 'موضوع', 'حكم'] : ['مفوضين', 'مرافعة', 'حكم'];
 
   const getAutocompleteOptions = (fieldId) => {
     if (!cases) return [];
@@ -64,67 +71,74 @@ export default function QuickEditCaseModal({ isOpen, onClose, caseData }) {
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
           <form id="quick-edit-case-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {schema.filter(f => f.visible && !['الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم'].includes(f.id)).map((field) => (
-              <div key={field.id} className={`${field.type === 'textarea' ? 'md:col-span-2' : ''}`}>
-                <label className="text-[11px] font-black text-slate-500 block mb-1.5">{field.label}</label>
-                {field.type === 'textarea' ? (
-                  <textarea 
-                    value={formData[field.id] || ''}
-                    onChange={(e) => setFormData({...formData, [field.id]: e.target.value})}
-                    rows={3}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 resize-none transition"
-                  />
-                ) : field.type === 'date' ? (
-                  <input 
-                    type="date"
-                    value={formData[field.id] || ''}
-                    onChange={(e) => setFormData({...formData, [field.id]: e.target.value})}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition"
-                  />
-                ) : (
-                  <div>
-                    <input 
-                      type="text"
+            {schema.filter(f => f.visible && !['الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم'].includes(f.id)).map((field) => {
+              const isStrictField = ['القرار', 'الصفة', 'صفة', 'مكان الملف', 'نوع الجلسة', 'تصنيف الحكم', 'نوع الحكم'].includes(field.id);
+              
+              return (
+                <div key={field.id} className={`${field.type === 'textarea' ? 'md:col-span-2' : ''}`}>
+                  {!isStrictField && (
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <label className="text-[11px] font-black text-slate-500 block">{field.label}</label>
+                    </div>
+                  )}
+
+                  {isStrictField ? (
+                    <StrictSelectField
+                      label={field.label}
                       value={formData[field.id] || ''}
-                      list={`list-edit-${field.id}`}
+                      options={
+                        field.id === 'القرار' ? (settings?.decisions || []) :
+                        field.id === 'مكان الملف' ? (settings?.fileLocations || []) :
+                        field.id === 'نوع الجلسة' ? sessionTypeOptions :
+                        field.id === 'تصنيف الحكم' ? (settings?.judgmentCategories || ['قطعي', 'تمهيدي']) :
+                        field.id === 'نوع الحكم' ? (settings?.judgmentTypes || ['قبول', 'رفض']) :
+                        (field.id === 'الصفة' || field.id === 'صفة') ? (settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل']) : []
+                      }
+                      onChange={(v) => setFormData({...formData, [field.id]: v})}
+                      onManage={() => {
+                        const keyMap = { 
+                          'القرار': 'decisions', 
+                          'مكان الملف': 'fileLocations', 
+                          'نوع الجلسة': 'sessionTypes',
+                          'تصنيف الحكم': 'judgmentCategories',
+                          'نوع الحكم': 'judgmentTypes',
+                          'الصفة': 'roles',
+                          'صفة': 'roles'
+                        };
+                        setManagingField({ key: keyMap[field.id], title: field.label });
+                      }}
+                    />
+                  ) : field.type === 'textarea' ? (
+                    <textarea 
+                      value={formData[field.id] || ''}
+                      onChange={(e) => setFormData({...formData, [field.id]: e.target.value})}
+                      rows={3}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 resize-none transition"
+                    />
+                  ) : field.type === 'date' ? (
+                    <input 
+                      type="date"
+                      value={formData[field.id] || ''}
                       onChange={(e) => setFormData({...formData, [field.id]: e.target.value})}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition"
                     />
-                    <datalist id={`list-edit-${field.id}`}>
-                      {getAutocompleteOptions(field.id).map((opt, i) => <option key={i} value={opt} />)}
-                    </datalist>
-                    {field.id === 'القرار' && settings?.decisions && (
-                       <div className="flex flex-wrap gap-1 mt-2">
-                         {settings.decisions.slice(0, 5).map(dec => (
-                           <button key={dec} type="button" onClick={() => setFormData({...formData, [field.id]: dec})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{dec}</button>
-                         ))}
-                       </div>
-                    )}
-                    {(field.id === 'الصفة' || field.id === 'صفة') && (
-                       <div className="flex flex-wrap gap-1 mt-2">
-                         {(settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل']).map(s => (
-                           <button key={s} type="button" onClick={() => setFormData({...formData, [field.id]: s})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{s}</button>
-                         ))}
-                       </div>
-                    )}
-                    {field.id === 'نوع الجلسة' && (
-                       <div className="flex flex-wrap gap-1 mt-2">
-                         {(settings?.sessionTypes || ['موضوع', 'فحص', 'للحكم', 'أول جلسة']).map(s => (
-                           <button key={s} type="button" onClick={() => setFormData({...formData, [field.id]: s})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{s}</button>
-                         ))}
-                       </div>
-                    )}
-                    {field.id === 'مكان الملف' && (
-                       <div className="flex flex-wrap gap-1 mt-2">
-                         {(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']).map(s => (
-                           <button key={s} type="button" onClick={() => setFormData({...formData, [field.id]: s})} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition">{s}</button>
-                         ))}
-                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+                  ) : (
+                    <div>
+                      <input 
+                        type="text"
+                        value={formData[field.id] || ''}
+                        list={`list-edit-${field.id}`}
+                        onChange={(e) => setFormData({...formData, [field.id]: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition"
+                      />
+                      <datalist id={`list-edit-${field.id}`}>
+                        {getAutocompleteOptions(field.id).map((opt, i) => <option key={i} value={opt} />)}
+                      </datalist>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </form>
         </div>
 
@@ -150,8 +164,14 @@ export default function QuickEditCaseModal({ isOpen, onClose, caseData }) {
             )}
           </button>
         </div>
-
       </div>
+
+      <FieldOptionsManager 
+        isOpen={!!managingField} 
+        onClose={() => setManagingField(null)} 
+        fieldKey={managingField?.key} 
+        title={managingField?.title} 
+      />
     </div>
   );
 }

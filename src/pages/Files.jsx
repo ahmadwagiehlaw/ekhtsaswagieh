@@ -12,12 +12,13 @@ import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 import useSessionState from '../hooks/useSessionState';
 
 export default function Files() {
-  const { cases, schema, settings, deleteCaseFromFirebase, saveCaseToFirebase } = useAppContext();
+  const { cases, schema, settings, deleteCaseFromFirebase, saveCaseToFirebase, globalHideNoInterest, setGlobalHideNoInterest, globalTasks } = useAppContext();
   const { toast, showConfirm } = useUI();
   const navigate = useNavigate();
   const location = useLocation();
 
   const [searchQuery, setSearchQuery] = useSessionState('files_searchQuery', '');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
   const [roleFilter, setRoleFilter] = useSessionState('files_roleFilter', 'all');
   const [currentPage, setCurrentPage] = useSessionState('files_currentPage', 1);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -40,9 +41,9 @@ export default function Files() {
   const [showRecentlyModifiedOnly, setShowRecentlyModifiedOnly] = useSessionState('files_showRecentlyModifiedOnly', false);
   const [showRecentlyViewedOnly, setShowRecentlyViewedOnly] = useSessionState('files_showRecentlyViewedOnly', false);
   const [showRecentlyAddedOnly, setShowRecentlyAddedOnly] = useSessionState('files_showRecentlyAddedOnly', false);
+  const [quickDateFilter, setQuickDateFilter] = useSessionState('files_quickDateFilter', '');
   const [isSelectionReportModalOpen, setIsSelectionReportModalOpen] = useState(false);
   const [isPrintViewOpen, setIsPrintViewOpen] = useState(false);
-  const [hideNoInterest, setHideNoInterest] = useSessionState('files_hideNoInterest', true);
 
   // Sorting and collapsible states
   const [sortBy, setSortBy] = useSessionState('files_sortBy', 'none');
@@ -66,6 +67,7 @@ export default function Files() {
         setShowRecentlyModifiedOnly(pinned.showRecentlyModifiedOnly ?? false);
         setShowRecentlyViewedOnly(pinned.showRecentlyViewedOnly ?? false);
         setShowRecentlyAddedOnly(pinned.showRecentlyAddedOnly ?? false);
+        setQuickDateFilter(pinned.quickDateFilter ?? '');
         setSortBy(pinned.sortBy ?? 'none');
       }
     } catch (e) {}
@@ -73,20 +75,26 @@ export default function Files() {
 
   const handlePinFilters = () => {
     if (isPinned) {
-      // Unpin: clear saved filters
       localStorage.removeItem('pinnedFilters');
       setIsPinned(false);
     } else {
-      // Pin current filters
       const toSave = {
         roleFilter, showOngoingOnly, showWithAttachmentsOnly,
         showImportantOnly, showSessionlessOnly, showPastSessionsOnly, 
-        showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly, sortBy
+        showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly, 
+        quickDateFilter, sortBy
       };
       localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
       setIsPinned(true);
     }
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const itemsPerPage = 20;
 
@@ -142,13 +150,6 @@ export default function Files() {
       result = result.filter(c => {
          const loc = String(c['مكان الملف'] || '').trim();
          return archiveLocations.includes(loc);
-      });
-    }
-
-    if (hideNoInterest) {
-      result = result.filter(c => {
-        const role = String(c['الصفة'] || c['صفة'] || '').trim();
-        return role !== 'لا شأن';
       });
     }
 
@@ -226,14 +227,33 @@ export default function Files() {
 
     if (showRecentlyAddedOnly) {
       result = result.filter(c => {
-        if (!c.createdAt) return false;
-        const diffDays = (new Date() - new Date(c.createdAt)) / (1000 * 60 * 60 * 24);
+        let createdDate = c.createdAt ? new Date(c.createdAt) : null;
+        if (!createdDate) {
+          const timestampStr = c.id?.split('_')[0];
+          if (timestampStr && timestampStr.length >= 13 && !isNaN(timestampStr)) {
+            createdDate = new Date(Number(timestampStr));
+          }
+        }
+        if (!createdDate || isNaN(createdDate.getTime())) return false;
+        const diffDays = (new Date() - createdDate) / (1000 * 60 * 60 * 24);
         return diffDays <= 7;
       });
     }
 
+    if (quickDateFilter) {
+      result = result.filter(c => {
+        const dStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'];
+        if (!dStr) return false;
+        const d = getSafeDateObj(dStr);
+        if (!d) return false;
+        const pad = n => n.toString().padStart(2, '0');
+        const dISO = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        return dISO === quickDateFilter;
+      });
+    }
+
     if (advancedParams) {
-      const { caseNo, year, opponentName, opponentRole, decision, sessionDateStart, sessionDateEnd, court, location } = advancedParams;
+      const { caseNo, year, opponentName, opponentRole, decision, sessionDateStart, sessionDateEnd, court, location, requiredTask } = advancedParams;
 
       result = result.filter(c => {
         // 1. Case No
@@ -269,6 +289,12 @@ export default function Files() {
           }
         }
 
+        // Required Task
+        if (requiredTask) {
+           const hasRequiredTask = globalTasks.some(t => t.status === 'pending' && t.title === requiredTask && t.linkedCases?.includes(c.id));
+           if (!hasRequiredTask) return false;
+        }
+
         // 5. Session Date
         if (sessionDateStart || sessionDateEnd) {
           const caseDateStr = c['آخر جلسة'] || c['تاريخ الجلسة'];
@@ -288,19 +314,20 @@ export default function Files() {
 
         return true;
       });
-    } else if (searchQuery.trim()) {
-      const query = searchQuery.trim().toLowerCase();
-      result = result.filter(c =>
-        Object.values(c).some(val => String(val).toLowerCase().includes(query))
-      );
+    } else if (debouncedSearchQuery) {
+      const q = debouncedSearchQuery.toLowerCase();
+      result = result.filter(c => {
+        const srchStr = `${c['رقم الدعوى'] || ''} ${c['السنة'] || ''} ${c['المدعي'] || ''} ${c['الطاعن'] || ''} ${c['المدعى عليه'] || ''} ${c['المطعون ضده'] || ''} ${c.id || ''}`.toLowerCase();
+        return srchStr.includes(q);
+      });
     }
 
     return result;
-  }, [cases, searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly, activeShoba, settings]);
+  }, [cases, debouncedSearchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly, quickDateFilter, activeShoba, settings]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly, sortBy, activeShoba]);
+  }, [debouncedSearchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly, quickDateFilter, sortBy, activeShoba]);
 
   const getPrimaryValue = (cObj, possibleKeys) => {
     for (let k of possibleKeys) {
@@ -311,6 +338,17 @@ export default function Files() {
 
   const sortedCases = useMemo(() => {
     let result = [...filteredCases];
+
+    const getSessionRoll = (c) => {
+      const rollStr = c['الرول'] || c['رول الجلسة'] || c['رقم الرول'] || '';
+      const parsed = parseInt(String(rollStr).replace(/[^\d]/g, ''), 10);
+      return isNaN(parsed) ? 999999 : parsed;
+    };
+
+    if (quickDateFilter) {
+      result.sort((a, b) => getSessionRoll(a) - getSessionRoll(b));
+    }
+
     if (sortBy === 'none') return result;
 
     const getCaseNumber = (c) => {
@@ -368,7 +406,9 @@ export default function Files() {
         if (!dA && !dB) return 0;
         if (!dA) return 1;
         if (!dB) return -1;
-        return dB.getTime() - dA.getTime();
+        const diff = dB.getTime() - dA.getTime();
+        if (diff === 0) return getSessionRoll(a) - getSessionRoll(b);
+        return diff;
       }
       if (sortBy === 'date_asc') {
         const dA = getSessionDate(a);
@@ -376,14 +416,16 @@ export default function Files() {
         if (!dA && !dB) return 0;
         if (!dA) return 1;
         if (!dB) return -1;
-        return dA.getTime() - dB.getTime();
+        const diff = dA.getTime() - dB.getTime();
+        if (diff === 0) return getSessionRoll(a) - getSessionRoll(b);
+        return diff;
       }
 
       return 0;
     });
 
     return result;
-  }, [filteredCases, sortBy]);
+  }, [filteredCases, sortBy, quickDateFilter]);
 
   const totalPages = Math.ceil(sortedCases.length / itemsPerPage);
   const currentCases = sortedCases.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -478,13 +520,13 @@ export default function Files() {
 
             {/* Hide 'No Interest' Toggle */}
             <button
-              onClick={() => setHideNoInterest(!hideNoInterest)}
+              onClick={() => setGlobalHideNoInterest(!globalHideNoInterest)}
               className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${
-                hideNoInterest ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                globalHideNoInterest ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
               }`}
               title="إخفاء أو إظهار ملفات (لا شأن)"
             >
-              {hideNoInterest ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+              {globalHideNoInterest ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
               <span>إخفاء (لا شأن)</span>
             </button>
 
@@ -519,7 +561,17 @@ export default function Files() {
           </div>
 
           {/* Search on the left (RTL end) */}
-          <div className="relative w-full sm:max-w-xs">
+          <div className="flex gap-2 w-full sm:w-auto flex-1 sm:max-w-md justify-end">
+            <div className="relative w-full sm:max-w-[130px]">
+              <input
+                type="date"
+                title="تاريخ الجلسة"
+                value={quickDateFilter}
+                onChange={(e) => setQuickDateFilter(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2 px-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
+              />
+            </div>
+            <div className="relative w-full sm:flex-1 max-w-xs">
             <input
               id="search-cases-input"
               type="text"
@@ -543,12 +595,13 @@ export default function Files() {
             </span>
 
             {searchQuery || advancedParams ? (
-              <button onClick={() => { setSearchQuery(''); setAdvancedParams(null); navigate('/files'); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <button onClick={() => { setSearchQuery(''); setAdvancedParams(null); setQuickDateFilter(''); navigate('/files'); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                 <X className="w-4 h-4" />
               </button>
             ) : (
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             )}
+          </div>
           </div>
         </div>
 
@@ -583,9 +636,15 @@ export default function Files() {
                       setShowRecentlyModifiedOnly(false);
                       setShowRecentlyViewedOnly(false);
                       setShowRecentlyAddedOnly(false);
+                      setQuickDateFilter('');
                       if (isPinned) {
                         // Update pin to reflect cleared state
-                        const toSave = { roleFilter: 'all', showOngoingOnly: false, showWithAttachmentsOnly: false, showImportantOnly: false, showSessionlessOnly: false, showPastSessionsOnly: false, showRecentlyModifiedOnly: false, showRecentlyViewedOnly: false, showRecentlyAddedOnly: false, sortBy };
+                        const toSave = { 
+                          roleFilter: 'all', showOngoingOnly: false, showWithAttachmentsOnly: false, 
+                          showImportantOnly: false, showSessionlessOnly: false, showPastSessionsOnly: false, 
+                          showRecentlyModifiedOnly: false, showRecentlyViewedOnly: false, showRecentlyAddedOnly: false, 
+                          quickDateFilter: '', sortBy 
+                        };
                         localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
                       }
                     }}
@@ -737,6 +796,7 @@ export default function Files() {
           const lastSession = getPrimaryValue(c, ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة']);
           const formattedLastSession = lastSession ? formatDateString(lastSession) : '';
           const decision = getPrimaryValue(c, ['القرار', 'قرار الجلسة', 'المنطوق']);
+          const sessionRoll = getPrimaryValue(c, ['الرول', 'رول الجلسة', 'رقم الرول']);
           const fileLocation = getPrimaryValue(c, ['مكان الملف']);
 
           const role = String(c['الصفة'] || c['صفة'] || '').trim();
@@ -974,6 +1034,11 @@ export default function Files() {
                     <div className="flex items-center gap-1.5 truncate pr-1">
                       <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4 opacity-70 shrink-0" />
                       <span className="truncate" dir="ltr">{formattedLastSession || 'لم تحدد'}</span>
+                      {sessionRoll && (
+                         <span className="bg-slate-200/50 text-slate-600 px-1.5 py-0.5 rounded text-[10px] mr-1 border border-slate-200 font-black shrink-0">
+                           رول: {sessionRoll}
+                         </span>
+                      )}
                     </div>
                     {decision && (
                       <span className={`px-2 py-1 rounded shadow-sm shrink-0 mr-1 flex items-center gap-1 border truncate max-w-[90px] sm:max-w-[130px] ${isJudgment ? 'bg-rose-500 text-white border-rose-600' : 'bg-white border-slate-200 text-navy-900'}`}>

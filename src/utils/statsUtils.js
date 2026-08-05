@@ -73,7 +73,7 @@ export function computeMonthStats(cases, settings, targetMonth, targetYear) {
 // ─────────────────────────────────────────────────────────────
 // calculateDashboardStats: full dashboard aggregation
 // ─────────────────────────────────────────────────────────────
-export function calculateDashboardStats(cases, settings) {
+export function calculateDashboardStats(cases, settings, globalTasks = []) {
   const appRole = settings?.roles?.[0] || 'طاعن';
   const apeRole = settings?.roles?.[1] || 'مطعون ضدنا';
 
@@ -242,6 +242,56 @@ export function calculateDashboardStats(cases, settings) {
       if (entity) opponentsCount[entity] = (opponentsCount[entity] || 0) + 1;
     }
   });
+
+  // ── Global Tasks Alerts (Grouped) ─────────────────────────
+  if (globalTasks && globalTasks.length > 0) {
+    const taskGroups = {};
+    
+    globalTasks.forEach(t => {
+      if (t.status === 'completed' || !t.dueDate) return;
+      
+      const tDueDate = new Date(t.dueDate);
+      tDueDate.setHours(0,0,0,0);
+      
+      const snoozed = t.snoozedUntil ? new Date(t.snoozedUntil) : null;
+      if (snoozed) snoozed.setHours(0,0,0,0);
+      
+      if (snoozed && snoozed > today) return; // Snoozed until tomorrow or later
+
+      const diffTime = tDueDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Alert if due within 3 days (or overdue < 0)
+      if (diffDays <= 3) {
+        const key = `${t.title}_${diffDays}`;
+        if (!taskGroups[key]) {
+          taskGroups[key] = {
+            title: t.title,
+            daysLeft: diffDays,
+            count: 0,
+            taskIds: [],
+            linkedCases: []
+          };
+        }
+        taskGroups[key].count++;
+        taskGroups[key].taskIds.push(t.id);
+        if (t.linkedCases?.length) {
+          taskGroups[key].linkedCases.push(...t.linkedCases);
+        }
+      }
+    });
+
+    Object.values(taskGroups).forEach(group => {
+      alerts.push({
+        type: 'task_alert_group',
+        ruleName: group.title,
+        daysLeft: group.daysLeft,
+        count: group.count,
+        taskIds: group.taskIds,
+        linkedCases: [...new Set(group.linkedCases)]
+      });
+    });
+  }
 
   const topYears     = Object.entries(yearCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const topOpponents = Object.entries(opponentsCount).sort((a, b) => b[1] - a[1]).slice(0, 5);

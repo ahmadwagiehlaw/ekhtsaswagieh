@@ -6,7 +6,7 @@ import { formatDateString } from '../utils/dateUtils';
 import { useLocation } from 'react-router-dom';
 
 export default function Tasks() {
-  const { globalTasks, saveGlobalTask, deleteGlobalTask, settings, isAdmin, currentUser, cases, currentUserPermissions } = useAppContext();
+  const { globalTasks, saveGlobalTask, completeGlobalTask, PREDEFINED_TASKS, deleteGlobalTask, settings, isAdmin, currentUser, cases, currentUserPermissions } = useAppContext();
 
   const canManageTasks = isAdmin || currentUserPermissions?.canManageTasks;
   const { toast, showConfirm } = useUI();
@@ -59,11 +59,15 @@ export default function Tasks() {
 
   const handleToggleStatus = async (task) => {
     try {
-      await saveGlobalTask({
-        ...task,
-        status: task.status === 'completed' ? 'pending' : 'completed',
-        completedAt: task.status !== 'completed' ? new Date().toISOString() : null
-      }, task.id);
+      if (task.status !== 'completed') {
+        await completeGlobalTask(task.id, '');
+      } else {
+        await saveGlobalTask({
+          ...task,
+          status: 'pending',
+          completedAt: null
+        }, task.id);
+      }
     } catch (e) {
       toast('حدث خطأ', 'error');
     }
@@ -196,14 +200,20 @@ export default function Tasks() {
             <h3 className="font-black text-indigo-900">إضافة مهمة جديدة</h3>
           </div>
           <div className="p-5 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <input
-                type="text"
-                placeholder="وصف المهمة (مثال: إعلان صحيفة...)"
-                value={newTask.title}
-                onChange={e => setNewTask({ ...newTask, title: e.target.value })}
-                className="flex-[2] bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+            <div className="flex flex-col sm:flex-row gap-4 mb-4">
+              <div className="flex-[2] relative">
+                <input 
+                  type="text"
+                  list="predefined-tasks-list"
+                  placeholder="وصف المهمة (مثال: شهادة من الجدول...)"
+                  value={newTask.title}
+                  onChange={e => setNewTask({...newTask, title: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20"
+                />
+                <datalist id="predefined-tasks-list">
+                  {PREDEFINED_TASKS?.map(t => <option key={t} value={t} />)}
+                </datalist>
+              </div>
               <select
                 value={newTask.assignee}
                 onChange={e => setNewTask({ ...newTask, assignee: e.target.value })}

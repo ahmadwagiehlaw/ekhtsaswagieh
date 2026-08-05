@@ -15,6 +15,7 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
     'المدعي': '',
     'المدعى_عليه': '',
     'الصفة': '',
+    'نوع الجلسة': '',
     'القرار': '',
     'آخر جلسة': prefillDate || '',
   });
@@ -265,8 +266,8 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
             </div>
           </div>
 
-          {/* Role + Decision */}
-          <div className="grid grid-cols-2 gap-2">
+          {/* Role + Session Type + Decision */}
+          <div className="grid grid-cols-3 gap-2">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 block">الصفة</label>
               <select
@@ -276,6 +277,17 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
               >
                 <option value="">-- اختر --</option>
                 {roles.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 block">نوع الجلسة</label>
+              <select
+                value={formData['نوع الجلسة']}
+                onChange={e => handleChange('نوع الجلسة', e.target.value)}
+                className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
+              >
+                <option value="">-- اختر --</option>
+                {(settings?.courtDegree === 'إدارية عليا' || settings?.courtDegree === 'عليا' || settings?.courtDegree === 'ثان درجة' ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة', 'حكم']).map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div className="space-y-1">

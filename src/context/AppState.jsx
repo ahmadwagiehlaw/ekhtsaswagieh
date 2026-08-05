@@ -8,7 +8,7 @@ const AppContext = createContext();
 export const AppProvider = ({ children }) => {
   const { userData, currentUser, logout } = useAuth();
   
-  const [cases, setCases] = useState([]);
+  const [rawCases, setRawCases] = useState([]);
   const [deletedCases, setDeletedCases] = useState([]);
   const [rolls, setRolls] = useState([]);
   const [globalTasks, setGlobalTasks] = useState([]);
@@ -18,14 +18,35 @@ export const AppProvider = ({ children }) => {
     consultantName: "أحمد وجيه", 
     courtDegree: "ثان درجة",
     courtSpecialization: "الإدارية العليا",
-    decisions: ['للحكم', 'تصريح', 'للإطلاع', 'للإعلان', 'آخر أجل', 'للمستندات', 'للمذكرات', 'لورود التقرير', 'استبعاد', 'لتنفيذ قرار الإعادة'],
+    decisions: ['للحكم', 'تصريح', 'للإطلاع', 'للإعلان', 'آخر أجل', 'للمستندات', 'للمذكرات', 'لورود التقرير', 'استبعاد', 'لتنفيذ قرار الإعادة', 'إحالة للموضوع'],
     judgmentCategories: ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي'],
     judgmentClassifications: ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء'],
-
+    roles: ['طاعن', 'مطعون ضده', 'مدعي', 'مدعى عليه', 'خصم مدخل', 'خصم متدخل', 'لا شأن'],
+    fileLocations: ['في المكتب', 'بالمحكمة', 'غير موجود', 'مؤقت', 'خارج الاختصاص'],
+    sessionTypes: ['فحص', 'موضوع', 'حكم', 'مفوضين', 'مرافعة']
   };
   
   const [settings, setSettings] = useState(defaultSettings);
   const [loading, setLoading] = useState(true);
+  
+  const [globalHideNoInterest, setGlobalHideNoInterest] = useState(() => {
+    const saved = localStorage.getItem('globalHideNoInterest');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('globalHideNoInterest', JSON.stringify(globalHideNoInterest));
+  }, [globalHideNoInterest]);
+
+  const cases = useMemo(() => {
+    if (globalHideNoInterest) {
+      return rawCases.filter(c => {
+         const role = String(c['الصفة'] || c['صفة'] || '').trim();
+         return role !== 'لا شأن' && role !== 'لاشأن';
+      });
+    }
+    return rawCases;
+  }, [rawCases, globalHideNoInterest]);
 
   const tenantId = userData?.tenantId;
   const isAdmin = userData?.role === 'super_admin' || userData?.role === 'consultant';
@@ -48,7 +69,7 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     if (!tenantId) {
-      setCases([]);
+      setRawCases([]);
       setDeletedCases([]);
       setRolls([]);
       setGlobalTasks([]);
@@ -70,7 +91,7 @@ export const AppProvider = ({ children }) => {
           casesData.push(data);
         }
       });
-      setCases(casesData);
+      setRawCases(casesData);
       setDeletedCases(deletedData);
       setLoading(false);
     });
@@ -92,7 +113,10 @@ export const AppProvider = ({ children }) => {
           { id: 'جلسة حكم أول درجة', label: 'جلسة حكم أول درجة', type: 'date', visible: true },
           { id: 'منطوق حكم أول درجة', label: 'منطوق حكم أول درجة', type: 'textarea', visible: true },
           { id: 'ملخص الطعن', label: 'ملخص الطعن وتفاصيله', type: 'textarea', visible: true },
-          { id: 'طلبات الطاعن', label: 'طلبات الطاعن', type: 'textarea', visible: true }
+          { id: 'طلبات الطاعن', label: 'طلبات الطاعن', type: 'textarea', visible: true },
+          { id: 'نوع الجلسة', label: 'نوع الجلسة', type: 'text', visible: true },
+          { id: 'تصنيف الحكم', label: 'تصنيف الحكم', type: 'text', visible: true },
+          { id: 'نوع الحكم', label: 'نوع الحكم', type: 'text', visible: true }
         ];
 
         essentialFields.forEach(ef => {
@@ -104,6 +128,10 @@ export const AppProvider = ({ children }) => {
               existing.type = 'textarea';
            }
         });
+
+        if (!cleanSchema.find(f => f.id === 'طلبات المدعي')) {
+          cleanSchema.push({ id: 'طلبات المدعي', label: 'طلبات المدعي', type: 'textarea', visible: true });
+        }
 
         setSchema(cleanSchema);
       } else {
@@ -127,7 +155,11 @@ export const AppProvider = ({ children }) => {
           { id: 'جلسة حكم أول درجة', label: 'جلسة حكم أول درجة', type: 'date', visible: true },
           { id: 'منطوق حكم أول درجة', label: 'منطوق حكم أول درجة', type: 'textarea', visible: true },
           { id: 'ملخص الطعن', label: 'ملخص الطعن وتفاصيله', type: 'textarea', visible: true },
-          { id: 'طلبات الطاعن', label: 'طلبات الطاعن', type: 'textarea', visible: true }
+          { id: 'طلبات الطاعن', label: 'طلبات الطاعن', type: 'textarea', visible: true },
+          { id: 'طلبات المدعي', label: 'طلبات المدعي', type: 'textarea', visible: true },
+          { id: 'نوع الجلسة', label: 'نوع الجلسة', type: 'text', visible: true },
+          { id: 'تصنيف الحكم', label: 'تصنيف الحكم', type: 'text', visible: true },
+          { id: 'نوع الحكم', label: 'نوع الحكم', type: 'text', visible: true }
         ]);
       }
     });
@@ -190,7 +222,35 @@ export const AppProvider = ({ children }) => {
     try {
       const safeId = sanitizeId(caseId);
       const caseRef = doc(getCasesRef(tenantId), safeId);
-      const dataToSave = cleanUndefined({ ...caseData, updatedAt: new Date().toISOString() });
+      
+      // Get the existing case data to check transitions correctly if needed
+      const existingCase = cases.find(c => c.id === caseId) || {};
+      let payload = { ...caseData };
+
+      // Apply Court Degree State Machine Logic
+      const currentCourtDegree = settings?.courtDegree || 'أول درجة';
+      const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
+      
+      const newSessionType = payload['نوع الجلسة'] || existingCase['نوع الجلسة'];
+      const newDecision = payload['القرار'] || existingCase['القرار'];
+      const hasJudgmentData = (payload['الحكم'] || existingCase['الحكم']) || (payload['منطوق الحكم'] || existingCase['منطوق الحكم']) || (payload['تصنيف الحكم'] || existingCase['تصنيف الحكم']);
+
+      if (isSupreme) {
+        // Supreme Court Transitions
+        if (newSessionType === 'فحص' && newDecision === 'إحالة للموضوع') {
+          payload['نوع الجلسة'] = 'موضوع';
+        } else if (newSessionType === 'موضوع' && hasJudgmentData) {
+          payload['نوع الجلسة'] = 'حكم';
+        }
+        // Note: If type is 'فحص' and hasJudgmentData is true, it intentionally remains 'فحص' per user rules.
+      } else {
+        // First Degree Transitions
+        if ((newSessionType === 'مفوضين' || newSessionType === 'مرافعة') && hasJudgmentData) {
+          payload['نوع الجلسة'] = 'حكم';
+        }
+      }
+
+      const dataToSave = cleanUndefined({ ...payload, updatedAt: new Date().toISOString() });
       delete dataToSave.id; 
       await setDoc(caseRef, dataToSave, { merge: true });
       return true;
@@ -222,9 +282,28 @@ export const AppProvider = ({ children }) => {
          throw new Error('DUPLICATE_CASE');
       }
 
+      let payload = { ...caseData };
+      const currentCourtDegree = settings?.courtDegree || 'أول درجة';
+      const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
+      const newSessionType = payload['نوع الجلسة'];
+      const newDecision = payload['القرار'];
+      const hasJudgmentData = payload['الحكم'] || payload['منطوق الحكم'] || payload['تصنيف الحكم'];
+
+      if (isSupreme) {
+        if (newSessionType === 'فحص' && newDecision === 'إحالة للموضوع') {
+          payload['نوع الجلسة'] = 'موضوع';
+        } else if (newSessionType === 'موضوع' && hasJudgmentData) {
+          payload['نوع الجلسة'] = 'حكم';
+        }
+      } else {
+        if ((newSessionType === 'مفوضين' || newSessionType === 'مرافعة') && hasJudgmentData) {
+          payload['نوع الجلسة'] = 'حكم';
+        }
+      }
+
       const rawId = `${caseNo}-${year}-${Date.now()}`;
       const safeId = sanitizeId(rawId);
-      await saveCaseToFirebase(safeId, caseData);
+      await saveCaseToFirebase(safeId, payload);
       return safeId;
     } catch (error) {
       console.error("Error creating new case: ", error);
@@ -352,14 +431,73 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const saveGlobalTask = async (id, data) => {
+  const saveGlobalTask = async (idOrData, dataObj) => {
     if (!tenantId) return false;
+    let id, data;
+    if (typeof idOrData === 'object' && idOrData !== null) {
+      data = idOrData;
+      id = data.id;
+    } else {
+      id = idOrData;
+      data = dataObj;
+    }
+    
     try {
       await setDoc(doc(getTasksRef(tenantId), id), data, { merge: true });
     } catch (e) {
       console.error(e);
       throw e;
     }
+  };
+
+  const PREDEFINED_TASKS = [
+    'شهادة من الجدول',
+    'تعجيل من الوقف',
+    'إخطار بالحكم',
+    'إجراءات حفظ الملف',
+    'إحالة الملف',
+    'طلب/ استعجال المستندات',
+    'خطاب فني للجهة الإدارية',
+    'تحرير مذكرة دفاع/رأي',
+    'عدم الممانعة / صيغة تنفيذية',
+    'الإعلان للمدعى عليه',
+    'الإعلان في مواجهة النيابة',
+    'إجراء تحريات'
+  ];
+
+  const completeGlobalTask = async (taskId, notes) => {
+    const t = globalTasks.find(task => task.id === taskId);
+    if (!t) return false;
+
+    const now = new Date().toISOString();
+    const updatedTask = { ...t, status: 'completed', notes: notes || '', completedAt: now };
+    await saveGlobalTask(updatedTask);
+
+    if (t.linkedCases && t.linkedCases.length > 0) {
+      for (const caseId of t.linkedCases) {
+        const c = cases.find(c => c.id === caseId);
+        if (c) {
+          const proceduresList = Array.isArray(c.procedures) ? c.procedures : Object.values(c.procedures || {});
+          const newProc = {
+            id: Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5),
+            title: `تنفيذ مهمة: ${t.title}`,
+            date: now.split('T')[0],
+            notes: notes || '',
+            createdAt: now
+          };
+          
+          let updateObj = { procedures: [...proceduresList, newProc] };
+          
+          // إحالة الملف -> شعبة المحال
+          if (t.title === 'إحالة الملف') {
+             updateObj['مكان الملف'] = 'شعبة المحال';
+          }
+          
+          await saveCaseToFirebase(caseId, updateObj);
+        }
+      }
+    }
+    return true;
   };
 
   const deleteGlobalTask = async (id) => {
@@ -374,6 +512,7 @@ export const AppProvider = ({ children }) => {
 
   const contextValue = useMemo(() => ({
       cases,
+      rawCases,
       deletedCases,
       rolls,
       schema,
@@ -383,6 +522,8 @@ export const AppProvider = ({ children }) => {
       currentUser: currentUser?.email || '',
       currentUserPermissions,
       loading,
+      globalHideNoInterest,
+      setGlobalHideNoInterest,
       logoutAdmin: logout,
       saveCaseToFirebase,
       createNewCase,
@@ -397,10 +538,12 @@ export const AppProvider = ({ children }) => {
       deleteRollFromFirebase,
       globalTasks,
       saveGlobalTask,
-      deleteGlobalTask
+      deleteGlobalTask,
+      PREDEFINED_TASKS,
+      completeGlobalTask
   }), [
-    cases, deletedCases, rolls, schema, settings, isAdmin, isEmployee, 
-    currentUser, currentUserPermissions, loading
+    cases, rawCases, deletedCases, rolls, schema, settings, isAdmin, isEmployee, 
+    currentUser, currentUserPermissions, loading, globalHideNoInterest
   ]);
 
   return (

@@ -167,7 +167,9 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   };
 
   const decisionOptions = settings?.decisions || PREDEFINED_DECISIONS;
-  const sessionTypes = settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة'];
+  const currentCourtDegree = settings?.courtDegree || 'أول درجة';
+  const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
+  const sessionTypes = settings?.sessionTypes || (isSupreme ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة', 'حكم']);
   const typeFahs = sessionTypes[0] || 'فحص';
 
   // '/' keyboard shortcut → focus search

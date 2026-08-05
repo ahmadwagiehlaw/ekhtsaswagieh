@@ -265,7 +265,7 @@ const PrintReportModal = ({ stats, settings, selectedMonthStats, selectedMonth, 
 // Main Dashboard
 // ─────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { cases, isEmployee, currentUser, saveCaseToFirebase, settings, globalTasks, saveGlobalTask } = useAppContext();
+  const { cases, isEmployee, currentUser, saveCaseToFirebase, settings, globalTasks, saveGlobalTask, completeGlobalTask } = useAppContext();
   const navigate = useNavigate();
   const { showPrompt, toast } = useUI();
 
@@ -283,7 +283,7 @@ export default function Dashboard() {
   // Month selector state
   const [viewMonth, setViewMonth] = useState({ month: today.getMonth(), year: today.getFullYear() });
 
-  const stats = useMemo(() => calculateDashboardStats(cases, settings), [cases, settings]);
+  const stats = useMemo(() => calculateDashboardStats(cases, settings, globalTasks), [cases, settings, globalTasks]);
 
   const selectedMonthStats = useMemo(() => computeMonthStats(cases, settings, viewMonth.month, viewMonth.year), [cases, settings, viewMonth]);
   const prevViewMonth = useMemo(() => ({ month: viewMonth.month === 0 ? 11 : viewMonth.month - 1, year: viewMonth.month === 0 ? viewMonth.year - 1 : viewMonth.year }), [viewMonth]);
@@ -320,7 +320,10 @@ export default function Dashboard() {
     const now = new Date().toISOString();
     if (taskType === 'global') {
       const t = globalTasks.find(t => t.id === taskId);
-      if (t) { await saveGlobalTask(taskId, { ...t, status: 'completed', notes: notes || '', completedAt: now }); toast('تم تسجيل الإجراء بنجاح', 'success'); }
+      if (t) { 
+         await completeGlobalTask(taskId, notes);
+         toast('تم تسجيل الإجراء بنجاح', 'success'); 
+      }
       return;
     }
     const c = cases.find(c => c.id === caseId);
@@ -481,11 +484,45 @@ export default function Dashboard() {
               <h3 className="font-black text-rose-900 mb-2 text-sm">⚠️ تنبيهات إجرائية هامة</h3>
               <div className="flex flex-col gap-1.5">
                 {stats.alerts.map((a, i) => (
-                  <button key={i} onClick={() => navigate(`/case/${a.case.id}`)}
-                    className="bg-white border border-rose-200 text-rose-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-rose-100 transition text-right flex justify-between items-center">
-                    <span>رقم {a.case['رقم الدعوى'] || a.case.id} | {a.ruleName}</span>
-                    <span className="text-[10px] bg-rose-100 px-2 py-0.5 rounded-full whitespace-nowrap">باقي {a.daysLeft} يوم</span>
-                  </button>
+                  <div key={i} className="bg-white border border-rose-200 text-rose-700 px-3 py-2 rounded-lg text-xs font-bold flex justify-between items-center transition">
+                    <button onClick={() => {
+                      if (a.type === 'task_alert_group') {
+                        navigate(`/files?q=&role=all&requiredTask=${a.ruleName}`);
+                      } else {
+                        navigate(`/case/${a.case.id}`);
+                      }
+                    }} className="flex-1 text-right hover:text-rose-900 truncate">
+                      {a.type === 'task_alert_group' ? (
+                        <span>({a.count}) ملف يتطلب مهمة: {a.ruleName}</span>
+                      ) : (
+                        <span>رقم {a.case['رقم الدعوى'] || a.case.id} | {a.ruleName}</span>
+                      )}
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] bg-rose-100 px-2 py-0.5 rounded-full whitespace-nowrap">
+                        {a.daysLeft < 0 ? `متأخر منذ ${Math.abs(a.daysLeft)} يوم` : a.daysLeft === 0 ? 'اليوم' : `باقي ${a.daysLeft} يوم`}
+                      </span>
+                      {a.type === 'task_alert_group' && (
+                        <button
+                          onClick={async () => {
+                            const tomorrow = new Date();
+                            tomorrow.setDate(tomorrow.getDate() + 1);
+                            for (const tid of a.taskIds) {
+                              const tObj = globalTasks.find(t => t.id === tid);
+                              if (tObj) {
+                                await saveGlobalTask({ ...tObj, snoozedUntil: tomorrow.toISOString() }, tid);
+                              }
+                            }
+                            toast('تم تأجيل التنبيه للغد', 'success');
+                          }}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-500 rounded p-1.5 transition"
+                          title="تأجيل للغد (Snooze)"
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

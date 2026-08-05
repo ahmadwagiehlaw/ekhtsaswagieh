@@ -8,6 +8,8 @@ import CaseDocuments from '../components/CaseDocuments';
 import AlertsModal from '../components/AlertsModal';
 import GlobalTemplatePrintModal from '../components/GlobalTemplatePrintModal';
 import ProceduresModal from '../components/ProceduresModal';
+import FieldOptionsManager from '../components/FieldOptionsManager';
+import StrictSelectField from '../components/StrictSelectField';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 import { localizeNumber } from '../utils/numberUtils';
 import { calculateLitigationStage } from '../utils/caseUtils';
@@ -24,7 +26,9 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
   const { cases, schema, isAdmin, saveCaseToFirebase, settings, rolls, checkDuplicateCase, deleteCaseFromFirebase, restoreCaseFromFirebase, saveSettingsToFirebase, saveGlobalTask, currentUser, currentUserPermissions } = useAppContext();
 
   const roleOptions = settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل'];
-  const sessionTypeOptions = settings?.sessionTypes || ['فحص', 'موضوع', 'للحكم', 'أول جلسة'];
+  const currentCourtDegree = settings?.courtDegree || 'أول درجة';
+  const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
+  const sessionTypeOptions = settings?.sessionTypes || (isSupreme ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة', 'حكم']);
   const typeFahs = sessionTypeOptions[0] || 'فحص';
   const fileLocationOptions = settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي'];
 
@@ -37,7 +41,8 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(caseData || {});
-  const [expandedGroups, setExpandedGroups] = useState(['📌 بيانات أساسية']);
+  const [activeDetailTab, setActiveDetailTab] = useState('📌 بيانات أساسية');
+  const [managingField, setManagingField] = useState(null);
   const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [isProceduresModalOpen, setIsProceduresModalOpen] = useState(false);
@@ -746,66 +751,198 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
         <div className="bg-transparent space-y-4 mx-4 sm:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-300">
           {/* Dynamic Fields from Schema (Grouped & Redesigned) */}
           <div className="space-y-6 pt-2">
-            {[
-              {
-                title: '📌 بيانات أساسية',
-                colorClass: 'text-blue-700 bg-blue-50/50 border-blue-100',
-                // ملاحظة: الخصوم (المدعى عليهم) تُعرض ديناميكياً تحت المجموعة أسفلها. لا ندرج الحقل النصي القديم (المدعى_عليه/الخصوم) هنا لتجنب التكرار
-                keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'دعاوى منضمة', 'المحكمة', 'الدائرة', 'المدعي', 'الصفة', 'صفة', 'تصنيف الدعوى', 'موضوع الدعوى']
-              },
-              {
-                title: '⚖️ الجلسة والقرار',
-                colorClass: 'text-amber-700 bg-amber-50/50 border-amber-100',
-                keys: ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'الرول', 'نوع الجلسة', 'القرار', 'قرار الجلسة', 'ملاحظات']
-              },
-              {
-                title: '🏛️ بيانات الحكم وأول درجة',
-                colorClass: 'text-rose-700 bg-rose-50/50 border-rose-100',
-                keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن']
-              },
-              {
-                title: '📍 بيانات أخرى',
-                colorClass: 'text-slate-700 bg-slate-50/50 border-slate-200',
-                keys: ['المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي']
-              }
-            ].map((group, idx, arr) => {
-              let groupFields = schema.filter(f => f.visible && group.keys.includes(f.id));
-              if (idx === arr.length - 1) {
-                const allConfiguredKeys = arr.flatMap(g => g.keys);
-                const unmappedFields = schema.filter(f => f.visible && !allConfiguredKeys.includes(f.id));
-                groupFields = [...groupFields, ...unmappedFields];
-              }
-
-              const hasContent = groupFields.some(f => {
-                const val = editData[f.id] || '';
-                return isEditing || !isEmptyValue(val);
-              });
-
-              if (!hasContent) return null;
-
-              const isExpanded = expandedGroups.includes(group.title);
-              const toggleGroup = () => {
-                if (isExpanded) {
-                  setExpandedGroups(expandedGroups.filter(g => g !== group.title));
-                } else {
-                  setExpandedGroups([...expandedGroups, group.title]);
+            {/* Tabs Header */}
+            <div className="flex flex-wrap gap-2 pb-2 mb-4 border-b border-slate-100">
+              {[
+                {
+                  title: '📌 بيانات أساسية',
+                  keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'دعاوى منضمة', 'المحكمة', 'الدائرة', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'مطعون ضدهم آخرين', 'الصفة', 'صفة']
+                },
+                {
+                  title: '⚖️ الجلسة والقرار',
+                  keys: ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'الرول', 'نوع الجلسة', 'القرار', 'قرار الجلسة', 'مكان الملف', 'ملاحظات']
+                },
+                {
+                  title: '📑 بيانات فنية',
+                  keys: ['تصنيف الدعوى', 'موضوع الدعوى', 'طلبات المدعي']
+                },
+                {
+                  title: '🏛️ بيانات الحكم وأخرى',
+                  keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي']
                 }
-              };
+              ].map((group) => (
+                <button
+                  key={group.title}
+                  type="button"
+                  onClick={() => setActiveDetailTab(group.title)}
+                  className={`whitespace-nowrap px-4 py-2.5 rounded-xl font-black text-xs transition-all border ${activeDetailTab === group.title ? 'bg-indigo-600 text-white border-indigo-600 shadow-md scale-[1.02]' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                >
+                  {group.title}
+                </button>
+              ))}
+            </div>
 
-              return (
-                <div key={idx} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-200">
-                  <button
-                    type="button"
-                    onClick={toggleGroup}
-                    className={`w-full px-4 py-3 font-black text-xs flex items-center justify-between gap-2 hover:opacity-90 transition-opacity ${group.colorClass} ${isExpanded ? 'border-b' : 'border-b-0'}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {group.title}
-                    </div>
-                    <span className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
-                  </button>
-                  {isExpanded && (
-                    <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 gap-y-5 animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* Active Tab Content */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 animate-in fade-in zoom-in duration-200 min-h-[400px]">
+              {[
+                {
+                  title: '📌 بيانات أساسية',
+                  keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'دعاوى منضمة', 'المحكمة', 'الدائرة', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'مطعون ضدهم آخرين', 'الصفة', 'صفة']
+                },
+                {
+                  title: '⚖️ الجلسة والقرار',
+                  keys: ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'الرول', 'نوع الجلسة', 'القرار', 'قرار الجلسة', 'مكان الملف', 'ملاحظات']
+                },
+                {
+                  title: '📑 بيانات فنية',
+                  keys: ['تصنيف الدعوى', 'موضوع الدعوى', 'طلبات المدعي']
+                },
+                {
+                  title: '🏛️ بيانات الحكم وأخرى',
+                  keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي']
+                }
+              ].map((group, idx, arr) => {
+                if (group.title !== activeDetailTab) return null;
+                let groupFields = schema.filter(f => f && f.visible && group.keys.includes(f.id));
+                if (idx === arr.length - 1) {
+                  const allConfiguredKeys = arr.flatMap(g => g.keys);
+                  const unmappedFields = schema.filter(f => f && f.visible && !allConfiguredKeys.includes(f.id));
+                  groupFields = [...groupFields, ...unmappedFields];
+                }
+
+                return (
+                  <div key={idx} className="w-full">
+                    {/* --- Defendants List injected at top of tab --- */}
+                    {group.title === '📌 بيانات أساسية' && (
+                      <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <label className="text-xs font-black text-slate-500 block mb-3">المدعى عليهم / المطعون ضدهم</label>
+                        <div className="space-y-3">
+                          {((editData.defendantsList && editData.defendantsList.length > 0) ? editData.defendantsList : effectiveDefendants).map((def, idx) => (
+                            <div key={def.id || idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 relative group">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div className="flex-1">
+                                  {isEditing ? (
+                                    <input 
+                                      type="text" 
+                                      value={def.name} 
+                                      onChange={e => {
+                                        const list = [...editData.defendantsList];
+                                        list[idx].name = e.target.value;
+                                        setEditData({ ...editData, defendantsList: list });
+                                      }}
+                                      placeholder="اسم المدعى عليه"
+                                      className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none focus:border-indigo-400"
+                                    />
+                                  ) : (
+                                    <div className="font-bold text-sm text-navy-900">{def.name || '---'}</div>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  {!isEditing && (def.address || def.chosenAddress) && (
+                                    <button 
+                                      onClick={() => setActiveDefId(activeDefId === def.id ? null : def.id)}
+                                      className="text-[10px] bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100 font-bold flex items-center gap-1"
+                                    >
+                                      <MapPin className="w-3 h-3" /> التفاصيل
+                                    </button>
+                                  )}
+                                  {isEditing && (
+                                    <button 
+                                      onClick={() => setActiveDefId(activeDefId === def.id ? null : def.id)}
+                                      className="text-[10px] bg-white border border-indigo-200 text-indigo-600 px-2 py-1.5 rounded-lg hover:bg-indigo-50 font-bold flex items-center gap-1"
+                                    >
+                                      <MapPin className="w-3 h-3" /> {activeDefId === def.id ? 'إخفاء العناوين' : 'إضافة/تعديل العناوين'}
+                                    </button>
+                                  )}
+                                  {isEditing && (
+                                    <button 
+                                      onClick={() => {
+                                        const list = [...editData.defendantsList];
+                                        list.splice(idx, 1);
+                                        setEditData({ ...editData, defendantsList: list });
+                                      }}
+                                      className="p-1.5 text-slate-400 hover:text-rose-600 bg-white rounded-lg border border-slate-200"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {/* Expanded Address Fields */}
+                              {(activeDefId === def.id || (!isEditing && activeDefId === def.id)) && (
+                                <div className="mt-3 pt-3 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in slide-in-from-top-2">
+                                  <div>
+                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">عنوان المدعى عليه</label>
+                                    {isEditing ? (
+                                      <textarea
+                                        value={def.address || ''}
+                                        onChange={e => {
+                                          const list = [...editData.defendantsList];
+                                          list[idx].address = e.target.value;
+                                          setEditData({ ...editData, defendantsList: list });
+                                        }}
+                                        placeholder="العنوان..."
+                                        rows={2}
+                                        className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-[11px] font-bold focus:outline-none focus:border-indigo-400 resize-none"
+                                      />
+                                    ) : (
+                                      <div className="text-xs font-bold text-slate-700">{def.address || 'لا يوجد'}</div>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">المقر المختار</label>
+                                    {isEditing ? (
+                                      <textarea
+                                        value={def.chosenAddress || ''}
+                                        onChange={e => {
+                                          const list = [...editData.defendantsList];
+                                          list[idx].chosenAddress = e.target.value;
+                                          setEditData({ ...editData, defendantsList: list });
+                                        }}
+                                        placeholder="المقر المختار..."
+                                        rows={2}
+                                        className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-[11px] font-bold focus:border-indigo-400 resize-none"
+                                      />
+                                    ) : (
+                                      <div className="text-xs font-bold text-slate-700">{def.chosenAddress || 'لا يوجد'}</div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                          {isEditing && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <input 
+                                type="text" 
+                                value={newDefName} 
+                                onChange={e => setNewDefName(e.target.value)} 
+                                placeholder="اسم المدعى عليه الجديد..." 
+                                className="flex-1 bg-white border border-indigo-200 shadow-sm rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-400"
+                              />
+                              <button 
+                                onClick={() => {
+                                  if (!newDefName.trim()) return;
+                                  const newList = [...(editData.defendantsList || []), { id: Date.now().toString(), name: newDefName, address: '', chosenAddress: '' }];
+                                  setEditData({ ...editData, defendantsList: newList });
+                                  setNewDefName('');
+                                }}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition whitespace-nowrap"
+                              >
+                                + إضافة
+                              </button>
+                            </div>
+                          )}
+                          {(!editData.defendantsList || editData.defendantsList.length === 0) && !isEditing && effectiveDefendants.length === 0 && (
+                            <div className="text-xs font-bold text-slate-400">لا يوجد مدعى عليهم مسجلين.</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 gap-y-5 animate-in fade-in slide-in-from-top-2 duration-200">
                       {groupFields.map(field => {
                         const val = editData[field.id] || '';
 
@@ -882,67 +1019,45 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
                             <label className="text-[11px] font-black text-slate-500 block">{field.label}</label>
                             {isEditing ? (
                               field.id === 'الصفة' || field.id === 'صفة' ? (
-                                <div className="flex bg-slate-100 p-1 rounded-xl w-full">
-                                  {roleOptions.map((opt, i) => (
-                                    <button
-                                      key={opt} type="button" onClick={() => setEditData({ ...editData, [field.id]: opt })}
-                                      className={`flex-1 py-2 px-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${val === opt ? (i === 0 ? 'bg-rose-500 text-white' : i === 1 ? 'bg-emerald-500 text-white' : 'bg-navy-900 text-white') : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
-                                    >{opt}</button>
-                                  ))}
-                                </div>
+                                <StrictSelectField
+                                  value={val}
+                                  onChange={v => setEditData({ ...editData, [field.id]: v })}
+                                  options={roleOptions}
+                                  onManage={() => setManagingField('roles')}
+                                  placeholder="اختر الصفة..."
+                                />
                               ) : field.id === 'نوع الجلسة' ? (
-                                <div className="flex bg-slate-100 p-1 rounded-xl w-full">
-                                  {sessionTypeOptions.map((opt, i) => (
-                                    <button
-                                      key={opt} type="button" onClick={() => setEditData({ ...editData, [field.id]: opt })}
-                                      className={`flex-1 py-2 px-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${val === opt ? (i === 0 ? 'bg-amber-500 text-white' : i === 1 ? 'bg-emerald-500 text-white' : 'bg-navy-900 text-white') : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
-                                    >{opt}</button>
-                                  ))}
-                                </div>
+                                <StrictSelectField
+                                  value={val}
+                                  onChange={v => setEditData({ ...editData, [field.id]: v })}
+                                  options={sessionTypeOptions}
+                                  onManage={() => setManagingField('sessionTypes')}
+                                  placeholder="اختر نوع الجلسة..."
+                                />
                               ) : field.id === 'القرار' && settings?.decisions ? (
-                                <div className="space-y-2">
-                                  <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-100 rounded-xl">
-                                    {settings.decisions.slice(0, 8).map(opt => (
-                                      <button
-                                        key={opt} type="button" onClick={() => setEditData({ ...editData, [field.id]: opt })}
-                                        className={`px-3 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${val === opt ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'}`}
-                                      >{opt}</button>
-                                    ))}
-                                  </div>
-                                  <input type="text" placeholder="أو اكتب قرار آخر..." value={!settings.decisions.includes(val) && val ? val : ''} onChange={(e) => setEditData({ ...editData, [field.id]: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
-                                </div>
+                                <StrictSelectField
+                                  value={val}
+                                  onChange={v => setEditData({ ...editData, [field.id]: v })}
+                                  options={settings.decisions}
+                                  onManage={() => setManagingField('decisions')}
+                                  placeholder="اختر القرار..."
+                                />
                               ) : field.id === 'مكان الملف' ? (
-                                <div className="space-y-2">
-                                  <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-100 rounded-xl">
-                                    {fileLocationOptions.map(opt => (
-                                      <button
-                                        key={opt} type="button" onClick={() => setEditData({ ...editData, [field.id]: opt })}
-                                        className={`px-3 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${val === opt ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'}`}
-                                      >{opt}</button>
-                                    ))}
-                                  </div>
-                                  <input type="text" placeholder="أو اكتب مكان آخر..." value={!fileLocationOptions.includes(val) && val ? val : ''} onChange={(e) => setEditData({ ...editData, [field.id]: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
-                                </div>
+                                <StrictSelectField
+                                  value={val}
+                                  onChange={v => setEditData({ ...editData, [field.id]: v })}
+                                  options={fileLocationOptions}
+                                  onManage={() => setManagingField('fileLocations')}
+                                  placeholder="اختر مكان الملف..."
+                                />
                               ) : field.id === 'تصنيف الدعوى' ? (
-                                <div className="space-y-2">
-                                  <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-100 rounded-xl">
-                                    {[...(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']), 'أخرى'].map(opt => (
-                                      <button
-                                        key={opt} type="button" onClick={() => setEditData({ ...editData, [field.id]: opt })}
-                                        className={`px-3 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${val === opt || (!(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']).includes(val) && val && opt === 'أخرى') ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'}`}
-                                      >{opt}</button>
-                                    ))}
-                                  </div>
-                                  {(!(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']).includes(val) || val === 'أخرى') && (
-                                    <input
-                                      type="text"
-                                      placeholder="اكتب التصنيف هنا..."
-                                      value={val === 'أخرى' ? '' : val}
-                                      onChange={(e) => setEditData({ ...editData, [field.id]: e.target.value })}
-                                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400 mt-2"
-                                    />
-                                  )}
-                                </div>
+                                <StrictSelectField
+                                  value={val}
+                                  onChange={v => setEditData({ ...editData, [field.id]: v })}
+                                  options={settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']}
+                                  onManage={() => setManagingField('caseClassifications')}
+                                  placeholder="اختر تصنيف الدعوى..."
+                                />
                               ) : field.type === 'textarea' ? (
                                 <textarea value={val} onChange={(e) => setEditData({ ...editData, [field.id]: e.target.value })} rows={3} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 resize-none transition" />
                               ) : field.type === 'date' || field.id.includes('تاريخ') || field.id.includes('جلسة') ? (
@@ -1062,142 +1177,12 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
                         );
                       })}
                     </div>
-                  )}
-                  {/* --- Defendants List UI inserted at the end of بيانات أساسية group --- */}
-                  {isExpanded && group.title === '📌 بيانات أساسية' && (
-                    <div className="px-4 pb-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                      <div className="mt-2 border-t border-slate-100 pt-4">
-                        <label className="text-xs font-black text-slate-500 block mb-3">المدعى عليهم / المطعون ضدهم</label>
-                        <div className="space-y-3">
-                          {((editData.defendantsList && editData.defendantsList.length > 0) ? editData.defendantsList : effectiveDefendants).map((def, idx) => (
-                            <div key={def.id || idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 relative group">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                <div className="flex-1">
-                                  {isEditing ? (
-                                    <input 
-                                      type="text" 
-                                      value={def.name} 
-                                      onChange={e => {
-                                        const list = [...editData.defendantsList];
-                                        list[idx].name = e.target.value;
-                                        setEditData({ ...editData, defendantsList: list });
-                                      }}
-                                      placeholder="اسم المدعى عليه"
-                                      className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none focus:border-indigo-400"
-                                    />
-                                  ) : (
-                                    <div className="font-bold text-sm text-navy-900">{def.name || '---'}</div>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  {!isEditing && (def.address || def.chosenAddress) && (
-                                    <button 
-                                      onClick={() => setActiveDefId(activeDefId === def.id ? null : def.id)}
-                                      className="text-[10px] bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100 font-bold flex items-center gap-1"
-                                    >
-                                      <MapPin className="w-3 h-3" /> التفاصيل
-                                    </button>
-                                  )}
-                                  {isEditing && (
-                                    <button 
-                                      onClick={() => setActiveDefId(activeDefId === def.id ? null : def.id)}
-                                      className="text-[10px] bg-white border border-indigo-200 text-indigo-600 px-2 py-1.5 rounded-lg hover:bg-indigo-50 font-bold flex items-center gap-1"
-                                    >
-                                      <MapPin className="w-3 h-3" /> {activeDefId === def.id ? 'إخفاء العناوين' : 'إضافة/تعديل العناوين'}
-                                    </button>
-                                  )}
-                                  {isEditing && (
-                                    <button 
-                                      onClick={() => {
-                                        const list = [...editData.defendantsList];
-                                        list.splice(idx, 1);
-                                        setEditData({ ...editData, defendantsList: list });
-                                      }}
-                                      className="p-1.5 text-slate-400 hover:text-rose-600 bg-white rounded-lg border border-slate-200"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              {/* Expanded Address Fields */}
-                              {(activeDefId === def.id || (!isEditing && activeDefId === def.id)) && (
-                                <div className="mt-3 pt-3 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in slide-in-from-top-2">
-                                  <div>
-                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">عنوان المدعى عليه</label>
-                                    {isEditing ? (
-                                      <textarea
-                                        value={def.address || ''}
-                                        onChange={e => {
-                                          const list = [...editData.defendantsList];
-                                          list[idx].address = e.target.value;
-                                          setEditData({ ...editData, defendantsList: list });
-                                        }}
-                                        placeholder="العنوان..."
-                                        rows={2}
-                                        className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-[11px] font-bold focus:outline-none focus:border-indigo-400 resize-none"
-                                      />
-                                    ) : (
-                                      <div className="text-xs font-bold text-slate-700">{def.address || 'لا يوجد'}</div>
-                                    )}
-                                  </div>
-                                  <div>
-                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">المقر المختار</label>
-                                    {isEditing ? (
-                                      <textarea
-                                        value={def.chosenAddress || ''}
-                                        onChange={e => {
-                                          const list = [...editData.defendantsList];
-                                          list[idx].chosenAddress = e.target.value;
-                                          setEditData({ ...editData, defendantsList: list });
-                                        }}
-                                        placeholder="المقر المختار..."
-                                        rows={2}
-                                        className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-[11px] font-bold focus:outline-none focus:border-indigo-400 resize-none"
-                                      />
-                                    ) : (
-                                      <div className="text-xs font-bold text-slate-700">{def.chosenAddress || 'لا يوجد'}</div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ))}
 
-                          {isEditing && (
-                            <div className="flex items-center gap-2 mt-2">
-                              <input 
-                                type="text" 
-                                value={newDefName} 
-                                onChange={e => setNewDefName(e.target.value)} 
-                                placeholder="اسم المدعى عليه الجديد..." 
-                                className="flex-1 bg-white border border-indigo-200 shadow-sm rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-400"
-                              />
-                              <button 
-                                onClick={() => {
-                                  if (!newDefName.trim()) return;
-                                  const newList = [...(editData.defendantsList || []), { id: Date.now().toString(), name: newDefName, address: '', chosenAddress: '' }];
-                                  setEditData({ ...editData, defendantsList: newList });
-                                  setNewDefName('');
-                                }}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition whitespace-nowrap"
-                              >
-                                + إضافة
-                              </button>
-                            </div>
-                          )}
-                          {(!editData.defendantsList || editData.defendantsList.length === 0) && !isEditing && effectiveDefendants.length === 0 && (
-                            <div className="text-xs font-bold text-slate-400">لا يوجد مدعى عليهم مسجلين.</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               );
             })}
           </div>
+        </div>
 
           {/* Custom fields not in schema (legacy/extra) */}
           {(() => {
@@ -1875,6 +1860,14 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
           cases={[caseData]}
           sessionDate={formatDateString(new Date().toISOString())}
           onClose={() => setIsPrintModalOpen(false)}
+        />
+      )}
+
+      {managingField && (
+        <FieldOptionsManager
+          fieldKey={managingField}
+          isOpen={true}
+          onClose={() => setManagingField(null)}
         />
       )}
     </div>

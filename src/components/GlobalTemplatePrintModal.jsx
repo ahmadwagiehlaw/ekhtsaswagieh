@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { X, FileText, File, Search, ChevronRight, Star, Folder } from 'lucide-react';
+import { X, FileText, File, Search, ChevronRight, Star, Folder, ClipboardList } from 'lucide-react';
+import { useUI } from '../context/UIContext';
 import { useAppContext } from '../context/AppState';
 import CertificatePrintView from './CertificatePrintView';
 
 export default function GlobalTemplatePrintModal({ cases, sessionDate, onClose }) {
-  const { settings, saveSettingsToFirebase } = useAppContext();
+  const { settings, saveSettingsToFirebase, globalTasks, PREDEFINED_TASKS } = useAppContext();
   const templates = settings?.printTemplates || [];
   
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -12,6 +13,8 @@ export default function GlobalTemplatePrintModal({ cases, sessionDate, onClose }
   const [searchQuery, setSearchQuery] = useState('');
   const [currentFolder, setCurrentFolder] = useState(null);
   const [repeatForDefendants, setRepeatForDefendants] = useState(true);
+  const [taskFilter, setTaskFilter] = useState('');
+  const { toast } = useUI ? useUI() : { toast: window.toast || alert }; // fallback if useUI isn't imported
 
   const filteredTemplates = templates.filter(t => t.name.includes(searchQuery));
   const sortedByUsage = [...templates].sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
@@ -26,6 +29,17 @@ export default function GlobalTemplatePrintModal({ cases, sessionDate, onClose }
   }, {});
 
   const handlePrint = (tpl) => {
+    // Check if we need to filter by task
+    let printCases = cases;
+    if (taskFilter) {
+      printCases = cases.filter(c => 
+        globalTasks?.some(t => t.title === taskFilter && t.linkedCases?.includes(c.id) && t.status === 'pending')
+      );
+      if (printCases.length === 0) {
+        return toast('عفواً، لا توجد ملفات ضمن التحديد تحتوي على هذه المهمة قيد التنفيذ', 'error');
+      }
+    }
+
     // Increment usage count
     const updatedTemplates = templates.map(t => 
       t.id === tpl.id ? { ...t, usageCount: (t.usageCount || 0) + 1 } : t
@@ -34,13 +48,13 @@ export default function GlobalTemplatePrintModal({ cases, sessionDate, onClose }
       saveSettingsToFirebase({ printTemplates: updatedTemplates });
     }
     setSelectedTemplate(tpl);
-    setShowPrintView(true);
+    setShowPrintView(printCases);
   };
 
   if (showPrintView && selectedTemplate) {
     return (
       <CertificatePrintView 
-        cases={cases} 
+        cases={Array.isArray(showPrintView) ? showPrintView : cases} 
         sessionDate={sessionDate} 
         template={selectedTemplate} 
         onClose={onClose} 
@@ -100,6 +114,22 @@ export default function GlobalTemplatePrintModal({ cases, sessionDate, onClose }
               />
               <span className="text-xs font-bold text-indigo-900">تكرار الوثيقة لكل مدعى عليه (في حال وجود أكثر من مدعى عليه بالملف)</span>
             </label>
+
+            <div className="mt-3 p-3 bg-indigo-50/30 rounded-xl border border-indigo-100 flex items-center gap-3">
+              <ClipboardList className="w-4 h-4 text-indigo-500 shrink-0" />
+              <div className="flex-1">
+                <select
+                  value={taskFilter}
+                  onChange={e => setTaskFilter(e.target.value)}
+                  className="w-full bg-white border border-indigo-200 rounded-lg py-1.5 px-3 text-xs font-bold text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">(طباعة لكافة الملفات المحددة)</option>
+                  {PREDEFINED_TASKS?.map(t => (
+                    <option key={t} value={t}>قصر الطباعة على الملفات التي تطلب مهمة: {t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
         )}
 
