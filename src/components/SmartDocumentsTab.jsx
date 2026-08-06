@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Save, Trash2, Edit3, Copy, FileText, Search, Settings, Variable, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Plus, Save, Trash2, Edit3, Copy, FileText, Search, Settings, Variable, ChevronDown, ChevronRight, ChevronLeft, Folder, FolderOpen, List, ListOrdered } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 
@@ -66,6 +66,7 @@ export default function SmartDocumentsTab() {
   const [metaForm, setMetaForm] = useState({ name: '', category: '' });
   const [expandedCats, setExpandedCats] = useState({ 'شهادات': true, 'عام': true });
   const [showMoreVars, setShowMoreVars] = useState(false);
+  const [searchTemplate, setSearchTemplate] = useState('');
   
   const editorRef = useRef(null);
 
@@ -139,6 +140,7 @@ export default function SmartDocumentsTab() {
 
   // Group templates by category
   const groupedTemplates = templates.reduce((acc, curr) => {
+    if (searchTemplate && !curr.name.toLowerCase().includes(searchTemplate.toLowerCase())) return acc;
     const cat = curr.category || 'عام';
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(curr);
@@ -191,35 +193,54 @@ export default function SmartDocumentsTab() {
             <Plus className="w-4 h-4" />
           </button>
         </div>
+        <div className="p-3 border-b border-slate-200">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="ابحث عن قالب..."
+              value={searchTemplate}
+              onChange={e => setSearchTemplate(e.target.value)}
+              className="w-full bg-slate-100 border-none rounded-lg py-1.5 pr-9 pl-3 text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-bold"
+            />
+          </div>
+        </div>
         
-        <div className="flex-1 overflow-y-auto p-3 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {Object.keys(groupedTemplates).length === 0 && (
+             <div className="text-center text-slate-400 text-xs py-4 font-bold">لا توجد قوالب مطابقة</div>
+          )}
           {Object.keys(groupedTemplates).map(cat => (
             <div key={cat} className="space-y-1">
               <button 
                 onClick={() => toggleCat(cat)}
-                className="w-full flex items-center justify-between p-1 hover:bg-slate-50 rounded"
+                className="w-full flex items-center justify-between p-1.5 hover:bg-slate-50 rounded text-right transition"
               >
-                <h4 className="text-xs font-black text-slate-500 flex items-center gap-1">
-                  {expandedCats[cat] ? <ChevronDown className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
-                  {cat} ({groupedTemplates[cat].length})
-                </h4>
+                <div className="flex items-center gap-2">
+                  {expandedCats[cat] ? <FolderOpen className="w-4 h-4 text-amber-500" /> : <Folder className="w-4 h-4 text-amber-500 fill-amber-100" />}
+                  <h4 className="text-xs font-black text-slate-700">
+                    {cat}
+                  </h4>
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 rounded">{groupedTemplates[cat].length}</span>
               </button>
               {expandedCats[cat] && (
-                <div className="space-y-1 pr-2 border-r-2 border-slate-100 mr-2">
+                <div className="space-y-0.5 pr-5 border-r border-slate-200 mr-2 mt-1">
                   {groupedTemplates[cat].map(tpl => (
                     <div 
                       key={tpl.id}
                       onClick={() => setActiveTemplate(tpl)}
-                      className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition ${activeTemplate?.id === tpl.id ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-slate-50 border border-transparent'}`}
+                      className={`flex items-center justify-between p-1.5 rounded-lg cursor-pointer transition relative group ${activeTemplate?.id === tpl.id ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}
                     >
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 border-t border-slate-200 -mr-2"></div>
                       <div className="flex items-center gap-2 overflow-hidden">
-                        <FileText className={`w-4 h-4 shrink-0 ${activeTemplate?.id === tpl.id ? 'text-indigo-600' : 'text-slate-400'}`} />
-                        <span className={`text-xs font-bold truncate ${activeTemplate?.id === tpl.id ? 'text-indigo-800' : 'text-slate-600'}`}>
+                        <FileText className={`w-3.5 h-3.5 shrink-0 ${activeTemplate?.id === tpl.id ? 'text-indigo-600' : 'text-slate-400'}`} />
+                        <span className={`text-[11px] font-bold truncate ${activeTemplate?.id === tpl.id ? 'text-indigo-800' : 'text-slate-600'}`}>
                           {tpl.name}
                         </span>
                       </div>
                       {isAdmin && (
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(tpl.id); }} className="text-slate-300 hover:text-rose-500">
+                        <button onClick={(e) => { e.stopPropagation(); handleDelete(tpl.id); }} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -276,12 +297,14 @@ export default function SmartDocumentsTab() {
 
               <div className="flex items-center gap-2">
                 <div className="flex items-center bg-white border rounded-lg overflow-hidden h-8">
-                  <button onClick={() => execCmd('bold')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 font-black border-l">B</button>
-                  <button onClick={() => execCmd('italic')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 italic border-l">I</button>
-                  <button onClick={() => execCmd('underline')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 underline border-l">U</button>
-                  <button onClick={() => execCmd('justifyRight')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 border-l" title="يمين">≡</button>
-                  <button onClick={() => execCmd('justifyCenter')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 border-l" title="توسيط">≢</button>
-                  <button onClick={() => execCmd('justifyLeft')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100" title="يسار">≡</button>
+                  <button onClick={() => execCmd('bold')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 font-black border-l text-slate-700">B</button>
+                  <button onClick={() => execCmd('italic')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 italic border-l text-slate-700">I</button>
+                  <button onClick={() => execCmd('underline')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 underline border-l text-slate-700">U</button>
+                  <button onClick={() => execCmd('insertUnorderedList')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 border-l text-slate-700" title="قائمة نقطية"><List className="w-4 h-4"/></button>
+                  <button onClick={() => execCmd('insertOrderedList')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 border-l text-slate-700" title="قائمة رقمية"><ListOrdered className="w-4 h-4"/></button>
+                  <button onClick={() => execCmd('justifyRight')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 border-l text-slate-700" title="يمين">≡</button>
+                  <button onClick={() => execCmd('justifyCenter')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 border-l text-slate-700" title="توسيط">≢</button>
+                  <button onClick={() => execCmd('justifyLeft')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 text-slate-700" title="يسار">≡</button>
                 </div>
                 {isAdmin && (
                   <button 
@@ -316,15 +339,18 @@ export default function SmartDocumentsTab() {
                   المزيد <ChevronDown className="w-3 h-3" />
                 </button>
                 {showMoreVars && (
-                  <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-xl z-50 p-2 grid grid-cols-2 gap-1">
-                    {moreVariables.map(v => (
-                      <button 
-                        key={v.val}
-                        onClick={() => { insertVariable(v.val); setShowMoreVars(false); }}
-                        className="text-right text-[10px] font-bold text-slate-700 hover:bg-slate-100 p-1.5 rounded"
-                      >
-                        {v.label}
-                      </button>
+                  <div className="absolute top-full right-0 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-xl z-50 p-3 grid grid-cols-2 gap-2">
+                    <div className="col-span-2 text-[9px] font-black text-slate-400 mb-1 border-b pb-1">بيانات الدعوى الأساسية</div>
+                    {moreVariables.slice(0, 5).map(v => (
+                      <button key={v.val} onClick={() => { insertVariable(v.val); setShowMoreVars(false); }} className="text-right text-[10px] font-bold text-slate-700 hover:bg-slate-100 p-1.5 rounded">{v.label}</button>
+                    ))}
+                    <div className="col-span-2 text-[9px] font-black text-slate-400 mb-1 mt-2 border-b pb-1">بيانات الجلسة والمحكمة</div>
+                    {moreVariables.slice(5, 11).map(v => (
+                      <button key={v.val} onClick={() => { insertVariable(v.val); setShowMoreVars(false); }} className="text-right text-[10px] font-bold text-slate-700 hover:bg-slate-100 p-1.5 rounded">{v.label}</button>
+                    ))}
+                    <div className="col-span-2 text-[9px] font-black text-slate-400 mb-1 mt-2 border-b pb-1">بيانات الحكم</div>
+                    {moreVariables.slice(11).map(v => (
+                      <button key={v.val} onClick={() => { insertVariable(v.val); setShowMoreVars(false); }} className="text-right text-[10px] font-bold text-slate-700 hover:bg-slate-100 p-1.5 rounded">{v.label}</button>
                     ))}
                   </div>
                 )}
@@ -343,8 +369,9 @@ export default function SmartDocumentsTab() {
                     style={{ minHeight: '100%', fontFamily: 'Cairo, sans-serif' }}
                     onBlur={handleSaveActive}
                     onPaste={(e) => {
-                      // Optionally we can prevent default and insert text/html manually, 
-                      // but just letting browser handle it is usually fine.
+                      e.preventDefault();
+                      const text = e.clipboardData.getData('text/plain');
+                      document.execCommand('insertText', false, text);
                     }}
                   />
                </div>
