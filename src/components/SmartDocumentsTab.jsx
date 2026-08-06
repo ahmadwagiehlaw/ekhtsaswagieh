@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Save, Trash2, Edit3, Copy, FileText, Search, Settings, Variable, ChevronDown, ChevronRight, ChevronLeft, Folder, FolderOpen, List, ListOrdered } from 'lucide-react';
+import { Plus, Save, Trash2, Edit3, Copy, FileText, Search, Settings, Variable, ChevronDown, ChevronRight, ChevronLeft, Folder, FolderOpen, List, ListOrdered, Undo, Redo, Eraser } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 
@@ -88,7 +88,7 @@ export default function SmartDocumentsTab() {
     const newTpl = {
       id: 'tpl_' + Date.now(),
       name: 'قالب جديد',
-      category: 'عام',
+      category: activeFolder || 'عام',
       content: '<div dir="rtl" style="font-family: \'Cairo\', sans-serif;">اكتب نص القالب هنا...</div>'
     };
     const updated = [...templates, newTpl];
@@ -284,11 +284,15 @@ export default function SmartDocumentsTab() {
                     />
                     <input 
                       type="text" 
+                      list="cat-suggestions"
                       value={metaForm.category} 
                       onChange={e => setMetaForm({...metaForm, category: e.target.value})}
                       className="text-xs font-bold px-2 py-1 rounded border w-24"
                       placeholder="المجلد"
                     />
+                    <datalist id="cat-suggestions">
+                      {sortedCategories.map(c => <option key={c} value={c} />)}
+                    </datalist>
                     <button onClick={() => {
                       const updated = templates.map(t => t.id === activeTemplate.id ? { ...t, name: metaForm.name, category: metaForm.category } : t);
                       saveTemplates(updated);
@@ -309,9 +313,12 @@ export default function SmartDocumentsTab() {
 
               <div className="flex items-center gap-2">
                 <div className="flex items-center bg-white border rounded-lg overflow-hidden h-8">
-                  <button onClick={() => execCmd('bold')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 font-black border-l text-slate-700">B</button>
-                  <button onClick={() => execCmd('italic')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 italic border-l text-slate-700">I</button>
-                  <button onClick={() => execCmd('underline')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 underline border-l text-slate-700">U</button>
+                  <button onClick={() => execCmd('undo')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 border-l text-slate-700" title="تراجع"><Undo className="w-3.5 h-3.5"/></button>
+                  <button onClick={() => execCmd('redo')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 border-l text-slate-700" title="إعادة"><Redo className="w-3.5 h-3.5"/></button>
+                  <button onClick={() => execCmd('bold')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 font-black border-l text-slate-700" title="عريض">B</button>
+                  <button onClick={() => execCmd('italic')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 italic border-l text-slate-700" title="مائل">I</button>
+                  <button onClick={() => execCmd('underline')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 underline border-l text-slate-700" title="تسطير">U</button>
+                  <button onClick={() => execCmd('removeFormat')} className="w-8 h-full flex items-center justify-center hover:bg-rose-50 hover:text-rose-600 border-l text-slate-500" title="مسح التنسيقات"><Eraser className="w-4 h-4"/></button>
                   <button onClick={() => execCmd('insertUnorderedList')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 border-l text-slate-700" title="قائمة نقطية"><List className="w-4 h-4"/></button>
                   <button onClick={() => execCmd('insertOrderedList')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 border-l text-slate-700" title="قائمة رقمية"><ListOrdered className="w-4 h-4"/></button>
                   <button onClick={() => execCmd('justifyRight')} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 border-l text-slate-700" title="يمين">≡</button>
@@ -381,9 +388,7 @@ export default function SmartDocumentsTab() {
                     style={{ minHeight: '100%', fontFamily: 'Cairo, sans-serif' }}
                     onBlur={handleSaveActive}
                     onPaste={(e) => {
-                      e.preventDefault();
-                      const text = e.clipboardData.getData('text/plain');
-                      document.execCommand('insertText', false, text);
+                      // Browser default paste is allowed here to keep Word formatting
                     }}
                   />
                </div>
