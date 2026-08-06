@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, ClipboardList, CheckCircle2, Plus, Trash2, Calendar, Search, Files, Printer } from 'lucide-react';
+import { X, ClipboardList, CheckCircle2, Plus, Trash2, Calendar, Search, Files, Printer, Camera } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
 import { useLocation } from 'react-router-dom';
+import UploadDocumentModal from './UploadDocumentModal';
 
-export default function Tasks() {
+export default function TasksManagerModal({ isOpen, onClose }) {
   const { globalTasks, saveGlobalTask, completeGlobalTask, PREDEFINED_TASKS, deleteGlobalTask, settings, isAdmin, currentUser, cases, currentUserPermissions } = useAppContext();
 
   const canManageTasks = isAdmin || currentUserPermissions?.canManageTasks;
@@ -17,6 +18,12 @@ export default function Tasks() {
   const [isCaseSelectOpen, setIsCaseSelectOpen] = useState(false);
   const [caseSearchQuery, setCaseSearchQuery] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [activeUploadTask, setActiveUploadTask] = useState(null);
+  const [activeUploadCase, setActiveUploadCase] = useState(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState([]);
+
   const [newTask, setNewTask] = useState({
     title: '',
     assignee: '',
@@ -74,10 +81,32 @@ export default function Tasks() {
   };
 
   const handleDelete = async (id) => {
-    const confirmed = await showConfirm('حذف المهمة', 'هل أنت متأكد من حذف هذه المهمة؟', 'delete_task');
+    const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذه المهمة نهائياً؟', 'delete_task');
     if (confirmed) {
       const success = await deleteGlobalTask(id);
-      if (success) toast('تم الحذف بنجاح', 'success');
+      if (success) toast('تم حذف المهمة بنجاح', 'success');
+    }
+  };
+
+  const toggleTaskSelection = (taskId) => {
+    if (selectedTaskIds.includes(taskId)) {
+      setSelectedTaskIds(selectedTaskIds.filter(id => id !== taskId));
+    } else {
+      setSelectedTaskIds([...selectedTaskIds, taskId]);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTaskIds.length === 0) return;
+    const confirmed = await showConfirm("تأكيد الحذف الجماعي", `هل أنت متأكد من حذف ${selectedTaskIds.length} مهمة نهائياً؟`);
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedTaskIds) {
+        const success = await deleteGlobalTask(id);
+        if (success) count++;
+      }
+      setSelectedTaskIds([]);
+      toast(`تم حذف ${count} مهام بنجاح`, "success");
     }
   };
 
@@ -165,21 +194,39 @@ export default function Tasks() {
     return 'عادية';
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="space-y-4 animate-fade-in pb-20">
-      {/* Header */}
-      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center">
-            <ClipboardList className="w-6 h-6 text-indigo-600" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+      <div className="absolute inset-0 bg-navy-900/60 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="relative w-full h-full sm:h-auto sm:max-h-[90vh] max-w-5xl bg-slate-50 sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+        
+        {/* Modal Header */}
+        <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+              <ClipboardList className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-navy-900">المهام والتكليفات</h2>
+              <p className="text-xs font-bold text-slate-500">إدارة مهام فريق العمل والملفات</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-navy-900 font-black text-xl">المهام والتكليفات</h2>
-            <p className="text-slate-500 text-sm font-bold mt-1">إدارة مهام فريق العمل والملفات</p>
-          </div>
+          <button 
+            onClick={onClose}
+            className="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
+        {/* Modal Body */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 hide-scrollbar">
+          <div className="space-y-4">
+            
+            {/* Search */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+              <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
@@ -314,6 +361,19 @@ export default function Tasks() {
           </div>
         </div>
 
+          {selectedTaskIds.length > 0 && (
+            <div className="mx-6 mb-2 bg-indigo-50 border border-indigo-200 p-3 rounded-xl flex items-center justify-between animate-in fade-in">
+              <span className="text-sm font-black text-indigo-700">تم تحديد {selectedTaskIds.length} مهام</span>
+              <button 
+                onClick={handleBulkDelete}
+                className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                حذف المحدد
+              </button>
+            </div>
+          )}
+
         {/* Task List */}
         <div className="p-5 bg-slate-50/50 min-h-[400px] space-y-3">
           {displayTasks.length === 0 ? (
@@ -323,9 +383,17 @@ export default function Tasks() {
             </div>
           ) : (
             displayTasks.map(task => (
-              <div key={task.id} className={`bg-white p-4 rounded-2xl border transition-all ${task.status === 'completed' ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-200 hover:shadow-sm'}`}>
+              <div key={task.id} className={`p-4 rounded-2xl border transition-all ${task.status === 'completed' ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-200 hover:border-indigo-300 shadow-sm hover:shadow-md'} ${selectedTaskIds.includes(task.id) ? 'ring-2 ring-indigo-400' : ''}`}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3 flex-1">
+                    {canManageTasks && (
+                      <input 
+                        type="checkbox"
+                        checked={selectedTaskIds.includes(task.id)}
+                        onChange={() => toggleTaskSelection(task.id)}
+                        className="mt-1.5 w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                      />
+                    )}
                     <button
                       onClick={() => canManageTasks || task.assignee === currentUser ? handleToggleStatus(task) : null}
                       disabled={!canManageTasks && task.assignee !== currentUser}
@@ -355,6 +423,18 @@ export default function Tasks() {
                           {task.notes}
                         </p>
                       )}
+                      {task.type === 'viewing' && task.linkedCases && task.linkedCases.length > 0 && task.status === 'pending' && canManageTasks && (
+                        <button
+                          onClick={() => {
+                            setActiveUploadTask(task);
+                            setActiveUploadCase(cases.find(c => c.id === task.linkedCases[0]));
+                            setIsUploadModalOpen(true);
+                          }}
+                          className="mt-2 flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold transition border border-indigo-200"
+                        >
+                          <Camera className="w-3.5 h-3.5" /> إتمام وإرفاق المستندات
+                        </button>
+                      )}
                       {task.linkedCases && task.linkedCases.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-1.5">
                           {task.linkedCases.map(caseId => {
@@ -379,6 +459,9 @@ export default function Tasks() {
               </div>
             ))
           )}
+        </div>
+      </div>
+          </div>
         </div>
       </div>
       {/* Case Selection Modal */}
@@ -464,6 +547,23 @@ export default function Tasks() {
           </div>
         </div>
       )}
+
+      <UploadDocumentModal
+        isOpen={isUploadModalOpen}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          setActiveUploadTask(null);
+          setActiveUploadCase(null);
+        }}
+        caseData={activeUploadCase}
+        initialDocType="تصوير مستندات"
+        onSuccess={async () => {
+          if (activeUploadTask) {
+            await completeGlobalTask(activeUploadTask.id, true);
+            toast("تم الإرفاق وإنجاز المهمة بنجاح", "success");
+          }
+        }}
+      />
     </div>
   );
 }

@@ -28,7 +28,7 @@ export default function AddCaseModal({ isOpen, onClose }) {
 
   const currentCourtDegree = settings?.courtDegree || 'أول درجة';
   const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
-  const sessionTypeOptions = isSupreme ? ['فحص', 'موضوع', 'حكم'] : ['مفوضين', 'مرافعة', 'حكم'];
+  const sessionTypeOptions = isSupreme ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة'];
 
   if (!isOpen) return null;
 
@@ -487,7 +487,7 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                         </div>
                                     ) : field.id === 'نوع الجلسة' ? (
                                         <div className="flex bg-slate-100 p-1 rounded-xl w-full mt-1">
-                                          {(settings?.courtDegree === 'إدارية عليا' || settings?.courtDegree === 'عليا' || settings?.courtDegree === 'ثان درجة' ? ['فحص', 'موضوع', 'حكم'] : ['مفوضين', 'مرافعة', 'حكم']).map((t, i) => (
+                                          {(settings?.courtDegree === 'إدارية عليا' || settings?.courtDegree === 'عليا' || settings?.courtDegree === 'ثان درجة' ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة']).map((t, i) => (
                                             <button
                                               key={t} type="button" onClick={() => setFormData({...formData, [field.id]: t})}
                                               className={`flex-1 py-2 px-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${val === t ? (i === 0 ? 'bg-amber-500 text-white' : i === 1 ? 'bg-emerald-500 text-white' : 'bg-navy-900 text-white') : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}

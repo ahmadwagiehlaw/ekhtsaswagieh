@@ -263,10 +263,15 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
       
       // Alert if due within 3 days (or overdue < 0)
       if (diffDays <= 3) {
-        const key = `${t.title}_${diffDays}`;
+        let key = `${t.title}_${diffDays}`;
+        if (t.type === 'viewing') {
+          key = `viewing_${diffDays}`;
+        }
         if (!taskGroups[key]) {
           taskGroups[key] = {
-            title: t.title,
+            title: t.type === 'viewing' ? `مهام إطلاع وتصوير مستندات` : t.title,
+            taskType: t.type,
+            dueDate: t.dueDate,
             daysLeft: diffDays,
             count: 0,
             taskIds: [],
@@ -285,6 +290,8 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
       alerts.push({
         type: 'task_alert_group',
         ruleName: group.title,
+        taskType: group.taskType,
+        dueDate: group.dueDate,
         daysLeft: group.daysLeft,
         count: group.count,
         taskIds: group.taskIds,

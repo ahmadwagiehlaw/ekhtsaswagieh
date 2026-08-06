@@ -16,7 +16,6 @@ const CaseReport    = lazy(() => import('./pages/CaseReport'));
 const RollsLibrary  = lazy(() => import('./pages/RollsLibrary'));
 const Reports       = lazy(() => import('./pages/Reports'));
 const DayRoll       = lazy(() => import('./pages/DayRoll'));
-const Tasks         = lazy(() => import('./pages/Tasks'));
 const Trash         = lazy(() => import('./pages/Trash'));
 const Login         = lazy(() => import('./pages/Login'));
 const SuperAdmin    = lazy(() => import('./pages/SuperAdmin'));
@@ -50,7 +49,6 @@ function AppContent() {
               <Route path="files" element={<Files />} />
               <Route path="agenda" element={<Agenda />} />
               <Route path="settings" element={<Settings />} />
-              <Route path="tasks" element={<Tasks />} />
               <Route path="trash" element={<Trash />} />
               <Route path="case/:id" element={<CaseDetails />} />
               <Route path="case/:id/report" element={<CaseReport />} />

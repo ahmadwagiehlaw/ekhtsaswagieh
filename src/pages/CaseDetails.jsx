@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2, Bell, AlertTriangle, FileText, ExternalLink, BookOpen, Files, Hash, Paperclip, Scale, Loader2, Plus, Star, MessageSquare, Printer, FolderOpen, History, MapPin } from 'lucide-react';
+import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2, Bell, AlertTriangle, FileText, ExternalLink, BookOpen, Files, Hash, Paperclip, Scale, Loader2, Plus, Star, MessageSquare, Printer, FolderOpen, History, MapPin, Camera } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import AddSessionModal from '../components/AddSessionModal';
 import CaseDocuments from '../components/CaseDocuments';
 import AlertsModal from '../components/AlertsModal';
+import CaseTasksModal from '../components/CaseTasksModal';
+import BulkViewingTaskModal from '../components/BulkViewingTaskModal';
 import GlobalTemplatePrintModal from '../components/GlobalTemplatePrintModal';
 import ProceduresModal from '../components/ProceduresModal';
 import FieldOptionsManager from '../components/FieldOptionsManager';
@@ -23,7 +25,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
   const { id: paramId } = useParams();
   const id = isModal ? modalCaseId : paramId;
   const navigate = useNavigate();
-  const { cases, schema, isAdmin, saveCaseToFirebase, settings, rolls, checkDuplicateCase, deleteCaseFromFirebase, restoreCaseFromFirebase, saveSettingsToFirebase, saveGlobalTask, currentUser, currentUserPermissions } = useAppContext();
+  const { cases, schema, isAdmin, saveCaseToFirebase, settings, rolls, checkDuplicateCase, deleteCaseFromFirebase, restoreCaseFromFirebase, saveSettingsToFirebase, saveGlobalTask, globalTasks, currentUser, currentUserPermissions } = useAppContext();
 
   const roleOptions = settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل'];
   const currentCourtDegree = settings?.courtDegree || 'أول درجة';
@@ -45,6 +47,8 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
   const [managingField, setManagingField] = useState(null);
   const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [isCaseTasksModalOpen, setIsCaseTasksModalOpen] = useState(false);
+  const [isViewingTaskModalOpen, setIsViewingTaskModalOpen] = useState(false);
   const [isProceduresModalOpen, setIsProceduresModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'documents' | 'sessions' | 'tasks'
   const [isChangeRoleModalOpen, setIsChangeRoleModalOpen] = useState(false);
@@ -234,6 +238,8 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
     }
   };
 
+  const caseStats = React.useMemo(() => calculateDashboardStats(caseData ? [caseData] : [], settings), [caseData, settings]);
+
   if (!caseData) {
     return (
       <div className="text-center p-10">
@@ -306,7 +312,6 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
     textColorClass = 'text-slate-500';
   }
 
-  const caseStats = React.useMemo(() => calculateDashboardStats([caseData], settings), [caseData, settings]);
   const dynamicAlerts = caseStats.alerts;
 
   const coverImageDoc = (caseData.documents || []).find(doc => doc.type === 'غلاف الملف' && doc.fileType === 'image');
@@ -635,13 +640,28 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
               <Star className={`w-5 h-5 ${caseData.isImportant ? 'fill-amber-500' : ''}`} />
             </button>
 
-            {/* Case Task Button */}
+            {/* Viewing Task Button */}
             <button
               onClick={() => {
-                navigate(`/tasks?caseId=${caseData.id}`);
+                const hasViewingTask = globalTasks?.some(t => t.type === 'viewing' && t.status !== 'completed' && t.linkedCases?.includes(caseData.id));
+                if (hasViewingTask) {
+                  toast('تم العثور على مهمة إطلاع حالية، جاري فتح سجل المهام...', 'success');
+                  setIsCaseTasksModalOpen(true);
+                } else {
+                  setIsViewingTaskModalOpen(true);
+                }
               }}
+              className="relative p-2 rounded-xl transition bg-indigo-50 text-indigo-500 hover:bg-indigo-100 hover:text-indigo-700"
+              title="إنشاء مهمة إطلاع جديدة"
+            >
+              <Camera className="w-5 h-5" />
+            </button>
+
+            {/* Case Task Button */}
+            <button
+              onClick={() => setIsCaseTasksModalOpen(true)}
               className="relative p-2 rounded-xl transition bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-indigo-600"
-              title="إضافة مهمة متعلقة بهذه الدعوى"
+              title="إدارة مهام وسجل إجراءات هذا الملف"
             >
               <ClipboardList className="w-5 h-5" />
             </button>
@@ -1699,6 +1719,23 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
       <AlertsModal
         isOpen={isAlertsOpen}
         onClose={() => setIsAlertsOpen(false)}
+        caseData={caseData}
+      />
+
+      {/* Viewing Task Modal */}
+      {isViewingTaskModalOpen && (
+        <BulkViewingTaskModal
+          isOpen={isViewingTaskModalOpen}
+          onClose={() => setIsViewingTaskModalOpen(false)}
+          selectedCaseIds={new Set([caseData.id])}
+          cases={cases}
+        />
+      )}
+
+      {/* Case Tasks Modal */}
+      <CaseTasksModal
+        isOpen={isCaseTasksModalOpen}
+        onClose={() => setIsCaseTasksModalOpen(false)}
         caseData={caseData}
       />
 

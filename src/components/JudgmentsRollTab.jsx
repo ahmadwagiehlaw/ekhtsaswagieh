@@ -14,6 +14,7 @@ import { getSafeDateObj } from '../utils/dateUtils';
 import { uploadToR2 } from '../lib/r2';
 import ExportPDFModal from './ExportPDFModal';
 import BulkProcedureFromRollModal from './BulkProcedureFromRollModal';
+import BulkViewingTaskModal from './BulkViewingTaskModal';
 import BulkSessionRolloverModal from './BulkSessionRolloverModal';
 import BulkJudgmentRegistrationModal from './BulkJudgmentRegistrationModal';
 import QuickAddCaseModal from './QuickAddCaseModal';
@@ -201,6 +202,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
   const [searchQ, setSearchQ] = useState('');
   const [sessionTypeFilter, setSessionTypeFilter] = useState('الكل');
   const [editingId, setEditingId] = useState(null);
+  const [editingFocusField, setEditingFocusField] = useState(null);
   const [editData, setEditData] = useState({});
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [savingId, setSavingId] = useState(null);
@@ -210,6 +212,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
   const [selectedCaseId, setSelectedCaseId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [isBulkProcedureOpen, setIsBulkProcedureOpen] = useState(false);
+  const [isBulkViewingOpen, setIsBulkViewingOpen] = useState(false);
   const [isRolloverOpen, setIsRolloverOpen] = useState(false);
   const [isBulkJudgmentOpen, setIsBulkJudgmentOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
@@ -320,10 +323,11 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
     return result;
   }, [judgmentCases, searchQ, sessionTypeFilter, judgmentFilter, date, sortConfig]);
 
-  const startEdit = (cObj) => {
+  const startEdit = (cObj, focusField = null) => {
     const session = cObj.sessions?.find(s => s.date === date);
     const j = session?.judgment || {};
     setEditingId(cObj.id);
+    setEditingFocusField(focusField);
     setEditData({
       _category: j.category || j._category || '',
       _result: j.result || j._result || session?.judgmentClassification || '',
@@ -423,6 +427,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
       await saveCaseToFirebase(cObj.id, payload);
       toast('تم حفظ الحكم بنجاح ✅', 'success');
       setEditingId(null);
+      setEditingFocusField(null);
       setEditData({});
     } catch (err) {
       console.error(err);
@@ -582,7 +587,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
               <ClipboardList className="w-3.5 h-3.5" /> إضافة إجراء
             </button>
             <button
-              onClick={() => setIsBulkProcedureOpen(true)}
+              onClick={() => setIsBulkViewingOpen(true)}
               className="flex items-center gap-1 bg-amber-500 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-amber-600 transition"
             >
               <Eye className="w-3.5 h-3.5" /> مهمة إطلاع
@@ -693,9 +698,10 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
 
                       {/* Roll Number */}
                       {visibleCols.roll && (
-                        <td className="px-2 py-2 text-center">
+                        <td className="px-2 py-2 text-center cursor-text" onClick={() => !isEditing && startEdit(cObj, '_rollNumber')} title="انقر للتعديل">
                           {isEditing ? (
                             <input
+                              autoFocus={editingFocusField === '_rollNumber'}
                               type="text"
                               value={editData._rollNumber}
                               onChange={e => setEditData(d => ({ ...d, _rollNumber: e.target.value }))}
@@ -737,10 +743,11 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
 
                       {/* Role / الصفة */}
                       {visibleCols.sessionType && (
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-2 cursor-text" onClick={() => !isEditing && startEdit(cObj, '_role')} title="انقر للتعديل">
                           {isEditing ? (
                             <div className="flex items-center gap-1">
                               <select
+                                autoFocus={editingFocusField === '_role'}
                                 value={editData._role}
                                 onChange={e => setEditData(d => ({ ...d, _role: e.target.value }))}
                                 className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white"
@@ -766,10 +773,11 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
 
                       {/* Type */}
                       {visibleCols.judgmentType && (
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-2 cursor-text" onClick={() => !isEditing && startEdit(cObj, '_type')} title="انقر للتعديل">
                           {isEditing ? (
                             <div>
                               <input
+                                autoFocus={editingFocusField === '_type'}
                                 list={`jtype-${cObj.id}`}
                                 value={editData._type}
                                 onChange={e => {
@@ -789,9 +797,10 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
 
                       {/* Category */}
                       {visibleCols.judgmentCategory && (
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-2 cursor-text" onClick={() => !isEditing && startEdit(cObj, '_category')} title="انقر للتعديل">
                           {isEditing ? (
                             <select
+                              autoFocus={editingFocusField === '_category'}
                               value={editData._category}
                               onChange={e => setEditData(d => applyDefaultRules('_category', e.target.value, { ...d, _category: e.target.value }))}
                               className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white"
@@ -807,9 +816,10 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
 
                       {/* Classification */}
                       {visibleCols.judgmentClassification && (
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-2 cursor-text" onClick={() => !isEditing && startEdit(cObj, '_result')} title="انقر للتعديل">
                           {isEditing ? (
                             <select
+                              autoFocus={editingFocusField === '_result'}
                               value={editData._result}
                               onChange={e => setEditData(d => applyDefaultRules('_result', e.target.value, { ...d, _result: e.target.value }))}
                               className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white"
@@ -830,9 +840,10 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
 
                       {/* Verdict text */}
                       {visibleCols.verdict && (
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-2 cursor-text" onClick={() => !isEditing && startEdit(cObj, '_verdict')} title="انقر للتعديل">
                           {isEditing ? (
                             <textarea
+                              autoFocus={editingFocusField === '_verdict'}
                               value={editData._verdict}
                               onChange={e => setEditData(d => ({ ...d, _verdict: e.target.value }))}
                               placeholder="المنطوق..."
@@ -869,7 +880,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                               حفظ
                             </button>
                             <button
-                              onClick={() => { setEditingId(null); setEditData({}); }}
+                              onClick={() => { setEditingId(null); setEditingFocusField(null); setEditData({}); }}
                               className="w-full flex items-center justify-center gap-1 bg-slate-200 hover:bg-slate-300 text-slate-600 text-[10px] font-black py-1.5 rounded-lg transition"
                             >
                               <X className="w-3 h-3" /> إلغاء
@@ -903,6 +914,14 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
       <BulkProcedureFromRollModal
         isOpen={isBulkProcedureOpen}
         onClose={() => setIsBulkProcedureOpen(false)}
+        selectedCaseIds={selectedIds}
+        cases={cases}
+        sessionDate={date}
+      />
+
+      <BulkViewingTaskModal
+        isOpen={isBulkViewingOpen}
+        onClose={() => setIsBulkViewingOpen(false)}
         selectedCaseIds={selectedIds}
         cases={cases}
         sessionDate={date}

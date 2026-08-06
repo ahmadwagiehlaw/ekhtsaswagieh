@@ -266,7 +266,7 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-500 block">نوع الجلسة</label>
               <div className="flex bg-slate-100 p-1 rounded-xl w-full">
-                {(settings?.courtDegree === 'إدارية عليا' || settings?.courtDegree === 'عليا' || settings?.courtDegree === 'ثان درجة' ? ['فحص', 'موضوع', 'حكم'] : ['مفوضين', 'مرافعة', 'حكم']).map((t, i) => (
+                {(settings?.courtDegree === 'إدارية عليا' || settings?.courtDegree === 'عليا' || settings?.courtDegree === 'ثان درجة' ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة']).map((t, i) => (
                   <button
                     key={t} type="button" onClick={() => handleChange('نوع الجلسة', t)}
                     className={`flex-1 py-1.5 px-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${formData['نوع الجلسة'] === t ? (i === 0 ? 'bg-amber-500 text-white' : i === 1 ? 'bg-emerald-500 text-white' : 'bg-navy-900 text-white') : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}

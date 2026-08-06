@@ -18,6 +18,7 @@ import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { getSafeDateObj } from '../utils/dateUtils';
 import BulkProcedureFromRollModal from './BulkProcedureFromRollModal';
+import BulkViewingTaskModal from './BulkViewingTaskModal';
 import BulkSessionRolloverModal from './BulkSessionRolloverModal';
 import ExportPDFModal from './ExportPDFModal';
 import QuickAddCaseModal from './QuickAddCaseModal';
@@ -89,6 +90,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   const [sessionTypeFilter, setSessionTypeFilter] = useState('الكل'); // الوضع الافتراضي: الكل
   const searchRef = useRef(null);
   const [isBulkProcedureOpen, setIsBulkProcedureOpen] = useState(false);
+  const [isBulkViewingOpen, setIsBulkViewingOpen] = useState(false);
   const [isPrintViewOpen, setIsPrintViewOpen] = useState(false);
   const [isRolloverOpen, setIsRolloverOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -169,7 +171,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   const decisionOptions = settings?.decisions || PREDEFINED_DECISIONS;
   const currentCourtDegree = settings?.courtDegree || 'أول درجة';
   const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
-  const sessionTypes = settings?.sessionTypes || (isSupreme ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة', 'حكم']);
+  const sessionTypes = settings?.sessionTypes || (isSupreme ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة']);
   const typeFahs = sessionTypes[0] || 'فحص';
 
   // '/' keyboard shortcut → focus search
@@ -554,7 +556,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
               <ClipboardList className="w-3.5 h-3.5" /> إضافة إجراء
             </button>
             <button
-              onClick={() => setIsBulkProcedureOpen(true)}
+              onClick={() => setIsBulkViewingOpen(true)}
               className="flex items-center gap-1 bg-amber-500 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-amber-600 transition"
             >
               <Eye className="w-3.5 h-3.5" /> مهمة إطلاع
@@ -664,17 +666,6 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                   return getFieldVal(cObj, [field]);
                 };
 
-                // Shared cell wrapper (makes any cell clickable to edit)
-                const EditableCell = ({ field, children, className = '' }) => (
-                  <td
-                    className={`px-2 py-2 cursor-text ${className}`}
-                    onClick={() => !isCell(field) && openCell(cObj, field)}
-                    title="انقر للتعديل"
-                  >
-                    {children}
-                  </td>
-                );
-
                 return (
                   <tr
                     key={cObj.id}
@@ -689,13 +680,12 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
 
                     {/* Roll number — editable */}
                     {visibleCols.roll && (
-                      <EditableCell field="الرول" className="w-16">
+                      <td className="px-2 py-2 cursor-text w-16" onClick={() => !isCell('الرول') && openCell(cObj, 'الرول')} title="انقر للتعديل">
                         {isCell('الرول') ? (
                           <input
                             autoFocus
                             type="text"
                             value={cellValue}
-                            onFocus={e => e.target.select()}
                             onChange={e => setCellValue(e.target.value)}
                             onKeyDown={e => handleCellKey(e, cObj, 'الرول')}
                             onBlur={() => handleCellBlur(cObj, 'الرول')}
@@ -706,7 +696,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                             {displayVal('الرول') || <span className="text-slate-300">—</span>}
                           </span>
                         )}
-                      </EditableCell>
+                      </td>
                     )}
 
                     {/* Case number — opens slide panel */}
@@ -758,7 +748,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
 
                     {/* Session type — editable, colored badge */}
                     {visibleCols.type && (
-                      <EditableCell field="نوع الجلسة" className="w-24">
+                      <td className="px-2 py-2 cursor-text w-24" onClick={() => !isCell('نوع الجلسة') && openCell(cObj, 'نوع الجلسة')} title="انقر للتعديل">
                         {isCell('نوع الجلسة') ? (
                           <select
                             autoFocus
@@ -775,19 +765,18 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                             {displayVal('نوع الجلسة') || <span className="text-slate-300 font-normal text-[9px]">انقر</span>}
                           </span>
                         )}
-                      </EditableCell>
+                      </td>
                     )}
 
                     {/* Decision — editable */}
                     {visibleCols.decision && (
-                      <EditableCell field="القرار" className="w-32">
+                      <td className="px-2 py-2 cursor-text w-32" onClick={() => !isCell('القرار') && openCell(cObj, 'القرار')} title="انقر للتعديل">
                         {isCell('القرار') ? (
                           <div>
                             <input
                               autoFocus
                               list={`dec-${cObj.id}`}
                               value={cellValue}
-                              onFocus={e => e.target.select()}
                               onChange={e => setCellValue(e.target.value)}
                               onKeyDown={e => handleCellKey(e, cObj, 'القرار')}
                               onBlur={() => handleCellBlur(cObj, 'القرار')}
@@ -803,18 +792,17 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                             {displayVal('القرار') || 'انقر'}
                           </span>
                         )}
-                      </EditableCell>
+                      </td>
                     )}
 
                     {/* Next session date — editable */}
                     {visibleCols.nextDate && (
-                      <EditableCell field="آخر جلسة" className="w-32">
+                      <td className="px-2 py-2 cursor-text w-32" onClick={() => !isCell('آخر جلسة') && openCell(cObj, 'آخر جلسة')} title="انقر للتعديل">
                         {isCell('آخر جلسة') ? (
                           <input
                             autoFocus
                             type="date"
                             value={cellValue}
-                            onFocus={e => e.target.select()}
                             onChange={e => setCellValue(e.target.value)}
                             onKeyDown={e => handleCellKey(e, cObj, 'آخر جلسة')}
                             onBlur={() => handleCellBlur(cObj, 'آخر جلسة')}
@@ -825,18 +813,17 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                             {displayVal('آخر جلسة') || 'انقر'}
                           </span>
                         )}
-                      </EditableCell>
+                      </td>
                     )}
 
                     {/* Notes — editable */}
                     {visibleCols.notes && (
-                      <EditableCell field="الملاحظات">
+                      <td className="px-2 py-2 cursor-text" onClick={() => !isCell('الملاحظات') && openCell(cObj, 'الملاحظات')} title="انقر للتعديل">
                         {isCell('الملاحظات') ? (
                           <input
                             autoFocus
                             type="text"
                             value={cellValue}
-                            onFocus={e => e.target.select()}
                             onChange={e => setCellValue(e.target.value)}
                             onKeyDown={e => {
                               if (e.key === 'Enter') { e.preventDefault(); commitCell(cObj.id, 'الملاحظات', cellValue); setTimeout(() => saveRow(cObj), 0); }
@@ -852,12 +839,12 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                             {displayVal('الملاحظات') || ''}
                           </span>
                         )}
-                      </EditableCell>
+                      </td>
                     )}
 
                     {/* مكان الملف — extra optional col, editable */}
                     {visibleCols.fileLocation && (
-                      <EditableCell field="مكان الملف" className="w-28">
+                      <td className="px-2 py-2 cursor-text w-28" onClick={() => !isCell('مكان الملف') && openCell(cObj, 'مكان الملف')} title="انقر للتعديل">
                         {isCell('مكان الملف') ? (
                           <select
                             autoFocus
@@ -878,7 +865,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                             fileLocation ? 'bg-emerald-100 text-emerald-700' : 'text-slate-300 font-normal'
                           }`}>{fileLocation || 'انقر'}</span>
                         )}
-                      </EditableCell>
+                      </td>
                     )}
 
                     {/* تصنيف الدعوى — extra optional col */}
@@ -961,6 +948,15 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
         cases={cases}
         sessionDate={date}
       />
+
+      <BulkViewingTaskModal
+        isOpen={isBulkViewingOpen}
+        onClose={() => setIsBulkViewingOpen(false)}
+        selectedCaseIds={selectedIds}
+        cases={cases}
+        sessionDate={date}
+      />
+
       <BulkSessionRolloverModal
         isOpen={isRolloverOpen}
         onClose={() => setIsRolloverOpen(false)}

@@ -32,18 +32,26 @@ export const AppProvider = ({ children }) => {
   
   const [globalHideNoInterest, setGlobalHideNoInterest] = useState(() => {
     const saved = localStorage.getItem('globalHideNoInterest');
-    return saved !== null ? JSON.parse(saved) : true;
+    if (saved === 'true') return 1;
+    if (saved === 'false') return 0;
+    return saved !== null ? Number(saved) : 1;
   });
 
   useEffect(() => {
-    localStorage.setItem('globalHideNoInterest', JSON.stringify(globalHideNoInterest));
+    localStorage.setItem('globalHideNoInterest', globalHideNoInterest.toString());
   }, [globalHideNoInterest]);
 
   const cases = useMemo(() => {
-    if (globalHideNoInterest) {
+    if (globalHideNoInterest === 1) {
       return rawCases.filter(c => {
          const role = String(c['الصفة'] || c['صفة'] || '').trim();
          return role !== 'لا شأن' && role !== 'لاشأن';
+      });
+    }
+    if (globalHideNoInterest === 2) {
+      return rawCases.filter(c => {
+         const role = String(c['الصفة'] || c['صفة'] || '').trim();
+         return role !== 'لا شأن' && role !== 'لاشأن' && role !== 'خارج الاختصاص';
       });
     }
     return rawCases;

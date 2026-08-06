@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, X, Upload, Edit3, Gavel, Settings2, Copy, Maximize2, CheckSquare, Square, Save, CopyPlus, RefreshCcw, Search, Settings, Plus, Trash2, FileText } from 'lucide-react';
+import { Check, X, Upload, Edit3, Gavel, Settings2, Copy, Maximize2, CheckSquare, Square, Save, CopyPlus, RefreshCcw, Search, Settings, Plus, Trash2, FileText, Camera } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { uploadToR2 } from '../lib/r2';
@@ -47,7 +47,7 @@ const getResultStyle = (result) => {
 const PREDEFINED_DECISIONS = ['للحكم', 'تصريح', 'للإعلان', 'للاطلاع', 'للإخطار', 'لورود التقرير', 'لتنفيذ قرار الإعادة', 'للاستعلام', 'استبعاد', 'إحالة للموضوع', 'رفض'];
 
 export default function SessionTable({ dayCases, date, onDateClick }) {
-  const { saveCaseToFirebase, settings, currentUser, cases } = useAppContext();
+  const { saveCaseToFirebase, settings, currentUser, cases, globalTasks } = useAppContext();
   const { showPrompt, toast } = useUI();
   const navigate = useNavigate();
   
@@ -621,6 +621,8 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
               else if (fileLocation === 'مؤقت') rowBgColor = 'bg-amber-50/80 hover:bg-amber-100/80';
               else if (fileLocation === 'خارج الاختصاص') rowBgColor = 'bg-indigo-50/80 hover:bg-indigo-100/80';
               
+              const hasViewingTask = globalTasks?.some(t => t.type === 'viewing' && t.status !== 'completed' && t.linkedCases?.includes(cObj.id));
+
               return (
                 <tr 
                   key={cObj.id} 
@@ -648,7 +650,10 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
                   
                   {visibleColumns['رقم الدعوى'] && (
                     <td className="px-3 py-2.5 text-xs font-black text-navy-900 cursor-pointer hover:text-indigo-600" onClick={() => !isEditing && setSelectedCaseId(cObj.id)}>
-                      {getFieldValueLocal(cObj, ['رقم الدعوى'])} / {getFieldValueLocal(cObj, ['السنة'])}
+                      <div className="flex items-center gap-1.5 justify-center">
+                        <span>{getFieldValueLocal(cObj, ['رقم الدعوى'])} / {getFieldValueLocal(cObj, ['السنة'])}</span>
+                        {hasViewingTask && <Camera className="w-3.5 h-3.5 text-indigo-500" title="مهمة إطلاع معلقة" />}
+                      </div>
                     </td>
                   )}
                   {visibleColumns['المدعي'] && (

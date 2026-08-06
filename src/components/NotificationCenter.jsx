@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Calendar, ClipboardList, AlertTriangle, CheckCircle2, ChevronLeft } from 'lucide-react';
+import { Bell, Calendar, ClipboardList, AlertTriangle, CheckCircle2, ChevronLeft, Camera } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useNavigate } from 'react-router-dom';
 import { parseISO, isAfter, isBefore, addDays, format, isToday, isTomorrow, startOfDay } from 'date-fns';
@@ -27,29 +27,8 @@ export default function NotificationCenter() {
     const today = startOfDay(new Date());
     const next3Days = addDays(today, 3);
 
-    // 1. Upcoming Sessions
     cases.forEach(c => {
-      if (c.sessions && Array.isArray(c.sessions)) {
-        c.sessions.forEach(session => {
-          if (session.date) {
-            const sDate = parseISO(session.date);
-            if (isAfter(sDate, today) || sDate.getTime() === today.getTime()) {
-              if (isBefore(sDate, next3Days)) {
-                notifs.push({
-                  id: `session-${session.id}`,
-                  type: 'session',
-                  title: 'جلسة قريبة',
-                  desc: `جلسة ${session.type || ''} للدعوى ${c['رقم الدعوى']}`,
-                  date: sDate,
-                  link: `/case/${c.id}`
-                });
-              }
-            }
-          }
-        });
-      }
-      
-      // 2. Urgent Reminders
+      // 1. Urgent Reminders
       if (c.urgentReminderDate) {
         const rDate = parseISO(c.urgentReminderDate);
         if (isBefore(rDate, next3Days)) {
@@ -66,21 +45,42 @@ export default function NotificationCenter() {
     });
 
     // 3. Global Tasks (Pending & Due Soon)
+    const viewingTasksByDate = {};
     globalTasks.forEach(task => {
       if (task.status !== 'completed' && task.dueDate) {
         const tDate = parseISO(task.dueDate);
         if (isBefore(tDate, next3Days) || isBefore(tDate, today)) {
-          const isOverdue = isBefore(tDate, today);
-          notifs.push({
-            id: `task-${task.id}`,
-            type: isOverdue ? 'overdue' : 'task',
-            title: isOverdue ? 'مهمة متأخرة' : 'مهمة قريبة',
-            desc: task.title,
-            date: tDate,
-            link: `/tasks`
-          });
+          if (task.type === 'viewing') {
+            const dateStr = task.dueDate.split('T')[0];
+            if (!viewingTasksByDate[dateStr]) {
+              viewingTasksByDate[dateStr] = { date: tDate, count: 0, dateStr };
+            }
+            viewingTasksByDate[dateStr].count++;
+          } else {
+            const isOverdue = isBefore(tDate, today);
+            notifs.push({
+              id: `task-${task.id}`,
+              type: isOverdue ? 'overdue' : 'task',
+              title: isOverdue ? 'مهمة متأخرة' : 'مهمة قريبة',
+              desc: task.title,
+              date: tDate,
+              link: `/tasks`
+            });
+          }
         }
       }
+    });
+
+    Object.values(viewingTasksByDate).forEach(group => {
+      const isOverdue = isBefore(group.date, today);
+      notifs.push({
+        id: `viewing-${group.dateStr}`,
+        type: 'viewing_group',
+        title: isOverdue ? 'مهام إطلاع وتصوير متأخرة' : 'مهام إطلاع جلسة قادمة',
+        desc: `يوجد ${group.count} ملفات في جلسة ${group.dateStr}`,
+        date: group.date,
+        link: `/files?q=&role=all&requiredTaskType=viewing&sessionDateStart=${group.dateStr}&sessionDateEnd=${group.dateStr}`
+      });
     });
 
     // Sort by date
@@ -100,6 +100,7 @@ export default function NotificationCenter() {
       case 'reminder': return <AlertTriangle className="w-4 h-4 text-amber-500" />;
       case 'overdue': return <AlertTriangle className="w-4 h-4 text-rose-500" />;
       case 'task': return <ClipboardList className="w-4 h-4 text-emerald-500" />;
+      case 'viewing_group': return <Camera className="w-4 h-4 text-indigo-500" />;
       default: return <Bell className="w-4 h-4 text-slate-500" />;
     }
   };

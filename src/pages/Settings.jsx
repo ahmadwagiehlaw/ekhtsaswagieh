@@ -35,6 +35,19 @@ export default function Settings() {
   const [localRoles, setLocalRoles] = useState(settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص']);
   const [localSessionTypes, setLocalSessionTypes] = useState(settings?.sessionTypes || []);
   const [localFileLocations, setLocalFileLocations] = useState(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
+  const [localViewingTasksPrintTemplate, setLocalViewingTasksPrintTemplate] = useState(settings?.viewingTasksPrintTemplate || {
+    title: 'كشف مهام الإطلاع وتصوير المستندات',
+    showCreationDate: true,
+    showConsultant: true,
+    showRoll: true,
+    showCaseNumber: true,
+    showAppellant: true,
+    showAppellee: true,
+    showRequiredDocs: true,
+    showSessionDate: true,
+    showDecision: true,
+    showStatus: true
+  });
   const [localCommonProcedures, setLocalCommonProcedures] = useState(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
   const [localCaseClassifications, setLocalCaseClassifications] = useState(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
   const [localCourtDegree, setLocalCourtDegree] = useState(settings?.courtDegree || 'أول درجة');
@@ -264,6 +277,7 @@ export default function Settings() {
     await saveSettingsToFirebase({
       ...settings,
       consultantName: localConsultantName,
+      viewingTasksPrintTemplate: localViewingTasksPrintTemplate,
       employees: localEmployees,
       decisions: localDecisions,
       reviewTasks: localReviewTasks,
@@ -514,7 +528,55 @@ export default function Settings() {
         <button onClick={() => setActiveTab('deadlines')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'deadlines' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⏰ المواعيد</button>
         <button onClick={() => setActiveTab('schema')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'schema' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🧩 هيكلة الحقول</button>
         <button onClick={() => setActiveTab('data')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'data' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🛡️ بيانات ونسخ</button>
+        <button onClick={() => setActiveTab('print')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'print' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🖨️ الطباعة</button>
       </div>
+
+      {/* PRINT TAB */}
+      {activeTab === 'print' && (
+        <div className="space-y-6 animate-in fade-in zoom-in duration-300">
+          <details className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-0" open>
+            <summary className="flex items-center justify-between pb-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-slate-100 transition-colors">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-navy-900" />
+                <h3 className="font-black text-sm text-navy-900">نموذج كشف مهام الإطلاع</h3>
+              </div>
+              <ArrowDownUp className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="pt-4 space-y-4">
+              <div>
+                <label className="text-[11px] font-black text-slate-500 block mb-1">عنوان الكشف الافتراضي</label>
+                <input
+                  type="text"
+                  value={localViewingTasksPrintTemplate.title}
+                  onChange={(e) => setLocalViewingTasksPrintTemplate({...localViewingTasksPrintTemplate, title: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  { key: 'showCreationDate', label: 'إظهار تاريخ التحرير' },
+                  { key: 'showConsultant', label: 'إظهار اسم المستشار / توقيع الموظف' },
+                  { key: 'showRoll', label: 'إظهار عمود الرول' },
+                  { key: 'showCaseNumber', label: 'إظهار عمود رقم الدعوى' },
+                  { key: 'showAppellant', label: 'إظهار عمود المدعي' },
+                  { key: 'showAppellee', label: 'إظهار عمود المدعى عليه' },
+                  { key: 'showRequiredDocs', label: 'إظهار عمود المستندات المطلوبة', disabled: true },
+                  { key: 'showSessionDate', label: 'إظهار عمود تاريخ الجلسة' },
+                  { key: 'showDecision', label: 'إظهار عمود القرار' },
+                  { key: 'showStatus', label: 'إظهار عمود حالة المهمة' }
+                ].map(field => (
+                  <div key={field.key} className={`flex items-center justify-between p-3 rounded-xl border ${localViewingTasksPrintTemplate[field.key] ? 'border-indigo-200 bg-indigo-50/50' : 'border-slate-200 bg-slate-50'} transition-all cursor-pointer`} onClick={() => !field.disabled && setLocalViewingTasksPrintTemplate({...localViewingTasksPrintTemplate, [field.key]: !localViewingTasksPrintTemplate[field.key]})}>
+                    <span className="text-[11px] font-black text-navy-900">{field.label} {field.disabled ? '(إلزامي)' : ''}</span>
+                    <div className={`w-8 h-4 rounded-full relative transition-colors ${localViewingTasksPrintTemplate[field.key] ? 'bg-indigo-600' : 'bg-slate-300'} ${field.disabled ? 'opacity-50' : ''}`}>
+                      <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${localViewingTasksPrintTemplate[field.key] ? 'left-0.5' : 'right-0.5'}`} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </details>
+        </div>
+      )}
 
       {/* DATA TAB: Sync + Backup merged */}
       {activeTab === 'data' && (
@@ -1176,7 +1238,7 @@ export default function Settings() {
 
             {/* Session Types choice */}
             <div className="space-y-2">
-              <h4 className="text-xs font-black text-slate-500">خيارات حقل نوع الجلسة (فحص / موضوع / إلخ):</h4>
+              <h4 className="text-xs font-black text-slate-500">إضافة نوع جلسة مخصص (فحص / موضوع / مفوضين / مرافعة):</h4>
               <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-200/60">
                 {localSessionTypes.map((type, i) => (
                   <div key={i} className="flex items-center gap-1 bg-emerald-50 border border-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-bold">

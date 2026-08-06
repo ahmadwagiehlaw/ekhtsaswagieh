@@ -15,7 +15,7 @@ export default function RollsLibrary() {
   const rollTypes = settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام'];
   const currentCourtDegree = settings?.courtDegree || 'أول درجة';
   const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
-  const sessionTypes = settings?.sessionTypes || (isSupreme ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة', 'حكم']);
+  const sessionTypes = settings?.sessionTypes || (isSupreme ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة']);
   const baseTypeDefault = rollTypes[0] || 'رول جلسة';
   const typeFahs = sessionTypes[0] || 'فحص';
   const typeMawdoo = sessionTypes[1] || 'موضوع';

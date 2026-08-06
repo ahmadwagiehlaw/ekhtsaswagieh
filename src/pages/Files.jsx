@@ -1,14 +1,17 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Filter, FolderClosed, Plus, Clock, FileText, Upload, Download, Loader2, Info, Building2, Gavel, FileBox, X, CalendarDays, Printer, CheckSquare, Square, ClipboardList, AlertTriangle, Sparkles, MapPin, User, Files as FilesIcon, ArrowUpDown, SlidersHorizontal, Edit3, Trash2, Pin, PinOff } from 'lucide-react';
+import { Search, Filter, FolderClosed, Plus, Clock, FileText, Upload, Download, Loader2, Info, Building2, Gavel, FileBox, X, CalendarDays, Printer, CheckSquare, Square, ClipboardList, AlertTriangle, Sparkles, MapPin, User, Files as FilesIcon, ArrowUpDown, SlidersHorizontal, Edit3, Trash2, Pin, PinOff, Eye, Camera } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import ExportPDFModal from '../components/ExportPDFModal';
 import BulkAssignTaskModal from '../components/BulkAssignTaskModal';
+import BulkViewingTaskModal from '../components/BulkViewingTaskModal';
 import BulkEditCasesModal from '../components/BulkEditCasesModal';
 import AdvancedSearchModal from '../components/AdvancedSearchModal';
 import GlobalTemplatePrintModal from '../components/GlobalTemplatePrintModal';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
+import { printViewingTasksList } from '../utils/printViewingTasks';
+
 import useSessionState from '../hooks/useSessionState';
 
 export default function Files() {
@@ -23,6 +26,8 @@ export default function Files() {
   const [currentPage, setCurrentPage] = useSessionState('files_currentPage', 1);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isBulkViewingOpen, setIsBulkViewingOpen] = useState(false);
+  const [singleViewingCaseId, setSingleViewingCaseId] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const [selectedCaseIds, setSelectedCaseIds] = useState([]);
@@ -42,6 +47,7 @@ export default function Files() {
   const [showRecentlyViewedOnly, setShowRecentlyViewedOnly] = useSessionState('files_showRecentlyViewedOnly', false);
   const [showRecentlyAddedOnly, setShowRecentlyAddedOnly] = useSessionState('files_showRecentlyAddedOnly', false);
   const [quickDateFilter, setQuickDateFilter] = useSessionState('files_quickDateFilter', '');
+  const [isDateSearchOpen, setIsDateSearchOpen] = useSessionState('files_isDateSearchOpen', false);
   const [isSelectionReportModalOpen, setIsSelectionReportModalOpen] = useState(false);
   const [isPrintViewOpen, setIsPrintViewOpen] = useState(false);
 
@@ -70,7 +76,7 @@ export default function Files() {
         setQuickDateFilter(pinned.quickDateFilter ?? '');
         setSortBy(pinned.sortBy ?? 'none');
       }
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   const handlePinFilters = () => {
@@ -80,8 +86,8 @@ export default function Files() {
     } else {
       const toSave = {
         roleFilter, showOngoingOnly, showWithAttachmentsOnly,
-        showImportantOnly, showSessionlessOnly, showPastSessionsOnly, 
-        showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly, 
+        showImportantOnly, showSessionlessOnly, showPastSessionsOnly,
+        showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly,
         quickDateFilter, sortBy
       };
       localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
@@ -108,7 +114,7 @@ export default function Files() {
     }
 
     // Check if it's an advanced search
-    if (params.get('caseNo') || params.get('year') || params.get('opponentName') || params.get('decision') || params.get('sessionDateStart') || params.get('court') || params.get('location')) {
+    if (params.get('caseNo') || params.get('year') || params.get('opponentName') || params.get('decision') || params.get('sessionDateStart') || params.get('court') || params.get('location') || params.get('requiredTask') || params.get('requiredTaskType')) {
       const adv = {};
       for (const [key, value] of params.entries()) {
         if (key !== 'q' && key !== 'role') adv[key] = value;
@@ -129,27 +135,27 @@ export default function Files() {
 
     // 1. Shoba Filter
     const archiveLocations = settings?.archiveLocations || ['شعبة الحفظ', 'الحفظ', 'حفظ'];
-    
+
     const isSpecialLocation = (loc) => {
-       if (!loc) return false;
-       if (archiveLocations.includes(loc)) return false;
-       return loc.includes('شعبة') || loc.includes('تحت التحديد') || loc.includes('القسم');
+      if (!loc) return false;
+      if (archiveLocations.includes(loc)) return false;
+      return loc.includes('شعبة') || loc.includes('تحت التحديد') || loc.includes('القسم');
     };
 
     if (activeShoba === 'متداول') {
       result = result.filter(c => {
-         const loc = String(c['مكان الملف'] || '').trim();
-         return !archiveLocations.includes(loc) && !isSpecialLocation(loc);
+        const loc = String(c['مكان الملف'] || '').trim();
+        return !archiveLocations.includes(loc) && !isSpecialLocation(loc);
       });
     } else if (activeShoba === 'تحت_التحديد') {
       result = result.filter(c => {
-         const loc = String(c['مكان الملف'] || '').trim();
-         return isSpecialLocation(loc);
+        const loc = String(c['مكان الملف'] || '').trim();
+        return isSpecialLocation(loc);
       });
     } else if (activeShoba === 'حفظ') {
       result = result.filter(c => {
-         const loc = String(c['مكان الملف'] || '').trim();
-         return archiveLocations.includes(loc);
+        const loc = String(c['مكان الملف'] || '').trim();
+        return archiveLocations.includes(loc);
       });
     }
 
@@ -162,6 +168,8 @@ export default function Files() {
           return role.includes(appRole) || role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
         } else if (roleFilter === 'appellee') {
           return role.includes(apeRole) || role.includes('مطعون') || role.includes('مستأنف ضده') || role.includes('مدعى عليه') || role.includes('مدعى علينا');
+        } else if (roleFilter === 'none') {
+          return !role || role === '-' || role === '---' || role === 'غير محدد';
         }
         return true;
       });
@@ -215,13 +223,13 @@ export default function Files() {
         return diffDays <= 7;
       });
     }
-    
+
     if (showRecentlyModifiedOnly) {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       result = result.filter(c => {
-         if (!c.updatedAt) return false;
-         return new Date(c.updatedAt) >= sevenDaysAgo;
+        if (!c.updatedAt) return false;
+        return new Date(c.updatedAt) >= sevenDaysAgo;
       });
     }
 
@@ -253,7 +261,7 @@ export default function Files() {
     }
 
     if (advancedParams) {
-      const { caseNo, year, opponentName, opponentRole, decision, sessionDateStart, sessionDateEnd, court, location, requiredTask } = advancedParams;
+      const { caseNo, year, opponentName, opponentRole, decision, sessionDateStart, sessionDateEnd, court, location, requiredTask, requiredTaskType } = advancedParams;
 
       result = result.filter(c => {
         // 1. Case No
@@ -291,8 +299,12 @@ export default function Files() {
 
         // Required Task
         if (requiredTask) {
-           const hasRequiredTask = globalTasks.some(t => t.status === 'pending' && t.title === requiredTask && t.linkedCases?.includes(c.id));
-           if (!hasRequiredTask) return false;
+          const hasRequiredTask = globalTasks.some(t => t.status === 'pending' && t.title === requiredTask && t.linkedCases?.includes(c.id));
+          if (!hasRequiredTask) return false;
+        }
+        if (requiredTaskType) {
+          const hasRequiredTaskType = globalTasks.some(t => t.status === 'pending' && t.type === requiredTaskType && t.linkedCases?.includes(c.id));
+          if (!hasRequiredTaskType) return false;
         }
 
         // 5. Session Date
@@ -466,19 +478,19 @@ export default function Files() {
 
       {/* Tab bar for Shoba Filtering */}
       <div className="bg-slate-100 p-1 rounded-2xl flex items-center justify-between mb-4">
-        <button 
+        <button
           onClick={() => setActiveShoba('متداول')}
           className={`flex-1 py-2 text-sm font-black rounded-xl transition ${activeShoba === 'متداول' ? 'bg-white text-indigo-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:bg-white/50'}`}
         >
           المتداول
         </button>
-        <button 
+        <button
           onClick={() => setActiveShoba('تحت_التحديد')}
           className={`flex-1 py-2 text-sm font-black rounded-xl transition ${activeShoba === 'تحت_التحديد' ? 'bg-white text-indigo-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:bg-white/50'}`}
         >
           شعبة تحت التحديد
         </button>
-        <button 
+        <button
           onClick={() => setActiveShoba('حفظ')}
           className={`flex-1 py-2 text-sm font-black rounded-xl transition ${activeShoba === 'حفظ' ? 'bg-white text-indigo-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:bg-white/50'}`}
         >
@@ -505,8 +517,8 @@ export default function Files() {
                 setIsSortPanelOpen(false);
               }}
               className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${isFilterPanelOpen || (roleFilter !== 'all' || showOngoingOnly || showPastSessionsOnly || showWithAttachmentsOnly || showImportantOnly || showSessionlessOnly)
-                  ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
-                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                 }`}
               title="خيارات الفلترة والتصفية"
             >
@@ -520,14 +532,22 @@ export default function Files() {
 
             {/* Hide 'No Interest' Toggle */}
             <button
-              onClick={() => setGlobalHideNoInterest(!globalHideNoInterest)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${
-                globalHideNoInterest ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-              }`}
-              title="إخفاء أو إظهار ملفات (لا شأن)"
+              onClick={() => {
+                const nextState = globalHideNoInterest === 2 ? 0 : globalHideNoInterest + 1;
+                setGlobalHideNoInterest(nextState);
+              }}
+              className={`px-3.5 py-2 rounded-xl text-[10.5px] font-black transition-all flex items-center gap-1.5 shadow-sm border ${
+                globalHideNoInterest === 1 ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
+                globalHideNoInterest === 2 ? 'bg-rose-100 text-rose-700 border-rose-200' :
+                'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                }`}
+              title="إخفاء أو إظهار ملفات (لا شأن) و (خارج الاختصاص)"
             >
-              {globalHideNoInterest ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
-              <span>إخفاء (لا شأن)</span>
+              {globalHideNoInterest === 0 ? <Eye className="w-3.5 h-3.5 text-indigo-500" /> : <PinOff className="w-3.5 h-3.5" />}
+              <span>
+                {globalHideNoInterest === 0 ? 'إظهار الكل' :
+                 globalHideNoInterest === 1 ? 'إخفاء (لا شأن)' : 'إخفاء (لا شأن والاختصاص)'}
+              </span>
             </button>
 
             {/* Sort Toggle Button */}
@@ -537,8 +557,8 @@ export default function Files() {
                 setIsFilterPanelOpen(false);
               }}
               className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${isSortPanelOpen || sortBy !== 'none'
-                  ? 'bg-amber-100 text-amber-700 border-amber-200'
-                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                ? 'bg-amber-100 text-amber-700 border-amber-200'
+                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                 }`}
               title="ترتيب المعروض"
             >
@@ -547,6 +567,21 @@ export default function Files() {
               {sortBy !== 'none' && (
                 <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
               )}
+            </button>
+
+            {/* Print Viewing Tasks */}
+            <button
+              onClick={() => {
+                const casesToPrint = selectedCaseIds.length > 0 ? cases.filter(c => selectedCaseIds.includes(c.id)) : filteredCases;
+                const vTasks = globalTasks?.filter(t => t.type === 'viewing' && t.status !== 'completed' && t.linkedCases?.some(id => casesToPrint.find(c => c.id === id)));
+                if(!vTasks || vTasks.length === 0) { toast('لا توجد مهام إطلاع معلقة للملفات المحددة', 'error'); return; }
+                printViewingTasksList(vTasks, cases, settings);
+              }}
+              className="bg-indigo-100 text-indigo-700 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-indigo-200 transition shadow-sm border border-indigo-200"
+              title="طباعة مهام الإطلاع"
+            >
+              <Camera className="w-4 h-4" />
+              <span className="hidden sm:inline">مهام الإطلاع</span>
             </button>
 
             {/* Print Button */}
@@ -562,46 +597,66 @@ export default function Files() {
 
           {/* Search on the left (RTL end) */}
           <div className="flex gap-2 w-full sm:w-auto flex-1 sm:max-w-md justify-end">
-            <div className="relative w-full sm:max-w-[130px]">
-              <input
-                type="date"
-                title="تاريخ الجلسة"
-                value={quickDateFilter}
-                onChange={(e) => setQuickDateFilter(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2 px-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
-              />
-            </div>
-            <div className="relative w-full sm:flex-1 max-w-xs">
-            <input
-              id="search-cases-input"
-              type="text"
-              placeholder="بحث في القضايا..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2 pl-28 pr-10 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
-            />
-
-            <button
-              type="button"
-              onClick={() => setIsAdvancedSearchOpen(true)}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded bg-indigo-50 text-indigo-500 hover:bg-indigo-100 transition"
-              title="البحث الذكي"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-            </button>
-
-            <span className="absolute left-9 top-1/2 -translate-y-1/2 bg-indigo-100/80 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded font-black border border-indigo-200 pointer-events-none select-none">
-              {filteredCases.length} ملف
-            </span>
-
-            {searchQuery || advancedParams ? (
-              <button onClick={() => { setSearchQuery(''); setAdvancedParams(null); setQuickDateFilter(''); navigate('/files'); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
+            {isDateSearchOpen || quickDateFilter ? (
+              <div className="relative w-full sm:max-w-[150px] flex items-center gap-1 bg-slate-50 border border-slate-300 rounded-xl px-1">
+                <input
+                  type="date"
+                  title="تاريخ الجلسة"
+                  value={quickDateFilter}
+                  onChange={(e) => setQuickDateFilter(e.target.value)}
+                  className="w-full bg-transparent py-2 px-1 text-xs font-bold text-navy-900 focus:outline-none"
+                />
+                <button
+                  onClick={() => {
+                    setQuickDateFilter('');
+                    setIsDateSearchOpen(false);
+                  }}
+                  className="text-slate-400 hover:text-rose-500 transition p-1"
+                  title="إلغاء بحث التاريخ"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             ) : (
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <button
+                onClick={() => setIsDateSearchOpen(true)}
+                className="p-2 rounded-xl transition border bg-slate-50 border-slate-300 text-slate-400 hover:bg-slate-100 hover:text-indigo-600"
+                title="البحث بالتاريخ"
+              >
+                <CalendarDays className="w-5 h-5" />
+              </button>
             )}
-          </div>
+            <div className="relative w-full sm:flex-1 max-w-xs">
+              <input
+                id="search-cases-input"
+                type="text"
+                placeholder="بحث في القضايا..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2 pl-28 pr-10 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
+              />
+
+              <button
+                type="button"
+                onClick={() => setIsAdvancedSearchOpen(true)}
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded bg-indigo-50 text-indigo-500 hover:bg-indigo-100 transition"
+                title="البحث الذكي"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+              </button>
+
+              <span className="absolute left-9 top-1/2 -translate-y-1/2 bg-indigo-100/80 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded font-black border border-indigo-200 pointer-events-none select-none">
+                {filteredCases.length} ملف
+              </span>
+
+              {searchQuery || advancedParams ? (
+                <button onClick={() => { setSearchQuery(''); setAdvancedParams(null); setQuickDateFilter(''); navigate('/files'); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  <X className="w-4 h-4" />
+                </button>
+              ) : (
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              )}
+            </div>
           </div>
         </div>
 
@@ -615,11 +670,10 @@ export default function Files() {
                 <button
                   onClick={handlePinFilters}
                   title={isPinned ? 'إلغاء تثبيت الفلاتر الحالية' : 'تثبيت الفلاتر الحالية (تبقى محفوظة)'}
-                  className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg border transition ${
-                    isPinned
+                  className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg border transition ${isPinned
                       ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200'
                       : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-amber-50 hover:text-amber-600'
-                  }`}
+                    }`}
                 >
                   {isPinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
                   {isPinned ? 'إلغاء التثبيت' : 'تثبيت الفلاتر'}
@@ -639,11 +693,11 @@ export default function Files() {
                       setQuickDateFilter('');
                       if (isPinned) {
                         // Update pin to reflect cleared state
-                        const toSave = { 
-                          roleFilter: 'all', showOngoingOnly: false, showWithAttachmentsOnly: false, 
-                          showImportantOnly: false, showSessionlessOnly: false, showPastSessionsOnly: false, 
-                          showRecentlyModifiedOnly: false, showRecentlyViewedOnly: false, showRecentlyAddedOnly: false, 
-                          quickDateFilter: '', sortBy 
+                        const toSave = {
+                          roleFilter: 'all', showOngoingOnly: false, showWithAttachmentsOnly: false,
+                          showImportantOnly: false, showSessionlessOnly: false, showPastSessionsOnly: false,
+                          showRecentlyModifiedOnly: false, showRecentlyViewedOnly: false, showRecentlyAddedOnly: false,
+                          quickDateFilter: '', sortBy
                         };
                         localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
                       }
@@ -657,11 +711,11 @@ export default function Files() {
             </div>
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => setRoleFilter(prev => prev === 'all' ? 'appellant' : prev === 'appellant' ? 'appellee' : 'all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${roleFilter === 'all' ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' : roleFilter === 'appellant' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}`}
+                onClick={() => setRoleFilter(prev => prev === 'all' ? 'appellant' : prev === 'appellant' ? 'appellee' : prev === 'appellee' ? 'none' : 'all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${roleFilter === 'all' ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' : roleFilter === 'appellant' ? 'bg-rose-100 text-rose-700 border-rose-200' : roleFilter === 'appellee' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-700 text-slate-100 border-slate-600'}`}
               >
                 <User className="w-3.5 h-3.5" />
-                <span>الصفة: {roleFilter === 'all' ? 'الكل' : roleFilter === 'appellant' ? (settings?.roles?.[0] || 'الطاعن') : (settings?.roles?.[1] || 'المطعون ضدنا')}</span>
+                <span>الصفة: {roleFilter === 'all' ? 'الكل' : roleFilter === 'appellant' ? (settings?.roles?.[0] || 'الطاعن') : roleFilter === 'appellee' ? (settings?.roles?.[1] || 'المطعون ضدنا') : 'غير محدد'}</span>
               </button>
 
               <button
@@ -881,16 +935,18 @@ export default function Files() {
 
           let locationRibbon = null;
           if (!isNoInterest && fileLocation && fileLocation !== 'في المكتب') {
-             if (isMissing) {
-                locationRibbon = { text: 'غير موجود', color: 'bg-rose-600', textColor: 'text-white' };
-             } else if (isTemp) {
-                locationRibbon = { text: 'مؤقت', color: 'bg-amber-500', textColor: 'text-white' };
-             } else if (isOut) {
-                locationRibbon = { text: 'خارج الاختصاص', color: 'bg-indigo-600', textColor: 'text-white' };
-             } else {
-                locationRibbon = { text: fileLocation, color: 'bg-slate-700', textColor: 'text-white' };
-             }
+            if (isMissing) {
+              locationRibbon = { text: 'غير موجود', color: 'bg-rose-600', textColor: 'text-white' };
+            } else if (isTemp) {
+              locationRibbon = { text: 'مؤقت', color: 'bg-amber-500', textColor: 'text-white' };
+            } else if (isOut) {
+              locationRibbon = { text: 'خارج الاختصاص', color: 'bg-indigo-600', textColor: 'text-white' };
+            } else {
+              locationRibbon = { text: fileLocation, color: 'bg-slate-700', textColor: 'text-white' };
+            }
           }
+
+          const hasViewingTask = globalTasks?.some(t => t.type === 'viewing' && t.status !== 'completed' && t.linkedCases?.includes(c.id));
 
           return (
             <div
@@ -917,6 +973,22 @@ export default function Files() {
                 </div>
               )}
 
+              {/* Viewing Task Button / Badge */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (hasViewingTask) {
+                    toast('هناك مهمة إطلاع مسجلة بالفعل. لا يمكنك إضافة مهمة جديدة إلا بعد حذف أو إنجاز المهمة الحالية.', 'error');
+                  } else {
+                    setSingleViewingCaseId(c.id);
+                  }
+                }}
+                className={`absolute top-1/2 -right-2.5 -translate-y-1/2 p-1.5 rounded-full shadow-sm z-30 flex items-center justify-center border-2 border-white transition-all duration-300 ${hasViewingTask ? 'bg-indigo-600 text-white opacity-100' : 'bg-slate-100 text-slate-500 hover:bg-indigo-500 hover:text-white opacity-0 group-hover:opacity-100 hover:scale-110'}`}
+                title={hasViewingTask ? "مهمة إطلاع معلقة (انقر للتنبيه)" : "إنشاء مهمة إطلاع جديدة"}
+              >
+                <Camera className="w-3.5 h-3.5" />
+              </button>
+
               {/* Card Body */}
               <div className={`relative ${bgClass} border ${borderClass} rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all duration-300 z-20 h-full flex flex-col group-hover:-translate-y-1 overflow-hidden ${cardOpacity} ${grayscale}`}>
 
@@ -937,46 +1009,58 @@ export default function Files() {
                 {/* Top Accent Line */}
                 <div className={`absolute top-0 left-0 w-full h-1 z-10 bg-gradient-to-r from-${roleColor}-400 to-${roleColor}-500`}></div>
 
-                {coverImageUrl && (
-                  <div className="mb-4 -mx-4 sm:-mx-5 -mt-4 sm:-mt-5 aspect-[3/4] relative border-b border-slate-100 bg-slate-100 shrink-0 overflow-hidden">
-                    <img src={coverImageUrl} alt="غلاف الملف" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-navy-900/80 via-transparent to-transparent"></div>
+                {/* Cover Area (Image or Beautiful CSS Fallback) */}
+                <div className="mb-4 -mx-4 sm:-mx-5 -mt-4 sm:-mt-5 aspect-[3/4] relative border-b border-slate-100 shrink-0 overflow-hidden flex flex-col items-center justify-center bg-slate-50">
+                  {coverImageUrl ? (
+                    <img src={coverImageUrl} alt="غلاف الملف" className="w-full h-full object-cover absolute inset-0 z-0" />
+                  ) : (
+                    <>
+                      <div className={`absolute inset-0 bg-gradient-to-br from-slate-50 to-slate-200 z-0`}></div>
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-white/40 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2 z-0"></div>
+                      <div className={`absolute bottom-0 left-0 w-40 h-40 bg-${roleColor}-500/10 rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2 z-0`}></div>
 
-                    {/* Tags over image */}
-                    <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end">
-                      <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-black border backdrop-blur-md shadow-sm ${isAppellant ? 'bg-rose-500/90 text-white border-rose-400' : isAppellee ? 'bg-emerald-500/90 text-white border-emerald-400' : 'bg-amber-500/90 text-white border-amber-400'}`}>
-                        {role || 'ملف دعوى'}
-                      </span>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setQuickLocationEditId(c.id); }}
-                        className={`w-7 h-7 flex items-center justify-center rounded-lg border backdrop-blur-md shadow-sm transition ${
-                          fileLocation === 'غير موجود' ? 'bg-rose-500/90 text-white border-rose-400' :
+                      <div className={`w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center mb-3 text-${roleColor}-500 ring-1 ring-black/5 z-10`}>
+                        <Gavel className="w-7 h-7 opacity-80" />
+                      </div>
+
+                      <div className="text-center px-4 z-10">
+                        <p className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">ملف دعوى</p>
+                        <h4 className="text-xl font-black text-slate-700 tracking-tight">{caseNum || 'بدون رقم'}</h4>
+                        {year && <p className="text-xs font-bold text-slate-500 mt-0.5">لسنة {year}</p>}
+                      </div>
+                    </>
+                  )}
+
+                  <div className="absolute inset-0 bg-gradient-to-t from-navy-900/80 via-transparent to-transparent pointer-events-none z-10"></div>
+
+                  {/* Tags over cover (always show) */}
+                  <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end z-20">
+                    <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-black border backdrop-blur-md shadow-sm ${isAppellant ? 'bg-rose-500/90 text-white border-rose-400' : isAppellee ? 'bg-emerald-500/90 text-white border-emerald-400' : 'bg-amber-500/90 text-white border-amber-400'}`}>
+                      {role || 'ملف دعوى'}
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setQuickLocationEditId(c.id); }}
+                      className={`w-7 h-7 flex items-center justify-center rounded-lg border backdrop-blur-md shadow-sm transition ${fileLocation === 'غير موجود' ? 'bg-rose-500/90 text-white border-rose-400' :
                           fileLocation === 'مؤقت' ? 'bg-amber-500/90 text-white border-amber-400' :
-                          fileLocation === 'في المكتب' ? 'bg-emerald-500/90 text-white border-emerald-400' :
-                          fileLocation?.includes('شعبة') ? 'bg-slate-700/90 text-white border-slate-600' :
-                          'bg-black/50 text-white border-white/20 hover:bg-black/70'
+                            fileLocation === 'في المكتب' ? 'bg-emerald-500/90 text-white border-emerald-400' :
+                              fileLocation?.includes('شعبة') ? 'bg-slate-700/90 text-white border-slate-600' :
+                                'bg-black/50 text-white border-white/20 hover:bg-black/70'
                         }`}
-                        title={`مكان الملف: ${fileLocation || 'لم يحدد'} (انقر للتغيير)`}
-                      >
-                        {fileLocation === 'غير موجود' ? <AlertTriangle className="w-3.5 h-3.5" /> :
-                         fileLocation === 'مؤقت' ? <FilesIcon className="w-3.5 h-3.5" /> :
-                         fileLocation === 'في المكتب' ? <CheckSquare className="w-3.5 h-3.5" /> :
-                         fileLocation?.includes('شعبة') ? <FolderClosed className="w-3.5 h-3.5" /> :
-                         <MapPin className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
+                      title={`مكان الملف: ${fileLocation || 'لم يحدد'} (انقر للتغيير)`}
+                    >
+                      {fileLocation === 'غير موجود' ? <AlertTriangle className="w-3.5 h-3.5" /> :
+                        fileLocation === 'مؤقت' ? <FilesIcon className="w-3.5 h-3.5" /> :
+                          fileLocation === 'في المكتب' ? <CheckSquare className="w-3.5 h-3.5" /> :
+                            fileLocation?.includes('شعبة') ? <FolderClosed className="w-3.5 h-3.5" /> :
+                              <MapPin className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
-                )}
+                </div>
 
-                {/* Header: Number, Year, and Role */}
-                <div className={`flex flex-col gap-3 mb-4 ${!coverImageUrl ? 'pt-1' : ''}`}>
+                {/* Header: Number, Year (Simplified since fallback is in the cover now) */}
+                <div className={`flex flex-col gap-3 mb-4 pt-1`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-2.5">
-                      {!coverImageUrl && (
-                        <div className={`w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0`}>
-                          <FolderClosed className={`w-5 h-5 text-${roleColor}-500`} />
-                        </div>
-                      )}
                       <div>
                         <h3 className="font-black text-lg sm:text-xl text-navy-900 leading-tight flex items-center gap-1.5 flex-wrap">
                           {c.isImportant && <Sparkles className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" title="دعوى هامة" />}
@@ -988,30 +1072,6 @@ export default function Files() {
                             </span>
                           )}
                         </h3>
-                        {!coverImageUrl && (
-                          <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                            <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-black border ${badgeBgClass}`}>
-                              {role || 'ملف دعوى'}
-                            </span>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); setQuickLocationEditId(c.id); }}
-                              className={`w-6 h-6 flex items-center justify-center rounded border shadow-sm transition ${
-                                fileLocation === 'غير موجود' ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100' :
-                                fileLocation === 'مؤقت' ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100' :
-                                fileLocation === 'في المكتب' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' :
-                                fileLocation?.includes('شعبة') ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' :
-                                'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'
-                              }`}
-                              title={`مكان الملف: ${fileLocation || 'لم يحدد'} (انقر للتغيير)`}
-                            >
-                              {fileLocation === 'غير موجود' ? <AlertTriangle className="w-3.5 h-3.5" /> :
-                               fileLocation === 'مؤقت' ? <FilesIcon className="w-3.5 h-3.5" /> :
-                               fileLocation === 'في المكتب' ? <CheckSquare className="w-3.5 h-3.5" /> :
-                               fileLocation?.includes('شعبة') ? <FolderClosed className="w-3.5 h-3.5" /> :
-                               <MapPin className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -1035,9 +1095,9 @@ export default function Files() {
                       <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4 opacity-70 shrink-0" />
                       <span className="truncate" dir="ltr">{formattedLastSession || 'لم تحدد'}</span>
                       {sessionRoll && (
-                         <span className="bg-slate-200/50 text-slate-600 px-1.5 py-0.5 rounded text-[10px] mr-1 border border-slate-200 font-black shrink-0">
-                           رول: {sessionRoll}
-                         </span>
+                        <span className="bg-slate-200/50 text-slate-600 px-1.5 py-0.5 rounded text-[10px] mr-1 border border-slate-200 font-black shrink-0">
+                          رول: {sessionRoll}
+                        </span>
                       )}
                     </div>
                     {decision && (
@@ -1106,19 +1166,20 @@ export default function Files() {
             <span>وثائق</span>
           </button>
           <button
+            onClick={() => setIsBulkViewingOpen(true)}
+            className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 transition shrink-0"
+          >
+            <Eye className="w-4 h-4" />
+            <span>مهمة إطلاع</span>
+          </button>
+          <button
             onClick={() => setIsAssignModalOpen(true)}
             className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 transition shrink-0"
           >
             <ClipboardList className="w-4 h-4" />
             <span>إسناد</span>
           </button>
-          <button
-            onClick={() => setIsSelectionReportModalOpen(true)}
-            className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 transition shrink-0"
-          >
-            <Printer className="w-4 h-4" />
-            <span>تقرير</span>
-          </button>
+
           <button
             onClick={async () => {
               const confirm = await showConfirm("تأكيد الحذف الجماعي", `هل أنت متأكد من حذف ${selectedCaseIds.length} ملف نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`);
@@ -1155,46 +1216,46 @@ export default function Files() {
               <button onClick={() => setQuickLocationEditId(null)} className="text-white/60 hover:text-white transition"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-5 space-y-3">
-               <div className="flex flex-wrap gap-2">
-                 {['غير موجود', 'أصلي', 'مؤقت', 'شعبة الحفظ', 'شعبة تحت التحديد', 'شعبة خاصة', 'شعبة الشغل', 'الأحكام', 'في البيت'].map(loc => {
-                   const cData = cases.find(c => c.id === quickLocationEditId);
-                   const isSelected = cData && (cData['مكان الملف'] === loc);
-                   return (
-                     <button 
-                       key={loc}
-                       onClick={async () => {
-                         try {
-                            const archiveLocs = settings?.archiveLocations || ['شعبة الحفظ', 'الحفظ', 'حفظ'];
-                            if (archiveLocs.includes(loc)) {
-                              const decision = String(cData['القرار'] || cData['قرار الجلسة'] || cData['المنطوق'] || '');
-                              const hasJudgment = decision.includes('حكم') || decision.includes('للحكم') || (cData.sessions && cData.sessions.some(s => s.judgment));
-                              if (!hasJudgment) {
-                                toast("لا يمكن حفظ قضية لم يصدر فيها حكم!", "error");
-                                return;
-                              }
+              <div className="flex flex-wrap gap-2">
+                {['غير موجود', 'أصلي', 'مؤقت', 'شعبة الحفظ', 'شعبة تحت التحديد', 'شعبة خاصة', 'شعبة الشغل', 'الأحكام', 'في البيت'].map(loc => {
+                  const cData = cases.find(c => c.id === quickLocationEditId);
+                  const isSelected = cData && (cData['مكان الملف'] === loc);
+                  return (
+                    <button
+                      key={loc}
+                      onClick={async () => {
+                        try {
+                          const archiveLocs = settings?.archiveLocations || ['شعبة الحفظ', 'الحفظ', 'حفظ'];
+                          if (archiveLocs.includes(loc)) {
+                            const decision = String(cData['القرار'] || cData['قرار الجلسة'] || cData['المنطوق'] || '');
+                            const hasJudgment = decision.includes('حكم') || decision.includes('للحكم') || (cData.sessions && cData.sessions.some(s => s.judgment));
+                            if (!hasJudgment) {
+                              toast("لا يمكن حفظ قضية لم يصدر فيها حكم!", "error");
+                              return;
                             }
-                            const locField = schema.find(f => f.id === 'مكان الملف') ? 'مكان الملف' : 'مكان الملف';
-                            const success = await saveCaseToFirebase(quickLocationEditId, { [locField]: loc });
-                            if (success) {
-                              toast("تم تحديث مكان الملف بنجاح", "success");
-                              setQuickLocationEditId(null);
-                            } else {
-                              toast("حدث خطأ أثناء حفظ مكان الملف", "error");
-                            }
-                         } catch(e) {
-                            toast("حدث خطأ غير متوقع", "error");
-                         }
-                       }}
-                       className={`px-3 py-2 rounded-lg text-xs font-bold transition flex-1 ${isSelected ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                     >
-                       {loc}
-                     </button>
-                   );
-                 })}
-               </div>
-               <div className="pt-2 text-center text-[10px] text-slate-400 font-bold">
-                 سيتم حفظ التغيير فور النقر على المكان المطلوب
-               </div>
+                          }
+                          const locField = schema.find(f => f.id === 'مكان الملف') ? 'مكان الملف' : 'مكان الملف';
+                          const success = await saveCaseToFirebase(quickLocationEditId, { [locField]: loc });
+                          if (success) {
+                            toast("تم تحديث مكان الملف بنجاح", "success");
+                            setQuickLocationEditId(null);
+                          } else {
+                            toast("حدث خطأ أثناء حفظ مكان الملف", "error");
+                          }
+                        } catch (e) {
+                          toast("حدث خطأ غير متوقع", "error");
+                        }
+                      }}
+                      className={`px-3 py-2 rounded-lg text-xs font-bold transition flex-1 ${isSelected ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    >
+                      {loc}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="pt-2 text-center text-[10px] text-slate-400 font-bold">
+                سيتم حفظ التغيير فور النقر على المكان المطلوب
+              </div>
             </div>
           </div>
         </div>
@@ -1220,6 +1281,22 @@ export default function Files() {
         selectedCases={selectedCaseIds}
         onClearSelection={() => setSelectedCaseIds([])}
       />
+
+      <BulkViewingTaskModal
+        isOpen={isBulkViewingOpen}
+        onClose={() => setIsBulkViewingOpen(false)}
+        selectedCaseIds={new Set(selectedCaseIds)}
+        cases={cases}
+      />
+
+      {singleViewingCaseId && (
+        <BulkViewingTaskModal
+          isOpen={!!singleViewingCaseId}
+          onClose={() => setSingleViewingCaseId(null)}
+          selectedCaseIds={new Set([singleViewingCaseId])}
+          cases={cases}
+        />
+      )}
 
       <BulkEditCasesModal
         isOpen={isEditModalOpen}

@@ -5,6 +5,7 @@ import { useAppContext } from '../context/AppState';
 import { useAuth } from '../context/AuthContext';
 import AddCaseModal from './AddCaseModal';
 import NotificationCenter from './NotificationCenter';
+import TasksManagerModal from './TasksManagerModal';
 
 export default function Layout() {
   const { settings, isAdmin, currentUserPermissions } = useAppContext();
@@ -15,6 +16,7 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isTasksModalOpen, setIsTasksModalOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   useEffect(() => {
@@ -76,7 +78,7 @@ export default function Layout() {
             </button>
           )}
           <button 
-            onClick={() => navigate('/tasks')}
+            onClick={() => setIsTasksModalOpen(true)}
             className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-slate-300 hover:text-white"
             title="المهام"
           >
@@ -215,6 +217,7 @@ export default function Layout() {
         isOpen={isAddModalOpen} 
         onClose={() => setIsAddModalOpen(false)} 
       />
+      <TasksManagerModal isOpen={isTasksModalOpen} onClose={() => setIsTasksModalOpen(false)} />
     </div>
   );
 }
