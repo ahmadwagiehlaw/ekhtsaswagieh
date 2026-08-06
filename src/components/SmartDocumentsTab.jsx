@@ -64,7 +64,7 @@ export default function SmartDocumentsTab() {
   const [activeTemplate, setActiveTemplate] = useState(templates[0] || null);
   const [isEditingMeta, setIsEditingMeta] = useState(false);
   const [metaForm, setMetaForm] = useState({ name: '', category: '' });
-  const [expandedCats, setExpandedCats] = useState({ 'شهادات': true, 'عام': true });
+  const [activeFolder, setActiveFolder] = useState(null);
   const [showMoreVars, setShowMoreVars] = useState(false);
   const [searchTemplate, setSearchTemplate] = useState('');
   
@@ -147,9 +147,7 @@ export default function SmartDocumentsTab() {
     return acc;
   }, {});
 
-  const toggleCat = (cat) => {
-    setExpandedCats(prev => ({ ...prev, [cat]: !prev[cat] }));
-  };
+  const sortedCategories = Object.keys(groupedTemplates).sort((a, b) => a.localeCompare(b, 'ar'));
 
   const mainVariables = [
     { label: 'رقم الدعوى', val: '{{رقم_الدعوى}}' },
@@ -207,49 +205,63 @@ export default function SmartDocumentsTab() {
         </div>
         
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {Object.keys(groupedTemplates).length === 0 && (
+          {sortedCategories.length === 0 && (
              <div className="text-center text-slate-400 text-xs py-4 font-bold">لا توجد قوالب مطابقة</div>
           )}
-          {Object.keys(groupedTemplates).map(cat => (
-            <div key={cat} className="space-y-1">
-              <button 
-                onClick={() => toggleCat(cat)}
-                className="w-full flex items-center justify-between p-1.5 hover:bg-slate-50 rounded text-right transition"
-              >
-                <div className="flex items-center gap-2">
-                  {expandedCats[cat] ? <FolderOpen className="w-4 h-4 text-amber-500" /> : <Folder className="w-4 h-4 text-amber-500 fill-amber-100" />}
-                  <h4 className="text-xs font-black text-slate-700">
-                    {cat}
-                  </h4>
-                </div>
-                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 rounded">{groupedTemplates[cat].length}</span>
-              </button>
-              {expandedCats[cat] && (
-                <div className="space-y-0.5 pr-5 border-r border-slate-200 mr-2 mt-1">
-                  {groupedTemplates[cat].map(tpl => (
-                    <div 
-                      key={tpl.id}
-                      onClick={() => setActiveTemplate(tpl)}
-                      className={`flex items-center justify-between p-1.5 rounded-lg cursor-pointer transition relative group ${activeTemplate?.id === tpl.id ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}
-                    >
-                      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 border-t border-slate-200 -mr-2"></div>
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <FileText className={`w-3.5 h-3.5 shrink-0 ${activeTemplate?.id === tpl.id ? 'text-indigo-600' : 'text-slate-400'}`} />
-                        <span className={`text-[11px] font-bold truncate ${activeTemplate?.id === tpl.id ? 'text-indigo-800' : 'text-slate-600'}`}>
-                          {tpl.name}
-                        </span>
-                      </div>
-                      {isAdmin && (
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(tpl.id); }} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+          
+          {!activeFolder ? (
+            // Folders View
+            <div className="grid grid-cols-2 gap-2">
+              {sortedCategories.map(cat => (
+                <button 
+                  key={cat}
+                  onClick={() => setActiveFolder(cat)}
+                  className="flex flex-col items-center justify-center p-4 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-xl transition gap-2 group"
+                >
+                  <Folder className="w-10 h-10 text-amber-400 fill-amber-100 group-hover:scale-110 transition-transform" />
+                  <h4 className="text-[11px] font-black text-slate-700 text-center line-clamp-1">{cat}</h4>
+                  <span className="text-[9px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded-full border">{groupedTemplates[cat].length} ملف</span>
+                </button>
+              ))}
             </div>
-          ))}
+          ) : (
+            // Files View (Inside a folder)
+            <div className="flex flex-col h-full animate-in fade-in slide-in-from-right-2 duration-200">
+              <button 
+                onClick={() => setActiveFolder(null)}
+                className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg mb-3 self-start transition"
+              >
+                <ChevronRight className="w-4 h-4" /> عودة للمجلدات
+              </button>
+              
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <FolderOpen className="w-5 h-5 text-amber-500" />
+                <h4 className="text-sm font-black text-slate-700">{activeFolder}</h4>
+              </div>
+
+              <div className="space-y-1.5 flex-1 overflow-y-auto">
+                {(groupedTemplates[activeFolder] || []).sort((a,b) => a.name.localeCompare(b.name, 'ar')).map(tpl => (
+                  <div 
+                    key={tpl.id}
+                    onClick={() => setActiveTemplate(tpl)}
+                    className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition group border ${activeTemplate?.id === tpl.id ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'hover:bg-slate-50 border-transparent hover:border-slate-200'}`}
+                  >
+                    <div className="flex items-center gap-2.5 overflow-hidden">
+                      <FileText className={`w-4 h-4 shrink-0 ${activeTemplate?.id === tpl.id ? 'text-indigo-600' : 'text-slate-400'}`} />
+                      <span className={`text-[11px] font-bold truncate ${activeTemplate?.id === tpl.id ? 'text-indigo-800' : 'text-slate-600'}`}>
+                        {tpl.name}
+                      </span>
+                    </div>
+                    {isAdmin && (
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(tpl.id); }} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition shrink-0 bg-white hover:bg-rose-50 p-1.5 rounded-lg shadow-sm border border-slate-200 hover:border-rose-200">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
