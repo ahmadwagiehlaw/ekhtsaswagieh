@@ -4,7 +4,7 @@ import {
   Search, TrendingUp, CalendarDays, AlertTriangle, Building2, Scale,
   PieChart, ClipboardList, CheckCircle2, ChevronLeft, Activity, Sparkles,
   Printer, Settings2, Eye, EyeOff, BarChart3, FileText, Clock, Gavel,
-  ChevronRight, Calendar
+  ChevronRight, Calendar, LogOut, X
 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { calculateDashboardStats, computeMonthStats } from '../utils/statsUtils';
@@ -34,7 +34,7 @@ const getJColor = (name) => {
 const DonutChart = ({ segments, size = 130, thickness = 22 }) => {
   const radius = (size - thickness) / 2;
   const circum = 2 * Math.PI * radius;
-  const total  = segments.reduce((s, d) => s + (d.value || 0), 0);
+  const total = segments.reduce((s, d) => s + (d.value || 0), 0);
   const cx = size / 2, cy = size / 2;
   if (total === 0) return null;
   let cum = 0;
@@ -122,7 +122,7 @@ const KPICard = ({ icon: Icon, label, sublabel, value, accentColor, bgFrom, bgTo
 // Print Report Modal
 // ─────────────────────────────────────────────────────────────
 const PrintReportModal = ({ stats, settings, selectedMonthStats, selectedMonth, selectedYear, onClose }) => {
-  const monthLabel     = new Date(selectedYear, selectedMonth, 1).toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' });
+  const monthLabel = new Date(selectedYear, selectedMonth, 1).toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' });
   const consultantName = settings?.consultantName || 'أحمد وجيه';
 
   const handlePrint = () => {
@@ -207,6 +207,7 @@ const PrintReportModal = ({ stats, settings, selectedMonthStats, selectedMonth, 
                 {[
                   { l: 'صالح', v: selectedMonthStats.judgments.good, c: '#10b981', bg: '#dcfce7' },
                   { l: 'ضد', v: selectedMonthStats.judgments.bad, c: '#ef4444', bg: '#fee2e2' },
+                  { l: 'مختلط', v: selectedMonthStats.judgments.mixed, c: '#6366f1', bg: '#e0e7ff' },
                   { l: 'وقف', v: selectedMonthStats.judgments.stop, c: '#f97316', bg: '#ffedd5' },
                   { l: 'اعتبار', v: selectedMonthStats.judgments.consideration, c: '#eab308', bg: '#fef9c3' },
                   { l: 'خبراء', v: selectedMonthStats.judgments.expert, c: '#8b5cf6', bg: '#ede9fe' },
@@ -265,21 +266,21 @@ const PrintReportModal = ({ stats, settings, selectedMonthStats, selectedMonth, 
 // Main Dashboard
 // ─────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { cases, isEmployee, currentUser, saveCaseToFirebase, settings, globalTasks, saveGlobalTask, completeGlobalTask } = useAppContext();
+  const { cases, isEmployee, currentUser, currentUserName, logoutAdmin, saveCaseToFirebase, settings, globalTasks, saveGlobalTask, completeGlobalTask } = useAppContext();
   const navigate = useNavigate();
   const { showPrompt, toast } = useUI();
 
   const today = new Date();
-  const [searchQuery, setSearchQuery]               = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const [isGlobalTaskModalOpen, setIsGlobalTaskModalOpen] = useState(false);
-  const [adminTasksTab, setAdminTasksTab]           = useState('pending');
-  const [showPrintModal, setShowPrintModal]         = useState(false);
-  const [showCustomize, setShowCustomize]           = useState(false);
-  const [hiddenWidgets, setHiddenWidgets]           = useState(() => {
+  const [adminTasksTab, setAdminTasksTab] = useState('pending');
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [showCustomize, setShowCustomize] = useState(false);
+  const [hiddenWidgets, setHiddenWidgets] = useState(() => {
     try { return JSON.parse(localStorage.getItem('dash-hidden-v3') || '[]'); } catch { return []; }
   });
-  
+
   // Month selector state
   const [viewMonth, setViewMonth] = useState({ month: today.getMonth(), year: today.getFullYear() });
 
@@ -320,9 +321,9 @@ export default function Dashboard() {
     const now = new Date().toISOString();
     if (taskType === 'global') {
       const t = globalTasks.find(t => t.id === taskId);
-      if (t) { 
-         await completeGlobalTask(taskId, notes);
-         toast('تم تسجيل الإجراء بنجاح', 'success'); 
+      if (t) {
+        await completeGlobalTask(taskId, notes);
+        toast('تم تسجيل الإجراء بنجاح', 'success');
       }
       return;
     }
@@ -359,17 +360,20 @@ export default function Dashboard() {
         myTasks.push({ ...t, type: 'global', caseNum, caseCover });
       }
     });
-    const pendingTasks   = myTasks.filter(t => t.status !== 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const pendingTasks = myTasks.filter(t => t.status !== 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     const completedTasks = myTasks.filter(t => t.status === 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return (
       <div className="space-y-6 animate-fade-in pb-10">
-        <div className="bg-emerald-600 rounded-3xl p-6 relative overflow-hidden shadow-sm">
-          <div className="absolute right-0 top-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
+        <div className="bg-emerald-600 rounded-3xl p-6 relative overflow-hidden shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="absolute right-0 top-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
           <div className="relative z-10 text-white">
-            <h1 className="text-3xl font-black mb-2">مرحباً، أ. {currentUser} 👋</h1>
+            <h1 className="text-3xl font-black mb-2">مرحباً، أ. {currentUserName} 👋</h1>
             <p className="text-sm font-bold text-emerald-100">إليك المهام المطلوبة منك اليوم</p>
           </div>
+          <button onClick={() => logoutAdmin().then(() => navigate('/login'))} className="relative z-10 self-start md:self-center bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition">
+            <LogOut className="w-4 h-4" /> تسجيل الخروج
+          </button>
         </div>
         <form onSubmit={handleSearch} className="relative">
           <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
@@ -379,6 +383,115 @@ export default function Dashboard() {
             <Search className="w-5 h-5" />
           </button>
         </form>
+
+        <div className="flex items-center justify-between mb-3 mt-2 px-1">
+          <h3 className="font-bold text-navy-900 text-sm">إحصائياتك السريعة</h3>
+          <div className="bg-slate-200/70 p-1 rounded-lg flex text-[10px] font-bold">
+            <button 
+              onClick={() => setViewMonth({ month: today.getMonth(), year: today.getFullYear() })}
+              className={`px-3 py-1.5 rounded-md transition-all ${viewMonth.month === today.getMonth() && viewMonth.year === today.getFullYear() ? 'bg-white text-navy-900 shadow-sm' : 'text-slate-500 hover:text-navy-900'}`}
+            >
+              الشهر الحالي
+            </button>
+            <button 
+              onClick={() => {
+                const prev = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                setViewMonth({ month: prev.getMonth(), year: prev.getFullYear() });
+              }}
+              className={`px-3 py-1.5 rounded-md transition-all ${viewMonth.month !== today.getMonth() || viewMonth.year !== today.getFullYear() ? 'bg-white text-navy-900 shadow-sm' : 'text-slate-500 hover:text-navy-900'}`}
+            >
+              الشهر السابق
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 md:gap-3 mb-4">
+          <div className="flex-1 min-w-[130px] bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-slate-500">دعاوى جديدة</span>
+                <span className="text-lg font-black text-navy-900 leading-none mt-1">{selectedMonthStats.casesAdded}</span>
+              </div>
+            </div>
+            {selectedMonthStats.casesAdded !== prevMonthStats.casesAdded && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${selectedMonthStats.casesAdded > prevMonthStats.casesAdded ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                {selectedMonthStats.casesAdded > prevMonthStats.casesAdded ? '↑' : '↓'}
+              </span>
+            )}
+          </div>
+
+          <div className="flex-1 min-w-[130px] bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <CalendarDays className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-slate-500">الملفات المتداولة</span>
+                <span className="text-lg font-black text-navy-900 leading-none mt-1">{selectedMonthStats.sessions}</span>
+              </div>
+            </div>
+            {selectedMonthStats.sessions !== prevMonthStats.sessions && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${selectedMonthStats.sessions > prevMonthStats.sessions ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                {selectedMonthStats.sessions > prevMonthStats.sessions ? '↑' : '↓'}
+              </span>
+            )}
+          </div>
+
+          <div className="flex-1 min-w-[130px] bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-slate-500">أحكام لصالحنا</span>
+                <span className="text-lg font-black text-navy-900 leading-none mt-1">{selectedMonthStats.judgments.good}</span>
+              </div>
+            </div>
+            {selectedMonthStats.judgments.good !== prevMonthStats.judgments.good && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${selectedMonthStats.judgments.good > prevMonthStats.judgments.good ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                {selectedMonthStats.judgments.good > prevMonthStats.judgments.good ? '↑' : '↓'}
+              </span>
+            )}
+          </div>
+
+          <div className="flex-1 min-w-[130px] bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                <X className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-slate-500">أحكام ضدنا</span>
+                <span className="text-lg font-black text-navy-900 leading-none mt-1">{selectedMonthStats.judgments.bad}</span>
+              </div>
+            </div>
+            {selectedMonthStats.judgments.bad !== prevMonthStats.judgments.bad && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${selectedMonthStats.judgments.bad > prevMonthStats.judgments.bad ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                {selectedMonthStats.judgments.bad > prevMonthStats.judgments.bad ? '↑' : '↓'}
+              </span>
+            )}
+          </div>
+
+          <div className="flex-1 min-w-[130px] bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-slate-500">الوقف الجزائي</span>
+                <span className="text-lg font-black text-navy-900 leading-none mt-1">{selectedMonthStats.judgments.penaltyStop}</span>
+              </div>
+            </div>
+            {selectedMonthStats.judgments.penaltyStop !== prevMonthStats.judgments.penaltyStop && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${selectedMonthStats.judgments.penaltyStop > prevMonthStats.judgments.penaltyStop ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                {selectedMonthStats.judgments.penaltyStop > prevMonthStats.judgments.penaltyStop ? '↑' : '↓'}
+              </span>
+            )}
+          </div>
+        </div>
+
         <div className="space-y-4">
           <h2 className="text-lg font-black text-navy-900 px-2 flex items-center gap-2">
             <ClipboardList className="w-5 h-5 text-emerald-600" /> مهام قيد التنفيذ ({pendingTasks.length})
@@ -438,7 +551,7 @@ export default function Dashboard() {
   }
 
   const donutSegments = stats.topJudgments.map(([name, value]) => ({ name, value, color: getJColor(name) }));
-  const donutTotal    = donutSegments.reduce((s, d) => s + d.value, 0);
+  const donutTotal = donutSegments.reduce((s, d) => s + d.value, 0);
   const viewMonthLabel = new Date(viewMonth.year, viewMonth.month, 1).toLocaleDateString('ar-EG', { month: 'long' });
 
   // ─── Consultant / Admin view ────────────────────────────────
@@ -450,7 +563,7 @@ export default function Dashboard() {
         {/* Decorative lights */}
         <div className="absolute top-0 right-0 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl translate-x-10 -translate-y-10 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl -translate-x-10 translate-y-10 pointer-events-none" />
-        
+
         <div className="relative z-10 max-w-2xl mx-auto space-y-3">
           <form onSubmit={handleSearch} className="relative">
             <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
@@ -460,7 +573,7 @@ export default function Dashboard() {
               <Search className="w-5 h-5" />
             </button>
           </form>
-          
+
           <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
             <button onClick={() => setIsAdvancedSearchOpen(true)} className="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 border border-slate-700">
               <Sparkles className="w-3 h-3" /> بحث ذكي
@@ -562,20 +675,20 @@ export default function Dashboard() {
         <div className="grid grid-cols-3 gap-2 mb-3">
           {[
             { icon: Activity, label: 'متداول الشهر', value: selectedMonthStats.sessions, prev: prevMonthStats.sessions, color: 'text-amber-400', iconColor: 'text-amber-500' },
-            { icon: FileText, label: 'مذكرات',       value: selectedMonthStats.memos,    prev: prevMonthStats.memos,    color: 'text-blue-400',  iconColor: 'text-blue-500' },
-            { icon: Gavel,    label: 'أحكام',         value: selectedMonthStats.judgments.total, prev: prevMonthStats.judgments.total, color: 'text-emerald-400', iconColor: 'text-emerald-500' },
+            { icon: FileText, label: 'مذكرات', value: selectedMonthStats.memos, prev: prevMonthStats.memos, color: 'text-blue-400', iconColor: 'text-blue-500' },
+            { icon: Gavel, label: 'أحكام', value: selectedMonthStats.judgments.total, prev: prevMonthStats.judgments.total, color: 'text-emerald-400', iconColor: 'text-emerald-500' },
           ].map(item => (
             <div key={item.label} className="bg-slate-900/40 rounded-xl p-3 border border-slate-700/40 flex items-center gap-3">
-               <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 shadow-inner">
-                 <item.icon className={`w-4 h-4 ${item.iconColor}`} />
-               </div>
-               <div className="flex-1 min-w-0">
-                 <p className="text-[10px] font-bold text-slate-400 mb-0.5 truncate">{item.label}</p>
-                 <div className="flex items-center gap-2">
-                   <p className={`text-xl font-black ${item.color} leading-none`}>{item.value}</p>
-                   <TrendBadge current={item.value} prev={item.prev} className="!mt-0" />
-                 </div>
-               </div>
+              <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 shadow-inner">
+                <item.icon className={`w-4 h-4 ${item.iconColor}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold text-slate-400 mb-0.5 truncate">{item.label}</p>
+                <div className="flex items-center gap-2">
+                  <p className={`text-xl font-black ${item.color} leading-none`}>{item.value}</p>
+                  <TrendBadge current={item.value} prev={item.prev} className="!mt-0" />
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -584,11 +697,12 @@ export default function Dashboard() {
         {selectedMonthStats.judgments.total > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-3 border-t border-slate-700/30">
             {[
-              { l: 'صالح',   v: selectedMonthStats.judgments.good,          pv: prevMonthStats.judgments.good,          color: 'text-emerald-400', bad: false },
-              { l: 'ضد',     v: selectedMonthStats.judgments.bad,           pv: prevMonthStats.judgments.bad,           color: 'text-rose-400',    bad: true  },
-              { l: 'وقف',    v: selectedMonthStats.judgments.stop,          pv: prevMonthStats.judgments.stop,          color: 'text-orange-400',  bad: true  },
-              { l: 'اعتبار', v: selectedMonthStats.judgments.consideration,  pv: prevMonthStats.judgments.consideration, color: 'text-yellow-400',  bad: true  },
-              { l: 'خبراء',  v: selectedMonthStats.judgments.expert,         pv: prevMonthStats.judgments.expert,        color: 'text-purple-400',  bad: false },
+              { l: 'صالح', v: selectedMonthStats.judgments.good, pv: prevMonthStats.judgments.good, color: 'text-emerald-400', bad: false },
+              { l: 'ضد', v: selectedMonthStats.judgments.bad, pv: prevMonthStats.judgments.bad, color: 'text-rose-400', bad: true },
+              { l: 'مختلط', v: selectedMonthStats.judgments.mixed, pv: prevMonthStats.judgments.mixed, color: 'text-indigo-400', bad: false },
+              { l: 'وقف', v: selectedMonthStats.judgments.stop, pv: prevMonthStats.judgments.stop, color: 'text-orange-400', bad: true },
+              { l: 'اعتبار', v: selectedMonthStats.judgments.consideration, pv: prevMonthStats.judgments.consideration, color: 'text-yellow-400', bad: true },
+              { l: 'خبراء', v: selectedMonthStats.judgments.expert, pv: prevMonthStats.judgments.expert, color: 'text-purple-400', bad: false },
             ].map(item => (
               <div key={item.l} className="flex-1 min-w-[45px] bg-slate-900/20 rounded-lg py-1.5 px-2 text-center border border-slate-700/20 flex flex-col items-center justify-center gap-0.5">
                 <p className={`text-sm font-black ${item.color} leading-none`}>{item.v}</p>
@@ -833,7 +947,7 @@ export default function Dashboard() {
                 <div className="space-y-3">
                   {stats.topJudgments.map(([name, count]) => {
                     const total = stats.topJudgments.reduce((s, c) => s + c[1], 0);
-                    const pct   = Math.round((count / total) * 100);
+                    const pct = Math.round((count / total) * 100);
                     const color = getJColor(name);
                     return (
                       <div key={name} className="space-y-1">
@@ -930,7 +1044,7 @@ export default function Dashboard() {
       {isAdvancedSearchOpen && (
         <AdvancedSearchModal isOpen={isAdvancedSearchOpen} onClose={() => setIsAdvancedSearchOpen(false)} onSearch={handleAdvancedSearch} />
       )}
-      <BulkAssignTaskModal isOpen={isGlobalTaskModalOpen} onClose={() => setIsGlobalTaskModalOpen(false)} selectedCases={[]} onClearSelection={() => {}} />
+      <BulkAssignTaskModal isOpen={isGlobalTaskModalOpen} onClose={() => setIsGlobalTaskModalOpen(false)} selectedCases={[]} onClearSelection={() => { }} />
       {showPrintModal && (
         <PrintReportModal
           stats={stats} settings={settings}

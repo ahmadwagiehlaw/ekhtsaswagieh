@@ -178,12 +178,18 @@ export default function ExportPDFModal({ isOpen, onClose, data, defaultTitle = "
               background-color: #f8fafc;
             }
             @media print {
-              body { padding: 0; }
-              @page { margin: 10mm; }
+              body { padding: 0; background-color: #fff; }
+              .no-print { display: none !important; }
             }
+            @page { margin: 10mm; }
           </style>
         </head>
         <body>
+          <div class="no-print" style="position: fixed; top: 15px; left: 15px; z-index: 9999;">
+            <button onclick="window.close()" style="background: #e11d48; color: #fff; padding: 10px 20px; border: none; border-radius: 8px; font-weight: 900; font-size: 14px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-family: 'Cairo', sans-serif;">
+              إغلاق وعودة للتطبيق ✕
+            </button>
+          </div>
           <div class="report-header-container">
             <div class="right-header">
               <h1>${reportTitle}</h1>

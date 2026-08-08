@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import AddCaseModal from './AddCaseModal';
 import NotificationCenter from './NotificationCenter';
 import TasksManagerModal from './TasksManagerModal';
+import OnboardingModal from './OnboardingModal';
 
 export default function Layout() {
   const { settings, isAdmin, currentUserPermissions } = useAppContext();
@@ -114,9 +115,12 @@ export default function Layout() {
         </div>
       </header>
 
+      {/* Main Content */}
       <main className="flex-grow max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 pb-4 space-y-4">
         <Outlet />
       </main>
+
+      <OnboardingModal />
 
       {/* Floating Action Button */}
       {!isDetailsPage && canEditData && (
@@ -126,6 +130,11 @@ export default function Layout() {
         >
           <Plus className="w-6 h-6" />
         </button>
+      )}
+
+      {/* Add Case Modal */}
+      {isAddModalOpen && (
+        <AddCaseModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
       )}
 
       {/* Bottom Navigation (Dark Theme) */}

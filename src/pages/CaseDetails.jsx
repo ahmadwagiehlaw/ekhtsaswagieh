@@ -1042,8 +1042,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
                                 <StrictSelectField
                                   value={val}
                                   onChange={v => setEditData({ ...editData, [field.id]: v })}
-                                  options={roleOptions}
-                                  onManage={() => setManagingField('roles')}
+                                  options={['طاعنين أو مدعين', 'مطعون ضدنا أو مدعى علينا', 'لا شأن', 'خارج الاختصاص']}
                                   placeholder="اختر الصفة..."
                                 />
                               ) : field.id === 'نوع الجلسة' ? (

@@ -9,9 +9,19 @@ function normalizeResult(raw, isAppellant, isAppellee) {
   if (r === 'للضد')       r = 'ضد';
   if (r === 'إجرائي')     r = 'تمهيدي';
   if (r === 'جزئي')       r = 'غير منه للخصومة';
-  if (r === 'حكم منه للخصومة') {
+  
+  if (
+    r === 'حكم منه للخصومة' || 
+    r === 'اعتبار الدعوى كأن لم تكن' || 
+    r === 'سقوط الخصومة'
+  ) {
     r = isAppellee ? 'صالح' : isAppellant ? 'ضد' : r;
   }
+  
+  if (r.includes('وقف جزائي')) {
+    r = isAppellant ? 'وقف جزائي (ضد)' : isAppellee ? 'وقف جزائي (صالح)' : 'وقف جزائي';
+  }
+  
   return r;
 }
 
@@ -19,14 +29,21 @@ function addToJudgments(target, computeAs) {
   target.total++;
   if (computeAs === 'صالح')                                   target.good++;
   else if (computeAs === 'ضد')                               target.bad++;
+  else if (computeAs.includes('وقف جزائي')) {
+    target.stop++;
+    target.penaltyStop = (target.penaltyStop || 0) + 1;
+    if (computeAs.includes('(ضد)')) target.bad++;
+    if (computeAs.includes('(صالح)')) target.good++;
+  }
   else if (computeAs.includes('وقف'))                        target.stop++;
   else if (computeAs.includes('خبير') || computeAs.includes('خبراء')) target.expert++;
   else if (computeAs === 'اعتبار')                           target.consideration++;
+  else if (computeAs === 'مختلط')                            target.mixed = (target.mixed || 0) + 1;
   else                                                        target.other++;
 }
 
 const emptyJudgments = () =>
-  ({ total: 0, good: 0, bad: 0, stop: 0, expert: 0, consideration: 0, other: 0 });
+  ({ total: 0, good: 0, bad: 0, stop: 0, penaltyStop: 0, expert: 0, consideration: 0, other: 0, mixed: 0 });
 
 // ─────────────────────────────────────────────────────────────
 // computeMonthStats: returns per-month stats for any month/year
@@ -34,40 +51,76 @@ const emptyJudgments = () =>
 // ─────────────────────────────────────────────────────────────
 export function computeMonthStats(cases, settings, targetMonth, targetYear) {
   const appRole = settings?.roles?.[0] || 'طاعن';
-  const apeRole = settings?.roles?.[1] || 'مطعون ضدنا';
-
   let sessions   = 0;
   let memos      = 0;
+  let casesAdded = 0;
   let judgments  = emptyJudgments();
+
+  const memoCalcMode = settings?.memoCalculationMode || 'session_date';
 
   cases.forEach(c => {
     const role = String(c['الصفة'] || c['صفة'] || '').trim();
     if (role === 'لا شأن' || role === 'خارج الاختصاص') return;
 
-    const isAppellant = role.includes(appRole) || role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
-    const isAppellee  = role.includes(apeRole)  || role.includes('مطعون ضده') || role.includes('مطعون ضدنا') || role.includes('مستأنف ضده') || role.includes('مدعى عليه') || role.includes('مدعى علينا');
+    // Strict role check
+    const isAppellant = role === 'طاعنين أو مدعين';
+    const isAppellee  = role === 'مطعون ضدنا أو مدعى علينا';
+
+    const createdAtDate = getSafeDateObj(c.createdAt || c.timestamp || '');
+    if (createdAtDate && createdAtDate.getMonth() === targetMonth && createdAtDate.getFullYear() === targetYear) {
+      casesAdded++;
+    }
 
     const rawSessions = Array.isArray(c.sessions) ? c.sessions : Object.values(c.sessions || {});
-
+    
+    // Calculate sessions
     rawSessions.forEach(s => {
       const sDate = getSafeDateObj(s.date);
       if (!sDate) return;
       if (sDate.getMonth() !== targetMonth || sDate.getFullYear() !== targetYear) return;
-
       sessions++;
+    });
 
-      const dec = String(s.decision || s['القرار'] || s['قرار'] || '').trim();
-      if (dec.includes('مذكرات')) memos++;
+    // Calculate memos from procedures
+    const procedures = Array.isArray(c.procedures) ? c.procedures : Object.values(c.procedures || {});
+    procedures.forEach(p => {
+       if (p.title && (p.title.includes('مذكرة') || p.title.includes('مذكرات'))) {
+          let targetDateStr = memoCalcMode === 'session_date' ? p.date : p.createdAt;
+          if (!targetDateStr) targetDateStr = p.date || p.createdAt;
+          const dObj = getSafeDateObj(targetDateStr);
+          if (dObj && dObj.getMonth() === targetMonth && dObj.getFullYear() === targetYear) {
+             memos++;
+          }
+       }
+    });
+
+    // Calculate judgments
+    rawSessions.forEach(s => {
+      // Must match the month!
+      const sDate = getSafeDateObj(s.date);
+      if (!sDate) return;
+      if (sDate.getMonth() !== targetMonth || sDate.getFullYear() !== targetYear) return;
 
       if (s.hasJudgment) {
         const raw       = s.judgment?.result || s.judgmentClassification || 'غير مصنف';
         const computeAs = normalizeResult(raw, isAppellant, isAppellee);
         addToJudgments(judgments, computeAs);
+      } else {
+        // Implicit examination judgments if not explicitly recorded
+        const dec = String(s.decision || '').trim();
+        const type = String(s.type || '').trim();
+        if (dec.includes('رفض') && type.includes('فحص')) {
+          const computeAs = isAppellant ? 'ضد' : isAppellee ? 'صالح' : 'ضد';
+          addToJudgments(judgments, computeAs);
+        } else if (dec.includes('قبول') && type.includes('فحص')) {
+          const computeAs = isAppellant ? 'صالح' : isAppellee ? 'ضد' : 'صالح';
+          addToJudgments(judgments, computeAs);
+        }
       }
     });
   });
 
-  return { sessions, memos, judgments };
+  return { sessions, memos, casesAdded, judgments };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -114,8 +167,9 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
     if (role === 'خارج الاختصاص')   outOfJurisdictionCount++;
     if (role === 'لا شأن' || role === 'خارج الاختصاص') return;
 
-    const isAppellant = role.includes(appRole) || role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
-    const isAppellee  = role.includes(apeRole)  || role.includes('مطعون ضده') || role.includes('مطعون ضدنا') || role.includes('مستأنف ضده') || role.includes('مدعى عليه') || role.includes('مدعى علينا');
+    // Strict role check
+    const isAppellant = role === 'طاعنين أو مدعين';
+    const isAppellee  = role === 'مطعون ضدنا أو مدعى علينا';
 
     // "آخر جلسة" field = next scheduled / most-recent session date
     const lastSessionStr  = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'] || '';
@@ -146,8 +200,14 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
 
     // Latest recorded session (for decision text)
     const latestSession        = sessions[0];
-    // Latest session with hasJudgment=true (judgment entered)
-    const latestJudgmentSession = sessions.find(s => s.hasJudgment);
+    // Latest session with hasJudgment=true (judgment entered) or implicit judgment (فحص)
+    const latestJudgmentSession = sessions.find(s => {
+      if (s.hasJudgment) return true;
+      const dec = String(s.decision || '').trim();
+      const type = String(s.type || '').trim();
+      if ((dec.includes('رفض') || dec.includes('قبول')) && type.includes('فحص')) return true;
+      return false;
+    });
     const hasHukm              = !!latestJudgmentSession;
 
     // Last session's decision / قرار
@@ -166,8 +226,19 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
       judgedCount++; // Count as judged regardless of date (judgment was recorded)
 
       // Overall judgment distribution
-      const rawResult = latestJudgmentSession.judgment?.result || latestJudgmentSession.judgmentClassification || 'غير مصنف';
-      const computeAs = normalizeResult(rawResult, isAppellant, isAppellee);
+      let computeAs = 'غير مصنف';
+      if (latestJudgmentSession.hasJudgment) {
+        const rawResult = latestJudgmentSession.judgment?.result || latestJudgmentSession.judgmentClassification || 'غير مصنف';
+        computeAs = normalizeResult(rawResult, isAppellant, isAppellee);
+      } else {
+        const dec = String(latestJudgmentSession.decision || '').trim();
+        if (dec.includes('رفض')) {
+          computeAs = isAppellant ? 'ضد' : isAppellee ? 'صالح' : 'ضد';
+        } else if (dec.includes('قبول')) {
+          computeAs = isAppellant ? 'صالح' : isAppellee ? 'ضد' : 'صالح';
+        }
+      }
+      
       judgmentsCount[computeAs] = (judgmentsCount[computeAs] || 0) + 1;
 
       // Deadline alerts (طعن window)
@@ -248,7 +319,7 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
     const taskGroups = {};
     
     globalTasks.forEach(t => {
-      if (t.status === 'completed' || !t.dueDate) return;
+      if (t.status === 'completed' || !t.dueDate || t.type === 'viewing') return;
       
       const tDueDate = new Date(t.dueDate);
       tDueDate.setHours(0,0,0,0);

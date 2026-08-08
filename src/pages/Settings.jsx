@@ -9,7 +9,7 @@ import { useUI } from '../context/UIContext';
 
 export default function Settings() {
   const { isAdmin, loginAdmin, logoutAdmin, cases, schema, settings, saveSettingsToFirebase, deleteAllCases, saveBatchCasesToFirebase, saveSchemaToFirebase } = useAppContext();
-  const { userData } = useAuth();
+  const { userData, login, currentUser } = useAuth();
   const { toast, showConfirm, showPrompt } = useUI();
 
   const [password, setPassword] = useState('');
@@ -88,6 +88,7 @@ export default function Settings() {
   const [expandedRules, setExpandedRules] = useState([]);
   const [rulesSearchQuery, setRulesSearchQuery] = useState('');
   const [expandedRuleGroups, setExpandedRuleGroups] = useState(['قواعد عامة']); // Default expand first/general group
+  const [localMemoCalculationMode, setLocalMemoCalculationMode] = useState(settings?.memoCalculationMode || 'session_date');
   const [deletePassword, setDeletePassword] = useState('');
   const backupInputRef = useRef(null);
   const [backupRestoreStatus, setBackupRestoreStatus] = useState(null); // { type: 'success'|'error'|'preview', data: ... }
@@ -129,6 +130,26 @@ export default function Settings() {
     XLSX.utils.book_append_sheet(wb, ws, 'القضايا');
     XLSX.writeFile(wb, `اختصاصي-export-${new Date().toISOString().split('T')[0]}.xlsx`);
     toast(`تم تصدير ${cases.length} قضية إلى Excel`, 'success');
+  };
+
+  const handleDownloadTemplate = () => {
+    // Generate empty template based on current visible schema
+    const headers = {};
+    localSchema.filter(s => s.visible).forEach(s => {
+      headers[s.id] = "";
+    });
+    
+    // Add a helper note row
+    const noteRow = {};
+    localSchema.filter(s => s.visible).forEach(s => {
+      noteRow[s.id] = s.primary ? "حقل إجباري" : "اختياري";
+    });
+
+    const ws = XLSX.utils.json_to_sheet([noteRow]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'قالب إدخال البيانات');
+    XLSX.writeFile(wb, `قالب-اختصاصي-لإدخال-البيانات.xlsx`);
+    toast('تم تحميل قالب الإكسيل بنجاح', 'success');
   };
 
   const handleImportBackup = async (e) => {
@@ -295,7 +316,8 @@ export default function Settings() {
       courtSpecialization: localCourtSpecialization,
 
       judgmentDefaults: localJudgmentDefaults,
-      deadlineRules: localDeadlineRules
+      deadlineRules: localDeadlineRules,
+      memoCalculationMode: localMemoCalculationMode
     });
     setIsProcessing(false);
     toast('تم حفظ الإعدادات المتقدمة بنجاح', 'success');
@@ -307,11 +329,24 @@ export default function Settings() {
   };
 
   const handleDeleteAll = async () => {
-    if (deletePassword !== 'a4450422') {
+    if (!deletePassword) {
+      toast('يرجى إدخال كلمة المرور!', 'error');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      // Verify with Firebase using current user email and provided password
+      if (currentUser?.email) {
+        await login(currentUser.email, deletePassword);
+      }
+    } catch (err) {
+      setIsProcessing(false);
       toast('كلمة المرور غير صحيحة!', 'error');
       return;
     }
 
+    setIsProcessing(false);
     const confirmed = await showConfirm('تحذير نهائي', 'هل أنت متأكد من مسح جميع البيانات بشكل لا رجعة فيه؟');
 
     if (confirmed) {
@@ -374,22 +409,24 @@ export default function Settings() {
         return clean;
       });
 
-      // Also dynamically update schema if new columns are found
-      if (excelCases.length > 0) {
-        const keys = Object.keys(excelCases[0]);
-        let schemaChanged = false;
-        const newSchema = [...localSchema];
-        keys.forEach(k => {
-          if (!newSchema.find(s => s.id === k)) {
-            newSchema.push({ id: k, label: k, type: 'text', visible: true, primary: false });
-            schemaChanged = true;
+      // We do NOT dynamically update the schema anymore based on user feedback.
+      // Filter out any columns from excelCases that do not exist in the current schema
+      const schemaKeys = localSchema.map(s => s.id);
+      
+      const mappedExcelCases = excelCases
+        .filter(ec => {
+           const val = String(ec['رقم الدعوى'] || ec['رقم القضية'] || ec['رقم_الدعوى'] || '').trim();
+           return val !== '' && val !== 'حقل إجباري' && val !== 'اختياري';
+        })
+        .map(ec => {
+        const mapped = {};
+        for (let k in ec) {
+          if (schemaKeys.includes(k)) {
+            mapped[k] = ec[k];
           }
-        });
-        if (schemaChanged) {
-          setLocalSchema(newSchema);
-          saveSchemaToFirebase(newSchema);
         }
-      }
+        return mapped;
+      });
 
       const existingMap = new Map();
       cases.forEach(c => existingMap.set(c.id || getCaseKey(c), c));
@@ -398,7 +435,7 @@ export default function Settings() {
       let updated = 0;
       const newMergedData = [];
 
-      excelCases.forEach(excelCase => {
+      mappedExcelCases.forEach(excelCase => {
         const key = getCaseKey(excelCase);
         if (existingMap.has(key)) {
           const existingCase = existingMap.get(key);
@@ -472,6 +509,22 @@ export default function Settings() {
     await saveSchemaToFirebase(localSchema);
     setIsProcessing(false);
     toast('تم حفظ بنية البيانات بنجاح!', 'success');
+  };
+
+  const handleCleanupSchema = async () => {
+    const confirmed = await showConfirm('تأكيد تنظيف الحقول', 'سيتم دمج الحقول المكررة (سنة، year) في (السنة)، و(رقم القضية، رقم_الدعوى) في (رقم الدعوى). هل أنت متأكد؟');
+    if (!confirmed) return;
+
+    setIsProcessing(true);
+    
+    const duplicatesToRemove = ['سنة', 'year', 'رقم القضية', 'رقم_الدعوى', 'المدعى_عليه'];
+    const newSchema = localSchema.filter(f => !duplicatesToRemove.includes(f.id));
+    
+    setLocalSchema(newSchema);
+    await saveSchemaToFirebase(newSchema);
+    
+    toast('تم تنظيف الحقول بنجاح', 'success');
+    setIsProcessing(false);
   };
 
   if (!isAdmin) {
@@ -562,6 +615,7 @@ export default function Settings() {
                   { key: 'showAppellee', label: 'إظهار عمود المدعى عليه' },
                   { key: 'showRequiredDocs', label: 'إظهار عمود المستندات المطلوبة', disabled: true },
                   { key: 'showSessionDate', label: 'إظهار عمود تاريخ الجلسة' },
+                  { key: 'showSessionType', label: 'إظهار عمود نوع الجلسة' },
                   { key: 'showDecision', label: 'إظهار عمود القرار' },
                   { key: 'showStatus', label: 'إظهار عمود حالة المهمة' }
                 ].map(field => (
@@ -575,6 +629,12 @@ export default function Settings() {
               </div>
             </div>
           </details>
+
+          <div className="pt-2">
+            <button onClick={handleSaveSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm hover:bg-navy-800 transition disabled:opacity-50">
+              {isProcessing ? 'جاري الحفظ...' : 'حفظ الإعدادات الأساسية والطباعة'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -592,16 +652,23 @@ export default function Settings() {
 
             <input type="file" accept=".xlsx, .xls" ref={fileInputRef} onChange={processExcel} className="hidden" />
 
-            <button onClick={() => fileInputRef.current?.click()} disabled={isProcessing} className="w-full border-2 border-dashed border-slate-300 hover:border-navy-900 hover:bg-slate-50 text-slate-600 font-bold py-5 rounded-2xl flex flex-col items-center justify-center gap-2">
-              {isProcessing ? (
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-navy-900"></div>
-              ) : (
-                <>
-                  <Upload className="w-7 h-7 text-amber-500" />
-                  <span className="text-sm">اختر ملف إكسيل (.xlsx) للمزامنة</span>
-                </>
-              )}
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => handleDownloadTemplate()} className="flex flex-col items-center gap-2 p-4 border-2 border-emerald-200 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100 text-emerald-700 font-bold rounded-2xl transition">
+                <Download className="w-6 h-6 text-emerald-500" />
+                <span className="text-xs text-center">تحميل قالب إكسيل فارغ</span>
+              </button>
+              
+              <button onClick={() => fileInputRef.current?.click()} disabled={isProcessing} className="flex flex-col items-center gap-2 p-4 border-2 border-dashed border-slate-300 hover:border-navy-900 hover:bg-slate-50 text-slate-600 font-bold rounded-2xl transition">
+                {isProcessing ? (
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-navy-900"></div>
+                ) : (
+                  <>
+                    <Upload className="w-6 h-6 text-amber-500" />
+                    <span className="text-xs text-center">رفع ملف إكسيل للمزامنة</span>
+                  </>
+                )}
+              </button>
+            </div>
 
             {syncData && syncData.ready && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-4">
@@ -904,9 +971,12 @@ export default function Settings() {
               ))}
             </div>
 
-            <div className="pt-3 border-t border-slate-100">
-              <button onClick={saveSchema} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">
+            <div className="pt-3 border-t border-slate-100 flex gap-2">
+              <button onClick={saveSchema} disabled={isProcessing} className="flex-[2] bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">
                 {isProcessing ? 'جاري الحفظ...' : 'حفظ هيكلة الحقول'}
+              </button>
+              <button onClick={handleCleanupSchema} disabled={isProcessing} className="flex-1 bg-amber-100 text-amber-700 font-bold py-3 rounded-xl shadow-sm text-sm border border-amber-200 hover:bg-amber-200">
+                تنظيف الحقول المكررة
               </button>
             </div>
 
@@ -957,6 +1027,26 @@ export default function Settings() {
                     <option value="d MMMM yyyy">نصي كامل (31 ديسمبر 2026)</option>
                     <option value="MM/dd">رقمي مختصر (12/31)</option>
                     <option value="d MMMM">نصي مختصر (31 ديسمبر)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-between border-b border-slate-100 pb-4">
+                <div className="flex flex-col gap-2 flex-1">
+                  <div className="flex items-center gap-1 group relative">
+                    <label className="text-xs font-bold text-slate-700">طريقة احتساب مذكرات الدفاع للإحصائية الشهرية:</label>
+                    <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-500 text-[9px] flex items-center justify-center cursor-help">?</span>
+                    <div className="absolute top-6 right-0 w-64 p-2 bg-navy-900 text-white text-[10px] rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition z-50">
+                      يحدد هذا الخيار طريقة عد مذكرات الدفاع في إحصائية الشهر. "تاريخ إضافة الإجراء" يعتمد على التاريخ الفعلي لتسجيل المذكرة في النظام كإجراء، بينما "تاريخ الجلسة" يعتمد على تاريخ الجلسة التي تم تقديم المذكرة فيها.
+                    </div>
+                  </div>
+                  <select
+                    value={localMemoCalculationMode}
+                    onChange={e => setLocalMemoCalculationMode(e.target.value)}
+                    className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
+                  >
+                    <option value="session_date">بناءً على تاريخ الجلسة المرتبطة (تاريخ الجلسة)</option>
+                    <option value="action_date">بناءً على تاريخ اعتماد وتسجيل الإجراء (تاريخ التنفيذ)</option>
                   </select>
                 </div>
               </div>
@@ -1172,6 +1262,19 @@ export default function Settings() {
 
             </div>
           </details>
+          
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-right">
+              <h3 className="font-bold text-sm text-blue-900">الدليل الترحيبي والتثبيت</h3>
+              <p className="text-xs text-blue-700 mt-1">إذا كنت ترغب في إعادة عرض الدليل الترحيبي وخطوات تثبيت التطبيق التي تظهر في المرة الأولى.</p>
+            </div>
+            <button onClick={() => {
+              localStorage.removeItem('ekhtsas_onboarding_v1');
+              window.location.reload();
+            }} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-xs whitespace-nowrap transition shadow-sm">
+              إعادة عرض الدليل
+            </button>
+          </div>
 
           {/* Save Settings Button */}
           <button onClick={handleSaveSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">

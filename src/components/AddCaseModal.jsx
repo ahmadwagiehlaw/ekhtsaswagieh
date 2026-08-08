@@ -478,9 +478,8 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                               <StrictSelectField
                                                 label="الصفة"
                                                 value={formData['الصفة'] || formData['صفة'] || ''}
-                                                options={settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل']}
+                                                options={['طاعنين أو مدعين', 'مطعون ضدنا أو مدعى علينا', 'لا شأن', 'خارج الاختصاص']}
                                                 onChange={(v) => setFormData({...formData, 'الصفة': v})}
-                                                onManage={() => setManagingField({ key: 'roles', title: 'الصفة' })}
                                               />
                                             </div>
                                           </div>

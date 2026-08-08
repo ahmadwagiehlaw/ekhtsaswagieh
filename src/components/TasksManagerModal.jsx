@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ClipboardList, CheckCircle2, Plus, Trash2, Calendar, Search, Files, Printer, Camera } from 'lucide-react';
+import { X, ClipboardList, CheckCircle2, Plus, Trash2, Calendar, Search, Files, Printer, Camera, Edit } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
@@ -13,8 +13,11 @@ export default function TasksManagerModal({ isOpen, onClose }) {
   const { toast, showConfirm } = useUI();
   const location = useLocation();
 
-  const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'completed' | 'viewing'
+  const [activeMainTab, setActiveMainTab] = useState('general'); // 'general' | 'viewing'
+  const [activeSubTab, setActiveSubTab] = useState('pending'); // 'pending' | 'completed'
+
   const [isAdding, setIsAdding] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState(null);
   const [isCaseSelectOpen, setIsCaseSelectOpen] = useState(false);
   const [caseSearchQuery, setCaseSearchQuery] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,10 +31,12 @@ export default function TasksManagerModal({ isOpen, onClose }) {
     title: '',
     assignee: '',
     dueDate: '',
-    priority: 'normal', // 'normal' | 'important' | 'urgent'
-    type: 'general', // 'general' | 'case'
-    caseId: '', // optional
-    linkedCases: [] // array of case IDs
+    sessionDate: '',
+    priority: 'normal',
+    type: 'general',
+    caseId: '',
+    linkedCases: [],
+    notes: ''
   });
 
   useEffect(() => {
@@ -43,31 +48,66 @@ export default function TasksManagerModal({ isOpen, onClose }) {
     }
   }, [location.search]);
 
+  const handleEditTask = (task) => {
+    setEditingTaskId(task.id);
+    setNewTask({
+      title: task.title || '',
+      assignee: task.assignee || '',
+      dueDate: task.dueDate || '',
+      sessionDate: task.sessionDate || task.caseContext?.date || '',
+      priority: task.priority || 'normal',
+      type: task.type || 'general',
+      caseId: task.caseId || '',
+      linkedCases: task.linkedCases || [],
+      notes: task.notes || ''
+    });
+    setIsAdding(true);
+    setActiveMainTab(task.type === 'viewing' ? 'viewing' : 'general');
+  };
+
   const handleSaveTask = async () => {
-    if (!newTask.title.trim()) {
+    if (!newTask.title.trim() && activeMainTab !== 'viewing') {
       toast('يرجى إدخال عنوان المهمة', 'error');
+      return;
+    }
+    if (activeMainTab === 'viewing' && newTask.linkedCases.length === 0) {
+      toast('يجب ربط ملف واحد على الأقل بمهمة الاطلاع', 'error');
       return;
     }
 
     try {
-      await saveGlobalTask({
+      const taskToSave = {
         ...newTask,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        createdBy: currentUser || 'مجهول'
-      });
-      toast('تمت إضافة المهمة بنجاح', 'success');
+        type: activeMainTab === 'viewing' ? 'viewing' : 'general',
+        title: activeMainTab === 'viewing' ? 'إطلاع وتصوير مستندات' : newTask.title,
+      };
+
+      if (editingTaskId) {
+        const existingTask = globalTasks.find(t => t.id === editingTaskId);
+        await saveGlobalTask({ ...existingTask, ...taskToSave, updatedAt: new Date().toISOString() }, editingTaskId);
+        toast('تم تعديل المهمة بنجاح', 'success');
+      } else {
+        await saveGlobalTask({
+          ...taskToSave,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          createdBy: currentUser || 'مجهول'
+        });
+        toast('تمت إضافة المهمة بنجاح', 'success');
+      }
+      
       setIsAdding(false);
-      setNewTask({ title: '', assignee: '', dueDate: '', priority: 'normal', type: 'general', caseId: '' });
+      setEditingTaskId(null);
+      setNewTask({ title: '', assignee: '', dueDate: '', sessionDate: '', priority: 'normal', type: 'general', caseId: '', linkedCases: [], notes: '' });
     } catch (e) {
-      toast('حدث خطأ أثناء إضافة المهمة', 'error');
+      toast('حدث خطأ أثناء حفظ المهمة', 'error');
     }
   };
 
   const handleToggleStatus = async (task) => {
     try {
       if (task.status !== 'completed') {
-        await completeGlobalTask(task.id, '');
+        await completeGlobalTask(task.id, task.notes);
       } else {
         await saveGlobalTask({
           ...task,
@@ -110,11 +150,16 @@ export default function TasksManagerModal({ isOpen, onClose }) {
     }
   };
 
-  const pendingTasks = globalTasks.filter(t => t.status !== 'completed' && t.type !== 'viewing' && (t.title?.toLowerCase().includes(searchQuery.toLowerCase()) || t.assignee?.toLowerCase().includes(searchQuery.toLowerCase())));
-  const completedTasks = globalTasks.filter(t => t.status === 'completed' && (t.title?.toLowerCase().includes(searchQuery.toLowerCase()) || t.assignee?.toLowerCase().includes(searchQuery.toLowerCase())));
-  const viewingTasks = globalTasks.filter(t => t.status !== 'completed' && t.type === 'viewing' && (t.title?.toLowerCase().includes(searchQuery.toLowerCase()) || t.assignee?.toLowerCase().includes(searchQuery.toLowerCase())));
+  const isViewingTask = (t) => t.type === 'viewing' || t.title?.includes('إطلاع') || t.title?.includes('تصوير');
 
-  const displayTasks = activeTab === 'pending' ? pendingTasks : (activeTab === 'completed' ? completedTasks : viewingTasks);
+  const generalTasks = globalTasks.filter(t => !isViewingTask(t) && (t.title?.toLowerCase().includes(searchQuery.toLowerCase()) || t.assignee?.toLowerCase().includes(searchQuery.toLowerCase())));
+  const viewingTasks = globalTasks.filter(t => isViewingTask(t) && (t.title?.toLowerCase().includes(searchQuery.toLowerCase()) || t.assignee?.toLowerCase().includes(searchQuery.toLowerCase())));
+
+  const activeTaskList = activeMainTab === 'general' ? generalTasks : viewingTasks;
+  const displayTasks = activeTaskList.filter(t => activeSubTab === 'pending' ? t.status !== 'completed' : t.status === 'completed');
+
+  const pendingCount = activeTaskList.filter(t => t.status !== 'completed').length;
+  const completedCount = activeTaskList.filter(t => t.status === 'completed').length;
 
   const handlePrintViewingTasks = () => {
     if (viewingTasks.length === 0) {
@@ -135,9 +180,15 @@ export default function TasksManagerModal({ isOpen, onClose }) {
             th, td { border: 1px solid #000; padding: 10px; text-align: center; }
             th { background-color: #f1f5f9; font-weight: bold; }
             .date { text-align: left; font-size: 14px; margin-bottom: 20px; }
+            @media print { .no-print { display: none; } }
           </style>
         </head>
-        <body>
+        <body dir="rtl">
+          <div class="no-print" style="position: fixed; top: 15px; left: 15px; z-index: 9999;">
+            <button onclick="window.close()" style="background: #e11d48; color: #fff; padding: 10px 20px; border: none; border-radius: 8px; font-weight: 900; font-size: 14px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-family: 'Cairo', sans-serif;">
+              إغلاق وعودة للتطبيق ✕
+            </button>
+          </div>
           <h1>كشف مهام الاطلاع والتصوير</h1>
           <div class="date">تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}</div>
           <table>
@@ -157,7 +208,7 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                 const caseNo = linkedCase ? `${linkedCase['رقم الدعوى']} لسنة ${linkedCase['السنة']}` : '---';
                 const ctx = t.caseContext || {};
                 const roll = ctx.roll || '---';
-                const sDate = ctx.date || t.dueDate || '---';
+                const sDate = t.sessionDate || ctx.date || '---';
                 const decision = ctx.decision || '---';
                 
                 return `
@@ -174,7 +225,7 @@ export default function TasksManagerModal({ isOpen, onClose }) {
             </tbody>
           </table>
           <script>
-            window.onload = function() { window.print(); window.close(); }
+            window.onload = function() { window.print(); }
           </script>
         </body>
       </html>
@@ -220,6 +271,22 @@ export default function TasksManagerModal({ isOpen, onClose }) {
           </button>
         </div>
 
+        {/* Main Tabs */}
+        <div className="flex bg-white border-b border-slate-200 px-6 pt-2 shrink-0">
+          <button
+            onClick={() => { setActiveMainTab('general'); setIsAdding(false); }}
+            className={`px-6 py-3 font-black text-sm border-b-2 transition-colors ${activeMainTab === 'general' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            المهام العادية
+          </button>
+          <button
+            onClick={() => { setActiveMainTab('viewing'); setIsAdding(false); }}
+            className={`px-6 py-3 font-black text-sm border-b-2 transition-colors ${activeMainTab === 'viewing' ? 'border-amber-600 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            مهام الإطلاع والتصوير
+          </button>
+        </div>
+
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 hide-scrollbar">
           <div className="space-y-4">
@@ -227,243 +294,307 @@ export default function TasksManagerModal({ isOpen, onClose }) {
             {/* Search */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
               <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="ابحث في المهام..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-4 pr-10 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Add Task Form (Inline) */}
-      {isAdding && canManageTasks && (
-        <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm overflow-hidden mt-4">
-          <div className="bg-indigo-50 px-5 py-4 border-b border-indigo-100">
-            <h3 className="font-black text-indigo-900">إضافة مهمة جديدة</h3>
-          </div>
-          <div className="p-5 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4 mb-4">
-              <div className="flex-[2] relative">
-                <input 
-                  type="text"
-                  list="predefined-tasks-list"
-                  placeholder="وصف المهمة (مثال: شهادة من الجدول...)"
-                  value={newTask.title}
-                  onChange={e => setNewTask({...newTask, title: e.target.value})}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20"
-                />
-                <datalist id="predefined-tasks-list">
-                  {PREDEFINED_TASKS?.map(t => <option key={t} value={t} />)}
-                </datalist>
-              </div>
-              <select
-                value={newTask.assignee}
-                onChange={e => setNewTask({ ...newTask, assignee: e.target.value })}
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">إسناد إلى...</option>
-                <option value="المستشار">المستشار</option>
-                {settings?.employees?.map(e => <option key={e.name} value={e.name}>{e.name}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1 flex gap-3">
-                <select
-                  value={newTask.priority}
-                  onChange={e => setNewTask({ ...newTask, priority: e.target.value })}
-                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="normal">أولوية عادية</option>
-                  <option value="important">مهمة</option>
-                  <option value="urgent">عاجلة جداً</option>
-                </select>
-                <input
-                  type="date"
-                  value={newTask.dueDate}
-                  onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })}
-                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div className="flex-1 relative">
-                <button
-                  type="button"
-                  onClick={() => setIsCaseSelectOpen(true)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 text-right flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-indigo-500 transition hover:bg-slate-100"
-                >
-                  <span>
-                    {newTask.linkedCases?.length > 0
-                      ? `مرتبطة بـ (${newTask.linkedCases.length}) ملفات`
-                      : 'مهمة عامة (انقر لربط ملفات)'}
-                  </span>
-                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
-                </button>
+                <div className="relative flex-1">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="ابحث في المهام..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-4 pr-10 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
               </div>
             </div>
-            <div className="flex gap-2 justify-end mt-4">
-              <button onClick={() => setIsAdding(false)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition">
-                إلغاء
-              </button>
-              <button onClick={handleSaveTask} className="px-6 py-2.5 rounded-xl text-sm font-black text-white bg-indigo-600 shadow-sm hover:bg-indigo-700 transition">
-                حفظ المهمة
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Main Content Area */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-        {/* Tabs and Actions */}
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-          <div className="flex bg-slate-100 p-1 rounded-xl">
-            <button
-              onClick={() => setActiveTab('pending')}
-              className={`px-4 py-2 rounded-lg text-xs font-black transition ${activeTab === 'pending' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              قيد التنفيذ ({pendingTasks.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('completed')}
-              className={`px-4 py-2 rounded-lg text-xs font-black transition ${activeTab === 'completed' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              مكتملة ({completedTasks.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('viewing')}
-              className={`px-4 py-2 rounded-lg text-xs font-black transition ${activeTab === 'viewing' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              مهام الاطلاع ({viewingTasks.length})
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            {activeTab === 'viewing' && (
-              <button
-                onClick={handlePrintViewingTasks}
-                className="flex items-center gap-1.5 bg-amber-50 text-amber-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-amber-100 transition"
-              >
-                <Printer className="w-4 h-4" /> طباعة كشف الاطلاع
-              </button>
-            )}
-            {canManageTasks && !isAdding && (
-              <button
-                onClick={() => setIsAdding(true)}
-                className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-indigo-100 transition"
-              >
-                <Plus className="w-4 h-4" /> إضافة مهمة
-              </button>
-            )}
-          </div>
-        </div>
-
-          {selectedTaskIds.length > 0 && (
-            <div className="mx-6 mb-2 bg-indigo-50 border border-indigo-200 p-3 rounded-xl flex items-center justify-between animate-in fade-in">
-              <span className="text-sm font-black text-indigo-700">تم تحديد {selectedTaskIds.length} مهام</span>
-              <button 
-                onClick={handleBulkDelete}
-                className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                حذف المحدد
-              </button>
-            </div>
-          )}
-
-        {/* Task List */}
-        <div className="p-5 bg-slate-50/50 min-h-[400px] space-y-3">
-          {displayTasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-              <ClipboardList className="w-12 h-12 mb-3 opacity-20" />
-              <p className="font-bold text-sm">لا توجد مهام في هذه القائمة.</p>
-            </div>
-          ) : (
-            displayTasks.map(task => (
-              <div key={task.id} className={`p-4 rounded-2xl border transition-all ${task.status === 'completed' ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-200 hover:border-indigo-300 shadow-sm hover:shadow-md'} ${selectedTaskIds.includes(task.id) ? 'ring-2 ring-indigo-400' : ''}`}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 flex-1">
-                    {canManageTasks && (
-                      <input 
-                        type="checkbox"
-                        checked={selectedTaskIds.includes(task.id)}
-                        onChange={() => toggleTaskSelection(task.id)}
-                        className="mt-1.5 w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
-                      />
-                    )}
-                    <button
-                      onClick={() => canManageTasks || task.assignee === currentUser ? handleToggleStatus(task) : null}
-                      disabled={!canManageTasks && task.assignee !== currentUser}
-                      className={`shrink-0 mt-0.5 rounded-full transition-colors ${(canManageTasks || task.assignee === currentUser) ? 'cursor-pointer hover:scale-110' : 'cursor-default'} ${task.status === 'completed' ? 'text-emerald-500' : 'text-slate-300 hover:text-indigo-500'}`}
-                    >
-                      <CheckCircle2 className="w-6 h-6" />
-                    </button>
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-200">
-                          المكلف: {task.assignee || 'غير محدد'}
-                        </span>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded border ${getPriorityColors(task.priority)}`}>
-                          {getPriorityLabel(task.priority)}
-                        </span>
-                        {task.dueDate && (
-                          <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
-                            <Calendar className="w-3 h-3" /> {formatDateString(task.dueDate)}
-                          </span>
-                        )}
+            {/* Add/Edit Task Form (Inline) */}
+            {isAdding && canManageTasks && (
+              <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm overflow-hidden mt-4 animate-in slide-in-from-top-4">
+                <div className="bg-indigo-50 px-5 py-4 border-b border-indigo-100 flex items-center justify-between">
+                  <h3 className="font-black text-indigo-900">{editingTaskId ? 'تعديل المهمة' : 'إضافة مهمة جديدة'}</h3>
+                  {activeMainTab === 'viewing' && <span className="text-xs font-bold text-amber-600 bg-amber-100 px-2 py-1 rounded">مهمة إطلاع وتصوير</span>}
+                </div>
+                <div className="p-5 space-y-4">
+                  {/* Row 1 */}
+                  <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                    {activeMainTab !== 'viewing' && (
+                      <div className="flex-[2] relative">
+                        <input 
+                          type="text"
+                          list="predefined-tasks-list"
+                          placeholder="وصف المهمة (مثال: شهادة من الجدول...)"
+                          value={newTask.title}
+                          onChange={e => setNewTask({...newTask, title: e.target.value})}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <datalist id="predefined-tasks-list">
+                          {PREDEFINED_TASKS?.map(t => <option key={t} value={t} />)}
+                        </datalist>
                       </div>
-                      <h4 className={`text-sm sm:text-base font-black ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-navy-900'}`}>
-                        {task.title}
-                      </h4>
-                      {task.type === 'viewing' && task.notes && (
-                        <p className="text-xs font-bold text-slate-500 mt-1 bg-slate-50 p-2 rounded border border-slate-100 inline-block">
-                          {task.notes}
-                        </p>
-                      )}
-                      {task.type === 'viewing' && task.linkedCases && task.linkedCases.length > 0 && task.status === 'pending' && canManageTasks && (
-                        <button
-                          onClick={() => {
-                            setActiveUploadTask(task);
-                            setActiveUploadCase(cases.find(c => c.id === task.linkedCases[0]));
-                            setIsUploadModalOpen(true);
-                          }}
-                          className="mt-2 flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold transition border border-indigo-200"
-                        >
-                          <Camera className="w-3.5 h-3.5" /> إتمام وإرفاق المستندات
-                        </button>
-                      )}
-                      {task.linkedCases && task.linkedCases.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {task.linkedCases.map(caseId => {
-                            const linkedCase = cases.find(c => c.id === caseId);
-                            if (!linkedCase) return null;
-                            return (
-                              <span key={caseId} className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded-lg">
-                                رقم {linkedCase['رقم الدعوى']} لسنة {linkedCase['السنة']}
-                              </span>
-                            );
-                          })}
+                    )}
+                    <select
+                      value={newTask.assignee}
+                      onChange={e => setNewTask({ ...newTask, assignee: e.target.value })}
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">إسناد إلى (المكلف)...</option>
+                      <option value="المستشار">المستشار</option>
+                      {settings?.employees?.map(e => <option key={e.name} value={e.name}>{e.name}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Row 2 */}
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    {activeMainTab === 'viewing' && (
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1">تاريخ الجلسة (إن وجد)</label>
+                        <input
+                          type="date"
+                          value={newTask.sessionDate}
+                          onChange={e => setNewTask({ ...newTask, sessionDate: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1 flex gap-3">
+                      {activeMainTab !== 'viewing' && (
+                        <div className="flex-1">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1">الأولوية</label>
+                          <select
+                            value={newTask.priority}
+                            onChange={e => setNewTask({ ...newTask, priority: e.target.value })}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <option value="normal">أولوية عادية</option>
+                            <option value="important">مهمة</option>
+                            <option value="urgent">عاجلة جداً</option>
+                          </select>
                         </div>
                       )}
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1">موعد التنفيذ (Due Date)</label>
+                        <input
+                          type="date"
+                          value={newTask.dueDate}
+                          onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
                     </div>
                   </div>
-                  {canManageTasks && (
-                    <button onClick={() => handleDelete(task.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition">
-                      <Trash2 className="w-4 h-4" />
+
+                  {/* Row 3 */}
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1 relative">
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">الملفات المرتبطة</label>
+                      <button
+                        type="button"
+                        onClick={() => setIsCaseSelectOpen(true)}
+                        className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-right flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-indigo-500 transition hover:bg-slate-100 ${newTask.linkedCases?.length > 0 ? 'text-indigo-700' : 'text-slate-500'}`}
+                      >
+                        <span>
+                          {newTask.linkedCases?.length > 0
+                            ? `مرتبطة بـ (${newTask.linkedCases.length}) ملفات`
+                            : 'انقر لربط ملفات بالمهمة'}
+                        </span>
+                        <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                      </button>
+                    </div>
+                    {activeMainTab === 'viewing' && (
+                      <div className="flex-[2]">
+                         <label className="block text-[10px] font-bold text-slate-500 mb-1">المطلوب (ملاحظات)</label>
+                         <input 
+                          type="text"
+                          placeholder="المطلوب تصويره..."
+                          value={newTask.notes}
+                          onChange={e => setNewTask({...newTask, notes: e.target.value})}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Actions */}
+                  <div className="flex gap-2 justify-end mt-4 pt-4 border-t border-slate-100">
+                    <button onClick={() => { setIsAdding(false); setEditingTaskId(null); }} className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition">
+                      إلغاء
+                    </button>
+                    <button onClick={handleSaveTask} className="px-6 py-2.5 rounded-xl text-sm font-black text-white bg-indigo-600 shadow-sm hover:bg-indigo-700 transition">
+                      {editingTaskId ? 'حفظ التعديلات' : 'إضافة المهمة'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Main Content Area */}
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden mt-4">
+              {/* Sub-Tabs and Actions */}
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0 flex-wrap gap-4">
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                  <button
+                    onClick={() => setActiveSubTab('pending')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black transition ${activeSubTab === 'pending' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    قيد التنفيذ ({pendingCount})
+                  </button>
+                  <button
+                    onClick={() => setActiveSubTab('completed')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black transition ${activeSubTab === 'completed' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    مكتملة ({completedCount})
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  {activeMainTab === 'viewing' && (
+                    <button
+                      onClick={handlePrintViewingTasks}
+                      className="flex items-center gap-1.5 bg-amber-50 text-amber-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-amber-100 transition border border-amber-200"
+                    >
+                      <Printer className="w-4 h-4" /> طباعة الكشف
+                    </button>
+                  )}
+                  {canManageTasks && !isAdding && (
+                    <button
+                      onClick={() => {
+                        setEditingTaskId(null);
+                        setNewTask({ title: '', assignee: '', dueDate: '', sessionDate: '', priority: 'normal', type: 'general', caseId: '', linkedCases: [], notes: '' });
+                        setIsAdding(true);
+                      }}
+                      className="flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-sm"
+                    >
+                      <Plus className="w-4 h-4" /> إضافة مهمة
                     </button>
                   )}
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      </div>
+
+                {selectedTaskIds.length > 0 && (
+                  <div className="mx-6 my-3 bg-indigo-50 border border-indigo-200 p-3 rounded-xl flex items-center justify-between animate-in fade-in">
+                    <span className="text-sm font-black text-indigo-700">تم تحديد {selectedTaskIds.length} مهام</span>
+                    <button 
+                      onClick={handleBulkDelete}
+                      className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      حذف المحدد
+                    </button>
+                  </div>
+                )}
+
+              {/* Task List */}
+              <div className="p-5 bg-slate-50/50 min-h-[400px] space-y-3">
+                {displayTasks.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                    <ClipboardList className="w-12 h-12 mb-3 opacity-20" />
+                    <p className="font-bold text-sm">لا توجد مهام في هذه القائمة.</p>
+                  </div>
+                ) : (
+                  displayTasks.map(task => (
+                    <div key={task.id} className={`p-4 rounded-2xl border transition-all ${task.status === 'completed' ? 'bg-slate-50 border-slate-200 opacity-70' : 'bg-white border-slate-200 hover:border-indigo-300 shadow-sm hover:shadow-md'} ${selectedTaskIds.includes(task.id) ? 'ring-2 ring-indigo-400' : ''}`}>
+                      <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1 w-full">
+                          {canManageTasks && (
+                            <input 
+                              type="checkbox"
+                              checked={selectedTaskIds.includes(task.id)}
+                              onChange={() => toggleTaskSelection(task.id)}
+                              className="mt-1 w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer shrink-0"
+                            />
+                          )}
+                          <button
+                            onClick={() => canManageTasks || task.assignee === currentUser ? handleToggleStatus(task) : null}
+                            disabled={!canManageTasks && task.assignee !== currentUser}
+                            className={`shrink-0 rounded-full transition-colors ${(canManageTasks || task.assignee === currentUser) ? 'cursor-pointer hover:scale-110' : 'cursor-default'} ${task.status === 'completed' ? 'text-emerald-500' : 'text-slate-300 hover:text-indigo-500'}`}
+                          >
+                            <CheckCircle2 className="w-6 h-6" />
+                          </button>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                              {task.assignee && (
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-lg border bg-slate-50 text-slate-600 border-slate-200">
+                                  المكلف: {task.assignee}
+                                </span>
+                              )}
+                              {activeMainTab !== 'viewing' && (
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${getPriorityColors(task.priority)}`}>
+                                  {getPriorityLabel(task.priority)}
+                                </span>
+                              )}
+                              {task.dueDate && (
+                                <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-lg border ${task.status !== 'completed' && new Date(task.dueDate) < new Date() ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                  <Calendar className="w-3 h-3" /> موعد التنفيذ: {formatDateString(task.dueDate)}
+                                </span>
+                              )}
+                              {activeMainTab === 'viewing' && (task.sessionDate || task.caseContext?.date) && (
+                                <span className="flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-lg border bg-amber-50 text-amber-600 border-amber-200">
+                                  تاريخ الجلسة: {formatDateString(task.sessionDate || task.caseContext?.date)}
+                                </span>
+                              )}
+                            </div>
+                            
+                            <h4 className={`text-base font-black ${task.status === 'completed' ? 'text-slate-500 line-through' : 'text-navy-900'} leading-tight mt-1`}>
+                              {task.title}
+                            </h4>
+                            
+                            {task.notes && (
+                              <p className="text-xs font-bold text-slate-600 mt-2 bg-slate-50/50 p-2.5 rounded-lg border border-slate-100">
+                                <span className="text-slate-400 ml-1">ملاحظات/المطلوب:</span> {task.notes}
+                              </p>
+                            )}
+                            
+                            {task.type === 'viewing' && task.linkedCases && task.linkedCases.length > 0 && task.status === 'pending' && canManageTasks && (
+                              <button
+                                onClick={() => {
+                                  setActiveUploadTask(task);
+                                  setActiveUploadCase(cases.find(c => c.id === task.linkedCases[0]));
+                                  setIsUploadModalOpen(true);
+                                }}
+                                className="mt-3 flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold transition border border-indigo-200 w-fit"
+                              >
+                                <Camera className="w-3.5 h-3.5" /> إتمام وإرفاق المستندات
+                              </button>
+                            )}
+                            
+                            {task.linkedCases && task.linkedCases.length > 0 && (
+                              <div className="mt-3 flex flex-wrap gap-1.5">
+                                {task.linkedCases.map(caseId => {
+                                  const linkedCase = cases.find(c => c.id === caseId);
+                                  if (!linkedCase) return null;
+                                  return (
+                                    <span key={caseId} className="text-[10px] font-bold text-indigo-700 bg-indigo-50/50 border border-indigo-100 px-2 py-1 rounded-lg">
+                                      ملف: {linkedCase['رقم الدعوى']} لسنة {linkedCase['السنة']}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-1 sm:self-start self-end">
+                          {canManageTasks && (
+                            <>
+                              <button onClick={() => handleEditTask(task)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition" title="تعديل">
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => handleDelete(task.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="حذف">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
+      
       {/* Case Selection Modal */}
       {isCaseSelectOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">

@@ -124,7 +124,7 @@ export const AppProvider = ({ children }) => {
 
     const unsubSchema = onSnapshot(getSchemaRef(tenantId), (docSnap) => {
       if (docSnap.exists() && docSnap.data().fields) {
-        const obsoleteFields = ['الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي'];
+        const obsoleteFields = ['الحكم', 'تصنيف الحكم', 'المنطوق', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي'];
         let cleanSchema = docSnap.data().fields.filter(f => f && !obsoleteFields.includes(f.id));
         
         const essentialFields = [
@@ -142,7 +142,8 @@ export const AppProvider = ({ children }) => {
           { id: 'طلبات الطاعن', label: 'طلبات الطاعن', type: 'textarea', visible: true },
           { id: 'نوع الجلسة', label: 'نوع الجلسة', type: 'text', visible: true },
           { id: 'تصنيف الحكم', label: 'تصنيف الحكم', type: 'text', visible: true },
-          { id: 'نوع الحكم', label: 'نوع الحكم', type: 'text', visible: true }
+          { id: 'نوع الحكم', label: 'نوع الحكم', type: 'text', visible: true },
+          { id: 'منطوق الحكم', label: 'منطوق الحكم', type: 'textarea', visible: true }
         ];
 
         essentialFields.forEach(ef => {
@@ -462,12 +463,15 @@ export const AppProvider = ({ children }) => {
     let id, data;
     if (typeof idOrData === 'object' && idOrData !== null) {
       data = idOrData;
-      id = data.id;
+      id = data.id || crypto.randomUUID();
     } else {
-      id = idOrData;
-      data = dataObj;
+      id = idOrData || crypto.randomUUID();
+      data = dataObj || {};
     }
     
+    // Ensure the data has the generated ID
+    data.id = id;
+
     try {
       await setDoc(doc(getTasksRef(tenantId), id), data, { merge: true });
     } catch (e) {
@@ -536,6 +540,19 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const userEmail = currentUser?.email || '';
+  const username = userEmail.split('@')[0];
+    
+  let currentUserName = username;
+  if (isAdmin) {
+    currentUserName = settings?.consultantName || 'المستشار';
+  } else if (isEmployee && settings?.employees) {
+    const emp = settings.employees.find(e => e.username === username);
+    if (emp && emp.name) {
+      currentUserName = emp.name;
+    }
+  }
+
   const contextValue = useMemo(() => ({
       cases,
       rawCases,
@@ -547,7 +564,8 @@ export const AppProvider = ({ children }) => {
       settings,
       isAdmin,
       isEmployee,
-      currentUser: currentUser?.email || '',
+      currentUser: userEmail,
+      currentUserName,
       currentUserPermissions,
       loading,
       globalHideNoInterest,
@@ -571,7 +589,7 @@ export const AppProvider = ({ children }) => {
       completeGlobalTask
   }), [
     cases, rawCases, deletedCases, plaintiffsList, defendantsList, rolls, schema, settings, isAdmin, isEmployee, 
-    currentUser, currentUserPermissions, loading, globalHideNoInterest
+    currentUser, currentUserName, currentUserPermissions, loading, globalHideNoInterest
   ]);
 
   return (

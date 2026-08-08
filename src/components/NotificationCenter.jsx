@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Calendar, ClipboardList, AlertTriangle, CheckCircle2, ChevronLeft, Camera } from 'lucide-react';
+import { Bell, Calendar, ClipboardList, AlertTriangle, CheckCircle2, ChevronLeft, Camera, Check, Trash2 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useNavigate } from 'react-router-dom';
 import { parseISO, isAfter, isBefore, addDays, format, isToday, isTomorrow, startOfDay } from 'date-fns';
 
 export default function NotificationCenter() {
-  const { cases, globalTasks } = useAppContext();
+  const { cases, globalTasks, completeGlobalTask, deleteGlobalTask } = useAppContext();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -60,6 +60,7 @@ export default function NotificationCenter() {
             const isOverdue = isBefore(tDate, today);
             notifs.push({
               id: `task-${task.id}`,
+              taskId: task.id,
               type: isOverdue ? 'overdue' : 'task',
               title: isOverdue ? 'مهمة متأخرة' : 'مهمة قريبة',
               desc: task.title,
@@ -141,30 +142,78 @@ export default function NotificationCenter() {
             ) : (
               <div className="divide-y divide-slate-50">
                 {notifications.map((notif) => (
-                  <button
-                    key={notif.id}
-                    onClick={() => {
-                      setIsOpen(false);
-                      navigate(notif.link);
-                    }}
-                    className="w-full text-right p-3 sm:p-4 hover:bg-slate-50 transition flex items-start gap-3 group"
-                  >
+                  <div key={notif.id} className="w-full text-right p-3 sm:p-4 hover:bg-slate-50 transition flex items-start gap-3 group border-b border-slate-50 last:border-0">
                     <div className="mt-0.5 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
                       {getIcon(notif.type)}
                     </div>
-                    <div className="flex-1">
+                    
+                    <button 
+                      className="flex-1 text-right"
+                      onClick={() => {
+                        setIsOpen(false);
+                        navigate(notif.link);
+                      }}
+                    >
                       <div className="flex justify-between items-center mb-0.5">
                         <span className="text-xs font-black text-slate-800">{notif.title}</span>
                         <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${isToday(notif.date) ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`} dir="ltr">
                           {getRelativeDateStr(notif.date)}
                         </span>
                       </div>
-                      <p className="text-[11px] font-bold text-slate-500 leading-snug pr-1 text-right">
+                      <p className="text-[11px] font-bold text-slate-500 leading-snug pr-1">
                         {notif.desc}
                       </p>
-                    </div>
-                    <ChevronLeft className="w-4 h-4 text-slate-300 opacity-0 group-hover:opacity-100 transition self-center shrink-0" />
-                  </button>
+                    </button>
+
+                    {(notif.type === 'task' || notif.type === 'overdue' || notif.type === 'viewing_group') ? (
+                      <div className="flex flex-col gap-1 self-center shrink-0">
+                        <button 
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (notif.type === 'viewing_group') {
+                               const tasksToComplete = globalTasks.filter(t => t.type === 'viewing' && t.status !== 'completed' && t.dueDate && t.dueDate.split('T')[0] === notif.date.toISOString().split('T')[0]);
+                               for (let t of tasksToComplete) {
+                                  await completeGlobalTask(t.id, 'تم إنجاز مهام الإطلاع المجمعة');
+                               }
+                            } else {
+                               await completeGlobalTask(notif.taskId, 'تم إنجازها من التنبيهات');
+                            }
+                          }}
+                          className="p-1.5 bg-emerald-100 text-emerald-600 hover:bg-emerald-200 rounded-lg transition" 
+                          title="إنجاز"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (notif.type === 'viewing_group') {
+                               const tasksToDelete = globalTasks.filter(t => t.type === 'viewing' && t.status !== 'completed' && t.dueDate && t.dueDate.split('T')[0] === notif.date.toISOString().split('T')[0]);
+                               for (let t of tasksToDelete) {
+                                  await deleteGlobalTask(t.id);
+                               }
+                            } else {
+                               await deleteGlobalTask(notif.taskId);
+                            }
+                          }}
+                          className="p-1.5 bg-rose-100 text-rose-600 hover:bg-rose-200 rounded-lg transition"
+                          title="تجاهل / حذف"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => {
+                          setIsOpen(false);
+                          navigate(notif.link);
+                        }}
+                        className="self-center shrink-0 p-2"
+                      >
+                        <ChevronLeft className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition" />
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

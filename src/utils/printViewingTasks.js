@@ -13,6 +13,7 @@ export const printViewingTasksList = (tasks, cases, settings = {}) => {
     showAppellee: true,
     showRequiredDocs: true,
     showSessionDate: true,
+    showSessionType: true,
     showDecision: true,
     showStatus: true
   };
@@ -35,6 +36,7 @@ export const printViewingTasksList = (tasks, cases, settings = {}) => {
   if (template.showAppellee) tableHeaders += `<th>المدعى عليه</th>`;
   if (template.showRequiredDocs) tableHeaders += `<th>المطلوب (الملاحظات)</th>`;
   if (template.showSessionDate) tableHeaders += `<th>تاريخ الجلسة</th>`;
+  if (template.showSessionType) tableHeaders += `<th>نوع الجلسة</th>`;
   if (template.showDecision) tableHeaders += `<th>القرار</th>`;
   if (template.showStatus) tableHeaders += `<th>حالة المهمة</th>`;
 
@@ -53,6 +55,7 @@ export const printViewingTasksList = (tasks, cases, settings = {}) => {
 
     const docsString = task.title.includes(':') ? task.title.split(':').pop().trim() : task.title;
     const sessionDate = task.caseContext?.date || linkedCase['تاريخ الجلسة'] || linkedCase['آخر جلسة'] || '---';
+    const sessionType = task.caseContext?.type || linkedCase['نوع الجلسة'] || '---';
     const decision = task.caseContext?.decision || linkedCase['القرار'] || linkedCase['قرار الجلسة'] || '---';
     const statusText = task.status === 'completed' ? 'تم الإطلاع' : 'قيد الانتظار';
     const statusColor = task.status === 'completed' ? '#059669' : '#e11d48';
@@ -64,6 +67,7 @@ export const printViewingTasksList = (tasks, cases, settings = {}) => {
     if (template.showAppellee) rowHtml += `<td>${appellee}</td>`;
     if (template.showRequiredDocs) rowHtml += `<td style="font-weight: 900; font-size: 15px;">${docsString}</td>`;
     if (template.showSessionDate) rowHtml += `<td>${sessionDate}</td>`;
+    if (template.showSessionType) rowHtml += `<td>${sessionType}</td>`;
     if (template.showDecision) rowHtml += `<td>${decision}</td>`;
     if (template.showStatus) rowHtml += `<td style="color: ${statusColor}; font-weight: bold;">${statusText}</td>`;
     rowHtml += `</tr>`;
@@ -160,6 +164,11 @@ export const printViewingTasksList = (tasks, cases, settings = {}) => {
         </style>
       </head>
       <body>
+        <div class="no-print" style="position: fixed; top: 15px; left: 15px; z-index: 9999;">
+          <button onclick="window.close()" style="background: #e11d48; color: #fff; padding: 10px 20px; border: none; border-radius: 8px; font-weight: 900; font-size: 14px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-family: 'Cairo', sans-serif;">
+            إغلاق وعودة للتطبيق ✕
+          </button>
+        </div>
         <div class="header-container">
           <h1>${template.title}</h1>
           <div class="meta-info">
@@ -197,11 +206,9 @@ export const printViewingTasksList = (tasks, cases, settings = {}) => {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
   setTimeout(() => {
+    printWindow.focus();
     printWindow.print();
-    printWindow.close();
   }, 250);
   return true;
 };

@@ -260,7 +260,10 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
                 className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
               >
                 <option value="">-- اختر --</option>
-                {roles.map(r => <option key={r} value={r}>{r}</option>)}
+                <option value="طاعنين أو مدعين">طاعنين أو مدعين</option>
+                <option value="مطعون ضدنا أو مدعى علينا">مطعون ضدنا أو مدعى علينا</option>
+                <option value="لا شأن">لا شأن</option>
+                <option value="خارج الاختصاص">خارج الاختصاص</option>
               </select>
             </div>
             <div className="space-y-1">

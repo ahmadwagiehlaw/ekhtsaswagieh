@@ -335,7 +335,7 @@ export default function Files() {
     }
 
     return result;
-  }, [cases, debouncedSearchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly, quickDateFilter, activeShoba, settings]);
+  }, [cases, debouncedSearchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly, quickDateFilter, activeShoba, settings, globalTasks]);
 
   useEffect(() => {
     setCurrentPage(1);
