@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { onSnapshot, setDoc, doc, writeBatch, getDocs, deleteDoc } from 'firebase/firestore';
-import { db, getSettingsRef, getSchemaRef, getCasesRef, getRollsRef, getTasksRef } from '../lib/firebase';
+import { onSnapshot, setDoc, doc, writeBatch, getDocs, deleteDoc, addDoc } from 'firebase/firestore';
+import { db, getSettingsRef, getSchemaRef, getCasesRef, getRollsRef, getTasksRef, getActivityLogsRef } from '../lib/firebase';
 import { useAuth } from './AuthContext';
 import { getSafeDateObj } from '../utils/dateUtils';
 
@@ -234,6 +234,34 @@ export const AppProvider = ({ children }) => {
 
   const sanitizeId = (str) => String(str).replace(/[\/\\?%*:|"<>\s]/g, '_');
 
+  const logActivity = async (action, entity, entityId, details) => {
+    if (!tenantId) return;
+    try {
+      const email = currentUser?.email || '';
+      const uName = email.split('@')[0];
+      let displayName = uName;
+      if (isAdmin) {
+        displayName = settings?.consultantName || 'المستشار';
+      } else if (isEmployee && settings?.employees) {
+        const emp = settings.employees.find(e => e.username === uName);
+        if (emp && emp.name) displayName = emp.name;
+      }
+      
+      const logData = {
+        action,
+        entity,
+        entityId,
+        details,
+        user: displayName,
+        email: email,
+        timestamp: new Date().toISOString()
+      };
+      await addDoc(getActivityLogsRef(tenantId), logData);
+    } catch(e) {
+      console.warn('Failed to log activity', e);
+    }
+  };
+
   const cleanUndefined = (obj) => {
     const newObj = {};
     for (let key in obj) {
@@ -277,9 +305,65 @@ export const AppProvider = ({ children }) => {
         }
       }
 
+      const isNew = !cases.some(c => c.id === caseId);
       const dataToSave = cleanUndefined({ ...payload, updatedAt: new Date().toISOString() });
       delete dataToSave.id; 
       await setDoc(caseRef, dataToSave, { merge: true });
+      
+      if (isNew) {
+        await logActivity(
+          'إضافة',
+          'ملف',
+          caseId,
+          `تمت إضافة ملف جديد رقم ${payload['رقم الدعوى'] || ''} لسنة ${payload['السنة'] || ''}`
+        );
+      } else {
+        const caseNum = existingCase['رقم الدعوى'] || payload['رقم الدعوى'] || caseId;
+        const changes = [];
+        
+        if (payload.documents && Array.isArray(payload.documents)) {
+          const oldDocs = existingCase.documents || [];
+          if (payload.documents.length > oldDocs.length) {
+            const lastDoc = payload.documents[payload.documents.length - 1];
+            changes.push(`رفع مستند/صورة (${lastDoc?.name || 'جديدة'})`);
+          } else if (payload.documents.length < oldDocs.length) {
+            changes.push(`حذف مستند/مرفق من الملف`);
+          }
+        }
+
+        if (payload.coverImage && payload.coverImage !== existingCase.coverImage) {
+          changes.push(`تعديل/رفع غلاف الصورة للملف`);
+        }
+
+        if (payload.sessions && Array.isArray(payload.sessions)) {
+          const oldSessions = existingCase.sessions || [];
+          if (payload.sessions.length > oldSessions.length) {
+            changes.push(`إضافة جلسة جديدة`);
+          }
+        }
+
+        if (payload.procedures && Array.isArray(payload.procedures)) {
+          const oldProc = existingCase.procedures || [];
+          if (payload.procedures.length > oldProc.length) {
+            changes.push(`إضافة إجراء جديد للملف`);
+          }
+        }
+
+        if (payload['تاريخ الجلسة'] && payload['تاريخ الجلسة'] !== existingCase['تاريخ الجلسة']) {
+          changes.push(`تحديث تاريخ الجلسة إلى (${payload['تاريخ الجلسة']})`);
+        }
+
+        if (payload['القرار'] && payload['القرار'] !== existingCase['القرار']) {
+          changes.push(`تحديث القرار إلى (${payload['القرار']})`);
+        }
+
+        const detailsText = changes.length > 0
+          ? `${changes.join(' + ')} (ملف رقم ${caseNum})`
+          : `تعديل بيانات الملف رقم ${caseNum}`;
+
+        await logActivity('تعديل', 'ملف', caseId, detailsText);
+      }
+
       return true;
     } catch (error) {
       console.error("Error saving case: ", error);
@@ -319,8 +403,6 @@ export const AppProvider = ({ children }) => {
       if (isSupreme) {
         if (newSessionType === 'فحص' && newDecision === 'إحالة للموضوع') {
           payload['نوع الجلسة'] = 'موضوع';
-        } else if (newSessionType === 'موضوع' && hasJudgmentData) {
-          payload['نوع الجلسة'] = 'حكم';
         }
       } else {
         if ((newSessionType === 'مفوضين' || newSessionType === 'مرافعة') && hasJudgmentData) {
@@ -343,13 +425,16 @@ export const AppProvider = ({ children }) => {
     if (!tenantId) return false;
     try {
       const safeId = sanitizeId(caseId);
+      const c = cases.find(x => x.id === caseId);
       if (permanent) {
         await deleteDoc(doc(getCasesRef(tenantId), safeId));
+        await logActivity('حذف نهائي', 'ملف', safeId, `حذف نهائي للملف ${c?.['رقم الدعوى'] || ''}`);
       } else {
         await setDoc(doc(getCasesRef(tenantId), safeId), { 
           isDeleted: true, 
           deletedAt: new Date().toISOString() 
         }, { merge: true });
+        await logActivity('حذف إلى الأرشيف', 'ملف', safeId, `تم نقل الملف ${c?.['رقم الدعوى'] || ''} إلى الأرشيف`);
       }
       return true;
     } catch (error) {
@@ -471,9 +556,18 @@ export const AppProvider = ({ children }) => {
     
     // Ensure the data has the generated ID
     data.id = id;
+    const isNew = !globalTasks.some(t => t.id === id);
 
     try {
       await setDoc(doc(getTasksRef(tenantId), id), data, { merge: true });
+      if (data.status !== 'completed' || isNew) {
+        await logActivity(
+          isNew ? 'إضافة' : 'تعديل',
+          'مهمة',
+          id,
+          isNew ? `تمت إضافة مهمة: ${data.title}` : `تم تعديل مهمة: ${data.title}`
+        );
+      }
     } catch (e) {
       console.error(e);
       throw e;
@@ -502,6 +596,8 @@ export const AppProvider = ({ children }) => {
     const now = new Date().toISOString();
     const updatedTask = { ...t, status: 'completed', notes: notes || '', completedAt: now };
     await saveGlobalTask(updatedTask);
+    
+    await logActivity('إنجاز', 'مهمة', taskId, `تم إنجاز المهمة: ${t.title}`);
 
     if (t.linkedCases && t.linkedCases.length > 0) {
       for (const caseId of t.linkedCases) {
@@ -533,7 +629,9 @@ export const AppProvider = ({ children }) => {
   const deleteGlobalTask = async (id) => {
     if (!tenantId) return false;
     try {
+      const t = globalTasks.find(x => x.id === id);
       await deleteDoc(doc(getTasksRef(tenantId), id));
+      await logActivity('حذف', 'مهمة', id, `تم حذف المهمة: ${t?.title || ''}`);
     } catch (e) {
       console.error(e);
       throw e;

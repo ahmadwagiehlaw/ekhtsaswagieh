@@ -19,6 +19,7 @@ const DayRoll       = lazy(() => import('./pages/DayRoll'));
 const Trash         = lazy(() => import('./pages/Trash'));
 const Login         = lazy(() => import('./pages/Login'));
 const SuperAdmin    = lazy(() => import('./pages/SuperAdmin'));
+const AuditLogs     = lazy(() => import('./pages/AuditLogs'));
 
 const PageLoader = () => (
   <div className="min-h-[50vh] flex items-center justify-center">
@@ -54,6 +55,7 @@ function AppContent() {
               <Route path="case/:id/report" element={<CaseReport />} />
               <Route path="reports" element={<Reports />} />
               <Route path="super-admin" element={<SuperAdmin />} />
+              <Route path="audit-logs" element={<AuditLogs />} />
             </Route>
             {/* Rolls pages are public */}
             <Route path="rolls" element={<RollsLibrary />} />

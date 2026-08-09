@@ -24,6 +24,7 @@ export const getSchemaRef = (tenantId) => doc(db, "tenants", tenantId, "appData"
 export const getCasesRef = (tenantId) => collection(db, "tenants", tenantId, "cases");
 export const getRollsRef = (tenantId) => collection(db, "tenants", tenantId, "rolls");
 export const getTasksRef = (tenantId) => collection(db, "tenants", tenantId, "tasks");
+export const getActivityLogsRef = (tenantId) => collection(db, "tenants", tenantId, "activity_logs");
 
 // ─── Global / Admin References ──────────────────────────────────
 export const USERS_DIRECTORY_REF = collection(db, "users_directory");

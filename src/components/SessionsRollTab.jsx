@@ -12,8 +12,9 @@ import {
   Edit3, Check, X, ChevronRight, ChevronLeft, Search,
   CheckSquare, Square, ClipboardList, Bell, Eye, CopyPlus,
   Printer, ExternalLink, Save, RefreshCcw, AlertCircle, Plus, Trash2,
-  ArrowUpDown, ArrowUp, ArrowDown, Columns, Settings2, FileText
+  ArrowUpDown, ArrowUp, ArrowDown, Columns, Settings2, FileText, Camera
 } from 'lucide-react';
+import { printViewingTasksList } from '../utils/printViewingTasks';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { getSafeDateObj } from '../utils/dateUtils';
@@ -63,7 +64,7 @@ const getRowBg = (fileLocation, isSelected) => {
 };
 
 export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
-  const { cases, saveCaseToFirebase, settings, deleteCaseFromFirebase } = useAppContext();
+  const { cases, saveCaseToFirebase, settings, deleteCaseFromFirebase, globalTasks } = useAppContext();
   const { showPrompt, toast } = useUI();
   const navigate = useNavigate();
 
@@ -479,6 +480,13 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
           <button onClick={() => setIsExportOpen(true)}
             className="flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition">
             <Printer className="w-3.5 h-3.5" /> طباعة
+          </button>
+          <button onClick={() => {
+            const vTasks = globalTasks?.filter(t => t.type === 'viewing' && t.status !== 'completed' && t.linkedCases?.some(id => filteredCases.find(c => c.id === id)));
+            if(!vTasks || vTasks.length === 0) { toast('لا توجد مهام إطلاع معلقة للرول الحالي', 'error'); return; }
+            printViewingTasksList(vTasks, cases, settings);
+          }} className="flex items-center gap-1 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition">
+            <Camera className="w-3.5 h-3.5" /> طباعة الإطلاع
           </button>
           {/* كشف ملفات: يفتح صفحة طباعة منظمة باسم المستشار وتاريخ الجلسة */}
           <button

@@ -44,44 +44,25 @@ export default function NotificationCenter() {
       }
     });
 
+    const isViewingTask = (t) => t.type === 'viewing' || t.title?.includes('إطلاع') || t.title?.includes('تصوير');
+
     // 3. Global Tasks (Pending & Due Soon)
-    const viewingTasksByDate = {};
     globalTasks.forEach(task => {
-      if (task.status !== 'completed' && task.dueDate) {
+      if (task.status !== 'completed' && task.dueDate && !isViewingTask(task)) {
         const tDate = parseISO(task.dueDate);
         if (isBefore(tDate, next3Days) || isBefore(tDate, today)) {
-          if (task.type === 'viewing') {
-            const dateStr = task.dueDate.split('T')[0];
-            if (!viewingTasksByDate[dateStr]) {
-              viewingTasksByDate[dateStr] = { date: tDate, count: 0, dateStr };
-            }
-            viewingTasksByDate[dateStr].count++;
-          } else {
-            const isOverdue = isBefore(tDate, today);
-            notifs.push({
-              id: `task-${task.id}`,
-              taskId: task.id,
-              type: isOverdue ? 'overdue' : 'task',
-              title: isOverdue ? 'مهمة متأخرة' : 'مهمة قريبة',
-              desc: task.title,
-              date: tDate,
-              link: `/tasks`
-            });
-          }
+          const isOverdue = isBefore(tDate, today);
+          notifs.push({
+            id: `task-${task.id}`,
+            taskId: task.id,
+            type: isOverdue ? 'overdue' : 'task',
+            title: isOverdue ? 'مهمة متأخرة' : 'مهمة قريبة',
+            desc: task.title,
+            date: tDate,
+            link: `/tasks`
+          });
         }
       }
-    });
-
-    Object.values(viewingTasksByDate).forEach(group => {
-      const isOverdue = isBefore(group.date, today);
-      notifs.push({
-        id: `viewing-${group.dateStr}`,
-        type: 'viewing_group',
-        title: isOverdue ? 'مهام إطلاع وتصوير متأخرة' : 'مهام إطلاع جلسة قادمة',
-        desc: `يوجد ${group.count} ملفات في جلسة ${group.dateStr}`,
-        date: group.date,
-        link: `/files?q=&role=all&requiredTaskType=viewing&sessionDateStart=${group.dateStr}&sessionDateEnd=${group.dateStr}`
-      });
     });
 
     // Sort by date

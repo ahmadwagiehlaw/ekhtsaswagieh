@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, X, Upload, Edit3, Gavel, Settings2, Copy, Maximize2, CheckSquare, Square, Save, CopyPlus, RefreshCcw, Search, Settings, Plus, Trash2, FileText, Camera } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
@@ -46,7 +46,7 @@ const getResultStyle = (result) => {
 
 const PREDEFINED_DECISIONS = ['للحكم', 'تصريح', 'للإعلان', 'للاطلاع', 'للإخطار', 'لورود التقرير', 'لتنفيذ قرار الإعادة', 'للاستعلام', 'استبعاد', 'إحالة للموضوع', 'رفض'];
 
-export default function SessionTable({ dayCases, date, onDateClick }) {
+export default function SessionTable({ dayCases, date, onDateClick, onFilteredCasesChange }) {
   const { saveCaseToFirebase, settings, currentUser, cases, globalTasks } = useAppContext();
   const { showPrompt, toast } = useUI();
   const navigate = useNavigate();
@@ -150,6 +150,13 @@ export default function SessionTable({ dayCases, date, onDateClick }) {
     
     return result;
   }, [dayCases, filterDecision, filterType, sortField, sortOrder, searchQuery, visibleColumns]);
+
+  // Expose the filtered array to parent (e.g. for printing)
+  useEffect(() => {
+    if (onFilteredCasesChange) {
+      onFilteredCasesChange(filteredCases);
+    }
+  }, [filteredCases, onFilteredCasesChange]);
 
   const handleSort = (field) => {
     if (sortField === field) {

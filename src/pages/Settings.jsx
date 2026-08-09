@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppState';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { firebaseConfig, USERS_DIRECTORY_REF } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
-import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList, Scale, Download, FileJson, ArrowUpFromLine, Copy, Clock, Fingerprint, Edit3, Search } from 'lucide-react';
+import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList, Scale, Download, FileJson, ArrowUpFromLine, Copy, Clock, Fingerprint, Edit3, Search, Activity, ChevronUp, ChevronDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useUI } from '../context/UIContext';
 
@@ -48,6 +49,17 @@ export default function Settings() {
     showDecision: true,
     showStatus: true
   });
+  const [localViewingTasksPrintOrder, setLocalViewingTasksPrintOrder] = useState(settings?.viewingTasksPrintOrder || [
+    'showRoll', 
+    'showCaseNumber', 
+    'showAppellant', 
+    'showAppellee', 
+    'showSessionDate', 
+    'showSessionType', 
+    'showDecision', 
+    'showStatus',
+    'showRequiredDocs'
+  ]);
   const [localCommonProcedures, setLocalCommonProcedures] = useState(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
   const [localCaseClassifications, setLocalCaseClassifications] = useState(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
   const [localCourtDegree, setLocalCourtDegree] = useState(settings?.courtDegree || 'أول درجة');
@@ -299,6 +311,7 @@ export default function Settings() {
       ...settings,
       consultantName: localConsultantName,
       viewingTasksPrintTemplate: localViewingTasksPrintTemplate,
+      viewingTasksPrintOrder: localViewingTasksPrintOrder,
       employees: localEmployees,
       decisions: localDecisions,
       reviewTasks: localReviewTasks,
@@ -605,27 +618,82 @@ export default function Settings() {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {[
-                  { key: 'showCreationDate', label: 'إظهار تاريخ التحرير' },
-                  { key: 'showConsultant', label: 'إظهار اسم المستشار / توقيع الموظف' },
-                  { key: 'showRoll', label: 'إظهار عمود الرول' },
-                  { key: 'showCaseNumber', label: 'إظهار عمود رقم الدعوى' },
-                  { key: 'showAppellant', label: 'إظهار عمود المدعي' },
-                  { key: 'showAppellee', label: 'إظهار عمود المدعى عليه' },
-                  { key: 'showRequiredDocs', label: 'إظهار عمود المستندات المطلوبة', disabled: true },
-                  { key: 'showSessionDate', label: 'إظهار عمود تاريخ الجلسة' },
-                  { key: 'showSessionType', label: 'إظهار عمود نوع الجلسة' },
-                  { key: 'showDecision', label: 'إظهار عمود القرار' },
-                  { key: 'showStatus', label: 'إظهار عمود حالة المهمة' }
-                ].map(field => (
-                  <div key={field.key} className={`flex items-center justify-between p-3 rounded-xl border ${localViewingTasksPrintTemplate[field.key] ? 'border-indigo-200 bg-indigo-50/50' : 'border-slate-200 bg-slate-50'} transition-all cursor-pointer`} onClick={() => !field.disabled && setLocalViewingTasksPrintTemplate({...localViewingTasksPrintTemplate, [field.key]: !localViewingTasksPrintTemplate[field.key]})}>
-                    <span className="text-[11px] font-black text-navy-900">{field.label} {field.disabled ? '(إلزامي)' : ''}</span>
-                    <div className={`w-8 h-4 rounded-full relative transition-colors ${localViewingTasksPrintTemplate[field.key] ? 'bg-indigo-600' : 'bg-slate-300'} ${field.disabled ? 'opacity-50' : ''}`}>
-                      <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${localViewingTasksPrintTemplate[field.key] ? 'left-0.5' : 'right-0.5'}`} />
-                    </div>
+              <div className="space-y-4">
+                <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200">
+                  <h4 className="font-bold text-xs text-navy-900 mb-3">بيانات الكشف الأساسية</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { key: 'showCreationDate', label: 'إظهار تاريخ التحرير' },
+                      { key: 'showConsultant', label: 'إظهار اسم المستشار / توقيع الموظف' }
+                    ].map(field => (
+                      <div key={field.key} className={`flex items-center justify-between p-3 rounded-xl border ${localViewingTasksPrintTemplate[field.key] ? 'border-indigo-200 bg-indigo-50/50' : 'border-slate-200 bg-white'} transition-all cursor-pointer shadow-sm`} onClick={() => setLocalViewingTasksPrintTemplate({...localViewingTasksPrintTemplate, [field.key]: !localViewingTasksPrintTemplate[field.key]})}>
+                        <span className="text-[11px] font-black text-navy-900">{field.label}</span>
+                        <div className={`w-8 h-4 rounded-full relative transition-colors ${localViewingTasksPrintTemplate[field.key] ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+                          <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${localViewingTasksPrintTemplate[field.key] ? 'left-0.5' : 'right-0.5'}`} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+
+                <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-bold text-xs text-navy-900">أعمدة الجدول وترتيبها</h4>
+                    <span className="text-[10px] text-slate-500 font-bold bg-slate-200/70 px-2 py-0.5 rounded-full">استخدم الأسهم للترتيب</span>
+                  </div>
+                  <div className="space-y-2">
+                    {localViewingTasksPrintOrder.map((key, index) => {
+                      const fieldLabels = {
+                        showRoll: 'عمود الرول',
+                        showCaseNumber: 'عمود رقم الدعوى',
+                        showAppellant: 'عمود المدعي',
+                        showAppellee: 'عمود المدعى عليه',
+                        showRequiredDocs: 'عمود المستندات المطلوبة (الملاحظات)',
+                        showSessionDate: 'عمود تاريخ الجلسة',
+                        showSessionType: 'عمود نوع الجلسة',
+                        showDecision: 'عمود القرار',
+                        showStatus: 'عمود حالة المهمة'
+                      };
+                      const label = fieldLabels[key];
+                      const isDisabled = key === 'showRequiredDocs';
+
+                      const moveUp = (e) => {
+                        e.stopPropagation();
+                        if (index === 0) return;
+                        const newOrder = [...localViewingTasksPrintOrder];
+                        [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+                        setLocalViewingTasksPrintOrder(newOrder);
+                      };
+
+                      const moveDown = (e) => {
+                        e.stopPropagation();
+                        if (index === localViewingTasksPrintOrder.length - 1) return;
+                        const newOrder = [...localViewingTasksPrintOrder];
+                        [newOrder[index + 1], newOrder[index]] = [newOrder[index], newOrder[index + 1]];
+                        setLocalViewingTasksPrintOrder(newOrder);
+                      };
+
+                      return (
+                        <div key={key} className={`flex items-center justify-between p-3 rounded-xl border ${localViewingTasksPrintTemplate[key] ? 'border-indigo-200 bg-indigo-50/50' : 'border-slate-200 bg-white'} transition-all cursor-pointer shadow-sm group hover:border-indigo-300`} onClick={() => !isDisabled && setLocalViewingTasksPrintTemplate({...localViewingTasksPrintTemplate, [key]: !localViewingTasksPrintTemplate[key]})}>
+                          <div className="flex items-center gap-3">
+                            <div className="flex flex-col gap-0.5 z-10 bg-white/60 p-0.5 rounded-lg border border-slate-100 opacity-70 group-hover:opacity-100 transition-opacity">
+                              <button type="button" onClick={moveUp} disabled={index === 0} className="p-0.5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all">
+                                <ChevronUp className="w-3 h-3" />
+                              </button>
+                              <button type="button" onClick={moveDown} disabled={index === localViewingTasksPrintOrder.length - 1} className="p-0.5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all">
+                                <ChevronDown className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <span className="text-[11px] font-black text-navy-900">{label} {isDisabled ? <span className="text-red-500 mr-1">(إلزامي ولا يمكن إخفاءه)</span> : ''}</span>
+                          </div>
+                          <div className={`w-8 h-4 rounded-full relative transition-colors ${localViewingTasksPrintTemplate[key] ? 'bg-indigo-600' : 'bg-slate-300'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${localViewingTasksPrintTemplate[key] ? 'left-0.5' : 'right-0.5'}`} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
           </details>
@@ -695,6 +763,26 @@ export default function Settings() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Audit Logs Section */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <Activity className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-black text-sm text-navy-900">سجل النشاطات (مراقبة الموظفين)</h3>
+            </div>
+            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+              تتبع جميع عمليات الإضافة والتعديل والحذف التي يقوم بها الموظفون داخل التطبيق مع تسجيل الوقت والتفاصيل.
+            </p>
+            <div className="mt-4">
+              <Link 
+                to="/audit-logs" 
+                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 border-2 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 transition rounded-xl px-4 py-3 font-black text-xs"
+              >
+                <Activity className="w-4 h-4" />
+                فتح سجل النشاطات
+              </Link>
+            </div>
           </div>
 
           {/* Export Section */}

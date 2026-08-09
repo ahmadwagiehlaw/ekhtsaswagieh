@@ -23,6 +23,7 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
     assignee: '',
     dueDate: '',
     priority: 'normal', // 'normal' | 'important' | 'urgent'
+    description: '',
   });
 
   if (!isOpen || !caseData) return null;
@@ -44,6 +45,7 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
       id: editingTaskId || `task-${Date.now()}`,
       title: newTask.title,
       notes: newTask.notes,
+      description: newTask.description || '',
       assignee: newTask.assignee || '',
       dueDate: newTask.dueDate || '',
       priority: newTask.priority,
@@ -62,7 +64,7 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
     const success = await saveGlobalTask(taskObj);
     if (success) {
       toast(editingTaskId ? "تم تعديل المهمة بنجاح" : "تمت إضافة المهمة بنجاح", "success");
-      setNewTask({ title: '', notes: '', assignee: '', dueDate: '', priority: 'normal' });
+      setNewTask({ title: '', notes: '', description: '', assignee: '', dueDate: '', priority: 'normal' });
       setIsAdding(false);
       setEditingTaskId(null);
       setActiveTab(taskObj.status === 'completed' ? 'completed' : 'pending');
@@ -188,10 +190,19 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
                     <div>
                       <input 
                         type="text"
-                        placeholder="عنوان أو وصف المهمة..."
+                        placeholder="عنوان المهمة (مثال: استخراج شهادة)..."
                         value={newTask.title}
                         onChange={e => setNewTask({...newTask, title: e.target.value})}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <textarea
+                        placeholder="وصف أو تفاصيل المهمة (اختياري)..."
+                        value={newTask.description}
+                        onChange={e => setNewTask({...newTask, description: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[60px]"
+                        rows={2}
                       />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -326,9 +337,14 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
                               </span>
                             )}
                           </div>
-                          <h4 className={`text-sm sm:text-base font-black ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-navy-900'}`}>
+                          <h4 className={`font-black text-sm ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-navy-900'} leading-relaxed`}>
                             {task.title}
                           </h4>
+                          {task.description && (
+                            <p className="text-xs font-bold text-slate-500 mt-1 whitespace-pre-wrap">
+                              {task.description}
+                            </p>
+                          )}
                           {task.notes && (
                             <p className="text-xs font-bold text-slate-500 mt-1 bg-slate-50 p-2 rounded border border-slate-100 inline-block">
                               {task.notes}

@@ -315,61 +315,8 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
   });
 
   // ── Global Tasks Alerts (Grouped) ─────────────────────────
-  if (globalTasks && globalTasks.length > 0) {
-    const taskGroups = {};
-    
-    globalTasks.forEach(t => {
-      if (t.status === 'completed' || !t.dueDate || t.type === 'viewing') return;
-      
-      const tDueDate = new Date(t.dueDate);
-      tDueDate.setHours(0,0,0,0);
-      
-      const snoozed = t.snoozedUntil ? new Date(t.snoozedUntil) : null;
-      if (snoozed) snoozed.setHours(0,0,0,0);
-      
-      if (snoozed && snoozed > today) return; // Snoozed until tomorrow or later
-
-      const diffTime = tDueDate - today;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      // Alert if due within 3 days (or overdue < 0)
-      if (diffDays <= 3) {
-        let key = `${t.title}_${diffDays}`;
-        if (t.type === 'viewing') {
-          key = `viewing_${diffDays}`;
-        }
-        if (!taskGroups[key]) {
-          taskGroups[key] = {
-            title: t.type === 'viewing' ? `مهام إطلاع وتصوير مستندات` : t.title,
-            taskType: t.type,
-            dueDate: t.dueDate,
-            daysLeft: diffDays,
-            count: 0,
-            taskIds: [],
-            linkedCases: []
-          };
-        }
-        taskGroups[key].count++;
-        taskGroups[key].taskIds.push(t.id);
-        if (t.linkedCases?.length) {
-          taskGroups[key].linkedCases.push(...t.linkedCases);
-        }
-      }
-    });
-
-    Object.values(taskGroups).forEach(group => {
-      alerts.push({
-        type: 'task_alert_group',
-        ruleName: group.title,
-        taskType: group.taskType,
-        dueDate: group.dueDate,
-        daysLeft: group.daysLeft,
-        count: group.count,
-        taskIds: group.taskIds,
-        linkedCases: [...new Set(group.linkedCases)]
-      });
-    });
-  }
+  // REMOVED: User requested that standard tasks should not appear in the critical procedural alerts section.
+  // They are now strictly tracked in the Agenda/Tasks module.
 
   const topYears     = Object.entries(yearCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const topOpponents = Object.entries(opponentsCount).sort((a, b) => b[1] - a[1]).slice(0, 5);

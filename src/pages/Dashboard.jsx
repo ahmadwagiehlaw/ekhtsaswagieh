@@ -342,26 +342,41 @@ export default function Dashboard() {
   };
 
   if (isEmployee) {
-    // ... Employee view code remains the same ...
-    const myTasks = [];
-    cases.forEach(c => {
-      if (c.tasks) c.tasks.forEach(t => {
-        if (t.assignee === currentUser)
-          myTasks.push({ ...t, caseId: c.id, caseNum: c['رقم الدعوى'] || c.id, year: c['السنة'], type: 'case', caseCover: c.coverImage });
+    const userEmail = currentUser || '';
+    const usernameOnly = userEmail.split('@')[0];
+
+    const { pendingTasks, completedTasks } = useMemo(() => {
+      const isAssignedToMe = (assignee) => {
+        if (!assignee) return false;
+        const ass = assignee.toLowerCase().trim();
+        return ass === userEmail.toLowerCase().trim() ||
+               ass === usernameOnly.toLowerCase().trim() ||
+               ass === (currentUserName || '').toLowerCase().trim();
+      };
+
+      const myTasks = [];
+      cases.forEach(c => {
+        if (c.tasks) c.tasks.forEach(t => {
+          if (isAssignedToMe(t.assignee))
+            myTasks.push({ ...t, caseId: c.id, caseNum: c['رقم الدعوى'] || c.id, year: c['السنة'], type: 'case', caseCover: c.coverImage });
+        });
       });
-    });
-    globalTasks.forEach(t => {
-      if (t.assignee === currentUser) {
-        let caseNum = 'مهمة عامة', caseCover = null;
-        if (t.linkedCases?.length > 0) {
-          const fc = cases.find(c => c.id === t.linkedCases[0]);
-          if (fc) { caseNum = t.linkedCases.length > 1 ? `مرتبطة بـ ${t.linkedCases.length} ملفات` : (fc['رقم الدعوى'] || 'ملف'); caseCover = fc.coverImage; }
+      globalTasks.forEach(t => {
+        if (isAssignedToMe(t.assignee)) {
+          let caseNum = 'مهمة عامة', caseCover = null;
+          if (t.linkedCases?.length > 0) {
+            const fc = cases.find(c => c.id === t.linkedCases[0]);
+            if (fc) { caseNum = t.linkedCases.length > 1 ? `مرتبطة بـ ${t.linkedCases.length} ملفات` : (fc['رقم الدعوى'] || 'ملف'); caseCover = fc.coverImage; }
+          }
+          myTasks.push({ ...t, type: 'global', caseNum, caseCover });
         }
-        myTasks.push({ ...t, type: 'global', caseNum, caseCover });
-      }
-    });
-    const pendingTasks = myTasks.filter(t => t.status !== 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    const completedTasks = myTasks.filter(t => t.status === 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      });
+      
+      const pTasks = myTasks.filter(t => t.status !== 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const cTasks = myTasks.filter(t => t.status === 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      
+      return { pendingTasks: pTasks, completedTasks: cTasks };
+    }, [cases, globalTasks, currentUser, currentUserName, userEmail, usernameOnly]);
 
     return (
       <div className="space-y-6 animate-fade-in pb-10">
@@ -514,6 +529,7 @@ export default function Dashboard() {
                           {task.type === 'global' && !task.linkedCases?.length ? 'مهمة عامة' : `رقم ${task.caseNum} ${task.year ? `لسنة ${task.year}` : ''}`}
                         </span>
                         <h3 className="font-black text-navy-900 text-sm leading-relaxed">{task.title}</h3>
+                        {task.description && <p className="text-xs text-slate-500 font-bold mt-1 whitespace-pre-wrap">{task.description}</p>}
                       </div>
                     </div>
                     {task.type === 'case' && (
@@ -538,6 +554,7 @@ export default function Dashboard() {
               <div key={task.id} className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex justify-between items-center gap-3">
                 <div>
                   <h3 className="font-black text-slate-600 text-xs line-through mb-1">{task.title}</h3>
+                  {task.description && <p className="text-[10px] font-bold text-slate-400 mb-1 line-through line-clamp-1">{task.description}</p>}
                   <p className="text-[10px] font-bold text-slate-400">رقم {task.caseNum}</p>
                   {task.notes && <p className="text-[10px] font-bold text-emerald-600 mt-1 bg-emerald-50 px-2 py-1 rounded-md inline-block">{task.notes}</p>}
                 </div>

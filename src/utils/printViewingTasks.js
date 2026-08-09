@@ -28,17 +28,35 @@ export const printViewingTasksList = (tasks, cases, settings = {}) => {
 
   const printWindow = window.open('', '_blank');
   
-  // Build columns based on settings
-  let tableHeaders = ``;
-  if (template.showRoll !== false) tableHeaders += `<th style="width: 60px;">الرول</th>`;
-  if (template.showCaseNumber) tableHeaders += `<th>رقم الدعوى والسنة</th>`;
-  if (template.showAppellant) tableHeaders += `<th>المدعي</th>`;
-  if (template.showAppellee) tableHeaders += `<th>المدعى عليه</th>`;
-  if (template.showRequiredDocs) tableHeaders += `<th>المطلوب (الملاحظات)</th>`;
-  if (template.showSessionDate) tableHeaders += `<th>تاريخ الجلسة</th>`;
-  if (template.showSessionType) tableHeaders += `<th>نوع الجلسة</th>`;
-  if (template.showDecision) tableHeaders += `<th>القرار</th>`;
-  if (template.showStatus) tableHeaders += `<th>حالة المهمة</th>`;
+  const defaultOrder = [
+    'showRoll', 
+    'showCaseNumber', 
+    'showAppellant', 
+    'showAppellee', 
+    'showSessionDate', 
+    'showSessionType', 
+    'showDecision', 
+    'showStatus',
+    'showRequiredDocs'
+  ];
+  const colOrder = settings?.viewingTasksPrintOrder || defaultOrder;
+
+  // Build columns based on settings order
+  let tableHeaders = colOrder.map(key => {
+    if (template[key] === false) return '';
+    switch(key) {
+      case 'showRoll': return `<th style="width: 60px;">الرول</th>`;
+      case 'showCaseNumber': return `<th>رقم الدعوى والسنة</th>`;
+      case 'showAppellant': return `<th>المدعي</th>`;
+      case 'showAppellee': return `<th>المدعى عليه</th>`;
+      case 'showRequiredDocs': return `<th>المطلوب (الملاحظات)</th>`;
+      case 'showSessionDate': return `<th>تاريخ الجلسة</th>`;
+      case 'showSessionType': return `<th>نوع الجلسة</th>`;
+      case 'showDecision': return `<th>القرار</th>`;
+      case 'showStatus': return `<th>حالة المهمة</th>`;
+      default: return '';
+    }
+  }).join('');
 
   // Build rows
   const tableRows = tasks.map((task, index) => {
@@ -60,17 +78,23 @@ export const printViewingTasksList = (tasks, cases, settings = {}) => {
     const statusText = task.status === 'completed' ? 'تم الإطلاع' : 'قيد الانتظار';
     const statusColor = task.status === 'completed' ? '#059669' : '#e11d48';
 
-    let rowHtml = `<tr>`;
-    if (template.showRoll !== false) rowHtml += `<td><span style="font-size: 16px; font-weight: 900;">${rollStr}</span></td>`;
-    if (template.showCaseNumber) rowHtml += `<td><span class="font-bold">${fullCaseNumber}</span></td>`;
-    if (template.showAppellant) rowHtml += `<td>${appellant}</td>`;
-    if (template.showAppellee) rowHtml += `<td>${appellee}</td>`;
-    if (template.showRequiredDocs) rowHtml += `<td style="font-weight: 900; font-size: 15px;">${docsString}</td>`;
-    if (template.showSessionDate) rowHtml += `<td>${sessionDate}</td>`;
-    if (template.showSessionType) rowHtml += `<td>${sessionType}</td>`;
-    if (template.showDecision) rowHtml += `<td>${decision}</td>`;
-    if (template.showStatus) rowHtml += `<td style="color: ${statusColor}; font-weight: bold;">${statusText}</td>`;
-    rowHtml += `</tr>`;
+    const cellsHtml = colOrder.map(key => {
+      if (template[key] === false) return '';
+      switch(key) {
+        case 'showRoll': return `<td><span style="font-size: 16px; font-weight: 900;">${rollStr}</span></td>`;
+        case 'showCaseNumber': return `<td><span class="font-bold">${fullCaseNumber}</span></td>`;
+        case 'showAppellant': return `<td>${appellant}</td>`;
+        case 'showAppellee': return `<td>${appellee}</td>`;
+        case 'showRequiredDocs': return `<td style="font-weight: 900; font-size: 15px;">${docsString}</td>`;
+        case 'showSessionDate': return `<td>${sessionDate}</td>`;
+        case 'showSessionType': return `<td>${sessionType}</td>`;
+        case 'showDecision': return `<td>${decision}</td>`;
+        case 'showStatus': return `<td style="color: ${statusColor}; font-weight: bold;">${statusText}</td>`;
+        default: return '';
+      }
+    }).join('');
+    
+    return `<tr>${cellsHtml}</tr>`;
     
     return rowHtml;
   }).join('');

@@ -1,43 +1,38 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, FileText, Image as ImageIcon, Trash2, Download, ExternalLink, FileBox, X, Plus, Camera, Edit3, Gavel, User, File as FileIcon } from 'lucide-react';
+import { Upload, FileText, Image as ImageIcon, Trash2, Download, ExternalLink, FileBox, X, Plus, Camera, Edit3, Gavel, User, File as FileIcon, Settings2 } from 'lucide-react';
 import { uploadToR2, deleteFromR2 } from '../lib/r2';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import imageCompression from 'browser-image-compression';
+import FieldOptionsManager from './FieldOptionsManager';
 
-const DOCUMENT_TYPES = [
-  'غلاف الملف',
-  'ملف الدعوى',
-  'مذكرة دفاع',
-  'تقرير مفوضين',
-  'حكم أول درجة',
-  'تقرير خبراء',
-  'منطوق الحكم',
-  'مسودة الحكم',
-  'إعلان',
-  'تحريات',
-  'حافظة مستندات'
-];
+const defaultJudicial = ['مذكرة دفاع', 'مستندات', 'طلب فتح باب مرافعة', 'تقرير مفوضين', 'تقرير خبراء', 'حكم', 'مذكرة رأي'];
+const defaultAdmin = ['إعلان', 'تحريات', 'طلبات واستعجالات', 'خطابات فنية', 'تعجيل من الوقف'];
 
 const getDocTypeStyle = (type) => {
   if (!type) return { color: 'text-slate-600', bg: 'bg-slate-100', icon: FileIcon };
-  if (type.includes('مذكرة') || type.includes('دفاع')) return { color: 'text-amber-600', bg: 'bg-amber-100', icon: FileText };
+  if (type.includes('مذكرة') || type.includes('دفاع') || type.includes('مستند')) return { color: 'text-amber-600', bg: 'bg-amber-100', icon: FileText };
   if (type.includes('حكم') || type.includes('منطوق')) return { color: 'text-rose-600', bg: 'bg-rose-100', icon: Gavel };
   if (type.includes('مفوضين') || type.includes('خبراء') || type.includes('تقرير')) return { color: 'text-emerald-600', bg: 'bg-emerald-100', icon: FileBox };
-  if (type.includes('إعلان')) return { color: 'text-blue-600', bg: 'bg-blue-100', icon: User };
+  if (type.includes('إعلان') || type.includes('تحريات') || type.includes('استعجالات')) return { color: 'text-blue-600', bg: 'bg-blue-100', icon: User };
   return { color: 'text-indigo-600', bg: 'bg-indigo-100', icon: FileText };
 };
 
 export default function CaseDocuments({ caseId, pastedFile, setPastedFile }) {
-  const { cases, saveCaseToFirebase, currentUser, isAdmin, currentUserPermissions } = useAppContext();
+  const { cases, saveCaseToFirebase, currentUser, isAdmin, currentUserPermissions, settings } = useAppContext();
   const canEditData = isAdmin || currentUserPermissions?.canEditData;
   const { toast, showConfirm } = useUI();
 
   const caseData = cases.find(c => c.id === caseId);
   const documents = caseData?.documents || [];
 
+  const judicialDocs = settings?.judicialDocs || defaultJudicial;
+  const adminDocs = settings?.adminDocs || defaultAdmin;
+  const allDocTypes = ['غلاف الملف', 'ملف الدعوى', ...judicialDocs, ...adminDocs];
+
   const [isUploading, setIsUploading] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [managingField, setManagingField] = useState(null);
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [docType, setDocType] = useState('ملف الدعوى');
@@ -59,7 +54,7 @@ export default function CaseDocuments({ caseId, pastedFile, setPastedFile }) {
     const file = e.target.files[0];
     if (file) {
       setSelectedFile(file);
-      setDocTitle(''); // Leave title empty as requested
+      setDocTitle(''); 
     }
   };
 
@@ -176,6 +171,27 @@ export default function CaseDocuments({ caseId, pastedFile, setPastedFile }) {
         </div>
 
         <div className="flex gap-2">
+          {isAdmin && (
+            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-1">
+              <button
+                onClick={() => setManagingField({ key: 'judicialDocs', title: 'الأوراق القضائية', defaults: defaultJudicial })}
+                className="p-1.5 px-3 flex items-center gap-1.5 text-slate-500 hover:text-indigo-600 text-[10px] font-black transition"
+                title="إدارة الأوراق القضائية"
+              >
+                <Settings2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">قضائية</span>
+              </button>
+              <div className="w-px h-4 bg-slate-200 mx-0"></div>
+              <button
+                onClick={() => setManagingField({ key: 'adminDocs', title: 'الأوراق الإدارية', defaults: defaultAdmin })}
+                className="p-1.5 px-3 flex items-center gap-1.5 text-slate-500 hover:text-rose-600 text-[10px] font-black transition"
+                title="إدارة الأوراق الإدارية"
+              >
+                <Settings2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">إدارية</span>
+              </button>
+            </div>
+          )}
           <button
             onClick={() => { setShowUploadModal(true); setTimeout(() => cameraInputRef.current?.click(), 100); }}
             className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-sm border border-slate-200"
@@ -308,7 +324,7 @@ export default function CaseDocuments({ caseId, pastedFile, setPastedFile }) {
 
               <div className="space-y-2">
                 <label className="text-xs font-black text-navy-900">تصنيف المستند</label>
-                {DOCUMENT_TYPES.includes(docType) || docType === 'ملف الدعوى' ? (
+                {allDocTypes.includes(docType) || docType === 'ملف الدعوى' || docType === 'غلاف الملف' ? (
                   <select
                     value={docType}
                     onChange={e => {
@@ -320,10 +336,22 @@ export default function CaseDocuments({ caseId, pastedFile, setPastedFile }) {
                     }}
                     className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:ring-2 focus:ring-indigo-500 outline-none transition"
                   >
-                    {DOCUMENT_TYPES.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                    <option value="أخرى...">أخرى... (إضافة تصنيف جديد)</option>
+                    <option value="غلاف الملف">غلاف الملف</option>
+                    <option value="ملف الدعوى">ملف الدعوى</option>
+                    
+                    <optgroup label="أوراق قضائية">
+                      {judicialDocs.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </optgroup>
+                    
+                    <optgroup label="أوراق إدارية">
+                      {adminDocs.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </optgroup>
+                    
+                    <option value="أخرى...">أخرى... (إضافة تصنيف مخصص لهذه القضية)</option>
                   </select>
                 ) : (
                   <div className="relative">
@@ -375,6 +403,16 @@ export default function CaseDocuments({ caseId, pastedFile, setPastedFile }) {
             </div>
           </div>
         </div>
+      )}
+      
+      {managingField && (
+        <FieldOptionsManager
+          isOpen={!!managingField}
+          onClose={() => setManagingField(null)}
+          fieldKey={managingField.key}
+          title={managingField.title}
+          defaultOptions={managingField.defaults}
+        />
       )}
     </div>
   );

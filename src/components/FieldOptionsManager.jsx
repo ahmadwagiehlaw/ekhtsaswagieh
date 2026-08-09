@@ -3,7 +3,7 @@ import { X, Settings2, Plus, Trash2, Edit2, GripVertical, Check } from 'lucide-r
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 
-export default function FieldOptionsManager({ fieldKey, title, isOpen, onClose }) {
+export default function FieldOptionsManager({ fieldKey, title, isOpen, onClose, defaultOptions = [] }) {
   const { settings, saveSettingsToFirebase } = useAppContext();
   const { toast } = useUI();
   
@@ -16,10 +16,10 @@ export default function FieldOptionsManager({ fieldKey, title, isOpen, onClose }
   // Initialize from settings when opened
   useEffect(() => {
     if (isOpen && settings) {
-      // Default to empty array if not defined yet
-      setOptions(settings[fieldKey] || []);
+      // Use settings array if defined, otherwise fallback to defaultOptions
+      setOptions(settings[fieldKey] !== undefined ? settings[fieldKey] : defaultOptions);
     }
-  }, [isOpen, settings, fieldKey]);
+  }, [isOpen, settings, fieldKey, defaultOptions]);
 
   if (!isOpen) return null;
 

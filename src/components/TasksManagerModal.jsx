@@ -1,13 +1,67 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, ClipboardList, CheckCircle2, Plus, Trash2, Calendar, Search, Files, Printer, Camera, Edit, FolderOpen, Folder, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, ClipboardList, CheckCircle2, Plus, Trash2, Calendar, Search, Files, Printer, Camera, Edit, FolderOpen, Folder, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
 import { useLocation } from 'react-router-dom';
 import UploadDocumentModal from './UploadDocumentModal';
 
+const EgyptianDateInput = ({ value, onChange, className }) => {
+  const inputRef = React.useRef(null);
+  
+  const displayValue = useMemo(() => {
+    if (!value) return '';
+    try {
+      const d = new Date(value);
+      if (!isNaN(d)) {
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+      }
+    } catch(e){}
+    return value;
+  }, [value]);
+
+  const handleClick = (e) => {
+    e.preventDefault();
+    if (inputRef.current) {
+      try {
+        if (typeof inputRef.current.showPicker === 'function') {
+          inputRef.current.showPicker();
+        } else {
+          inputRef.current.focus();
+        }
+      } catch (err) {
+        inputRef.current.focus();
+      }
+    }
+  };
+
+  return (
+    <div 
+      className={`relative flex items-center justify-between cursor-pointer ${className}`}
+      onClick={handleClick}
+    >
+      <span className={!value ? 'text-slate-400' : 'text-navy-900'}>
+        {displayValue || 'DD/MM/YYYY'}
+      </span>
+      <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+      
+      <input
+        ref={inputRef}
+        type="date"
+        value={value || ''}
+        onChange={onChange}
+        className="absolute bottom-0 left-0 w-0 h-0 opacity-0 pointer-events-none"
+        tabIndex={-1}
+      />
+    </div>
+  );
+};
+
 export default function TasksManagerModal({ isOpen, onClose }) {
-  const { globalTasks, saveGlobalTask, completeGlobalTask, PREDEFINED_TASKS, deleteGlobalTask, settings, isAdmin, currentUser, cases, currentUserPermissions } = useAppContext();
+  const { globalTasks, saveGlobalTask, completeGlobalTask, PREDEFINED_TASKS, deleteGlobalTask, settings, isAdmin, currentUser, currentUserName, cases, currentUserPermissions } = useAppContext();
 
   const canManageTasks = isAdmin || currentUserPermissions?.canManageTasks;
   const { toast, showConfirm } = useUI();
@@ -15,6 +69,16 @@ export default function TasksManagerModal({ isOpen, onClose }) {
 
   const [activeMainTab, setActiveMainTab] = useState('general'); // 'general' | 'viewing'
   const [activeSubTab, setActiveSubTab] = useState('pending'); // 'pending' | 'completed'
+
+  const userEmail = currentUser || '';
+  const usernameOnly = userEmail.split('@')[0];
+  const isAssignedToMe = (assignee) => {
+    if (!assignee) return false;
+    const ass = assignee.toLowerCase().trim();
+    return ass === userEmail.toLowerCase().trim() ||
+           ass === usernameOnly.toLowerCase().trim() ||
+           ass === (currentUserName || '').toLowerCase().trim();
+  };
 
   const [isAdding, setIsAdding] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState(null);
@@ -41,7 +105,8 @@ export default function TasksManagerModal({ isOpen, onClose }) {
     type: 'general',
     caseId: '',
     linkedCases: [],
-    notes: ''
+    notes: '',
+    description: ''
   });
 
   useEffect(() => {
@@ -64,10 +129,12 @@ export default function TasksManagerModal({ isOpen, onClose }) {
       type: task.type || 'general',
       caseId: task.caseId || '',
       linkedCases: task.linkedCases || [],
-      notes: task.notes || ''
+      notes: task.notes || '',
+      description: task.description || ''
     });
     setIsAdding(true);
-    setActiveMainTab(task.type === 'viewing' ? 'viewing' : 'general');
+    const isViewing = task.type === 'viewing' || task.title?.includes('إطلاع') || task.title?.includes('تصوير');
+    setActiveMainTab(isViewing ? 'viewing' : 'general');
   };
 
   const handleSaveTask = async () => {
@@ -103,7 +170,7 @@ export default function TasksManagerModal({ isOpen, onClose }) {
       
       setIsAdding(false);
       setEditingTaskId(null);
-      setNewTask({ title: '', assignee: '', dueDate: '', sessionDate: '', priority: 'normal', type: 'general', caseId: '', linkedCases: [], notes: '' });
+      setNewTask({ title: '', assignee: '', dueDate: '', sessionDate: '', priority: 'normal', type: 'general', caseId: '', linkedCases: [], notes: '', description: '' });
     } catch (e) {
       toast('حدث خطأ أثناء حفظ المهمة', 'error');
     }
@@ -141,6 +208,16 @@ export default function TasksManagerModal({ isOpen, onClose }) {
     }
   };
 
+  const handleToggleFolderSelection = (e, taskIdsInFolder) => {
+    e.stopPropagation();
+    const allSelected = taskIdsInFolder.every(id => selectedTaskIds.includes(id));
+    if (allSelected) {
+      setSelectedTaskIds(prev => prev.filter(id => !taskIdsInFolder.includes(id)));
+    } else {
+      setSelectedTaskIds(prev => [...new Set([...prev, ...taskIdsInFolder])]);
+    }
+  };
+
   const handleBulkDelete = async () => {
     if (selectedTaskIds.length === 0) return;
     const confirmed = await showConfirm("تأكيد الحذف الجماعي", `هل أنت متأكد من حذف ${selectedTaskIds.length} مهمة نهائياً؟`);
@@ -152,6 +229,23 @@ export default function TasksManagerModal({ isOpen, onClose }) {
       }
       setSelectedTaskIds([]);
       toast(`تم حذف ${count} مهام بنجاح`, "success");
+    }
+  };
+
+  const handleBulkComplete = async () => {
+    if (selectedTaskIds.length === 0) return;
+    const confirmed = await showConfirm("تأكيد الإنجاز", `هل أنت متأكد من تسجيل ${selectedTaskIds.length} مهام كمكتملة؟`);
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedTaskIds) {
+        const t = globalTasks.find(task => task.id === id);
+        if (t && t.status !== 'completed') {
+          await completeGlobalTask(id, t.notes);
+          count++;
+        }
+      }
+      setSelectedTaskIds([]);
+      toast(`تم إنجاز ${count} مهام بنجاح`, "success");
     }
   };
 
@@ -238,22 +332,22 @@ export default function TasksManagerModal({ isOpen, onClose }) {
             <tbody>
               ${viewingTasks.map((t, idx) => {
                 const linkedCase = t.linkedCases?.length > 0 ? cases.find(c => c.id === t.linkedCases[0]) : null;
-                const caseNo = linkedCase ? \`\${linkedCase['رقم الدعوى']} لسنة \${linkedCase['السنة']}\` : '---';
+                const caseNo = linkedCase ? `${linkedCase['رقم الدعوى']} لسنة ${linkedCase['السنة']}` : '---';
                 const ctx = t.caseContext || {};
                 const roll = ctx.roll || '---';
                 const sDate = t.sessionDate || ctx.date || '---';
                 const decision = ctx.decision || '---';
                 
-                return \`
+                return `
                   <tr>
-                    <td>\${idx + 1}</td>
-                    <td>\${caseNo}</td>
-                    <td>\${roll}</td>
-                    <td>\${sDate}</td>
-                    <td>\${decision}</td>
-                    <td>\${t.notes || '---'}</td>
+                    <td>${idx + 1}</td>
+                    <td>${caseNo}</td>
+                    <td>${roll}</td>
+                    <td>${sDate}</td>
+                    <td>${decision}</td>
+                    <td>${t.notes || '---'}</td>
                   </tr>
-                \`;
+                `;
               }).join('')}
             </tbody>
           </table>
@@ -355,7 +449,7 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                         <input 
                           type="text"
                           list="predefined-tasks-list"
-                          placeholder="وصف المهمة (مثال: شهادة من الجدول...)"
+                          placeholder="عنوان المهمة (مثال: استخراج شهادة)"
                           value={newTask.title}
                           onChange={e => setNewTask({...newTask, title: e.target.value})}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -375,20 +469,29 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                       {settings?.employees?.map(e => <option key={e.name} value={e.name}>{e.name}</option>)}
                     </select>
                   </div>
+                  
+                  {activeMainTab !== 'viewing' && (
+                    <div className="mb-4">
+                      <textarea
+                        placeholder="تفاصيل أو وصف المهمة..."
+                        value={newTask.description}
+                        onChange={e => setNewTask({...newTask, description: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[80px]"
+                        rows={3}
+                      />
+                    </div>
+                  )}
 
                   {/* Row 2 */}
                   <div className="flex flex-col sm:flex-row gap-4">
-                    {activeMainTab === 'viewing' && (
-                      <div className="flex-1">
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1">تاريخ الجلسة (إن وجد)</label>
-                        <input
-                          type="date"
-                          value={newTask.sessionDate}
-                          onChange={e => setNewTask({ ...newTask, sessionDate: e.target.value })}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                      </div>
-                    )}
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">تاريخ الجلسة (إن وجد)</label>
+                      <EgyptianDateInput
+                        value={newTask.sessionDate}
+                        onChange={e => setNewTask({ ...newTask, sessionDate: e.target.value })}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
                     <div className="flex-1 flex gap-3">
                       {activeMainTab !== 'viewing' && (
                         <div className="flex-1">
@@ -404,15 +507,16 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                           </select>
                         </div>
                       )}
-                      <div className="flex-1">
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1">موعد التنفيذ (Due Date)</label>
-                        <input
-                          type="date"
-                          value={newTask.dueDate}
-                          onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                      </div>
+                      {activeMainTab !== 'viewing' && (
+                        <div className="flex-1">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1">موعد التنفيذ (Due Date)</label>
+                          <EgyptianDateInput
+                            value={newTask.dueDate}
+                            onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -505,13 +609,22 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                 {selectedTaskIds.length > 0 && (
                   <div className="mx-6 my-3 bg-indigo-50 border border-indigo-200 p-3 rounded-xl flex items-center justify-between animate-in fade-in">
                     <span className="text-sm font-black text-indigo-700">تم تحديد {selectedTaskIds.length} مهام</span>
-                    <button 
-                      onClick={handleBulkDelete}
-                      className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      حذف المحدد
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={handleBulkComplete}
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        إنجاز المحدد
+                      </button>
+                      <button 
+                        onClick={handleBulkDelete}
+                        className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        حذف المحدد
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -540,9 +653,9 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                                   />
                                 )}
                                 <button
-                                  onClick={() => canManageTasks || task.assignee === currentUser ? handleToggleStatus(task) : null}
-                                  disabled={!canManageTasks && task.assignee !== currentUser}
-                                  className={`shrink-0 rounded-full transition-colors ${(canManageTasks || task.assignee === currentUser) ? 'cursor-pointer hover:scale-110' : 'cursor-default'} ${task.status === 'completed' ? 'text-emerald-500' : 'text-slate-300 hover:text-indigo-500'}`}
+                                  onClick={() => canManageTasks || isAssignedToMe(task.assignee) ? handleToggleStatus(task) : null}
+                                  disabled={!canManageTasks && !isAssignedToMe(task.assignee)}
+                                  className={`shrink-0 rounded-full transition-colors ${(canManageTasks || isAssignedToMe(task.assignee)) ? 'cursor-pointer hover:scale-110' : 'cursor-default'} ${task.status === 'completed' ? 'text-emerald-500' : 'text-slate-300 hover:text-indigo-500'}`}
                                 >
                                   <CheckCircle2 className="w-6 h-6" />
                                 </button>
@@ -567,6 +680,11 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                                   <h4 className={`text-base font-black ${task.status === 'completed' ? 'text-slate-500 line-through' : 'text-navy-900'} leading-tight mt-1`}>
                                     {task.title}
                                   </h4>
+                                  {task.description && (
+                                    <p className="text-sm font-bold text-slate-500 mt-1 whitespace-pre-wrap">
+                                      {task.description}
+                                    </p>
+                                  )}
                                   
                                   {task.linkedCases && task.linkedCases.length > 0 && (
                                     <div className="mt-3 flex flex-wrap gap-1.5">
@@ -613,14 +731,24 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                           <div key={dateGroup} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                             {/* Folder Header */}
                             <div 
-                              className="bg-slate-50 px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-slate-100 transition select-none"
+                              className="bg-slate-50 px-4 py-3 flex items-center justify-between hover:bg-slate-100 transition select-none"
                               onClick={() => setExpandedGroups(prev => ({...prev, [dateGroup]: !prev[dateGroup]}))}
                             >
                               <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${expandedGroups[dateGroup] ? 'bg-amber-100 text-amber-600' : 'bg-slate-200 text-slate-500'}`}>
+                                {canManageTasks && (
+                                  <input
+                                    type="checkbox"
+                                    checked={tasksInGroup.every(t => selectedTaskIds.includes(t.id))}
+                                    onChange={(e) => handleToggleFolderSelection(e, tasksInGroup.map(t => t.id))}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer shrink-0"
+                                    title="تحديد الكل"
+                                  />
+                                )}
+                                <div className={`cursor-pointer w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${expandedGroups[dateGroup] ? 'bg-amber-100 text-amber-600' : 'bg-slate-200 text-slate-500'}`}>
                                   {expandedGroups[dateGroup] ? <FolderOpen className="w-5 h-5" /> : <Folder className="w-5 h-5" />}
                                 </div>
-                                <div>
+                                <div className="cursor-pointer">
                                   <h3 className="text-sm font-black text-navy-900">
                                     تاريخ الجلسة: {dateGroup !== 'بدون تاريخ محدد' ? formatDateString(dateGroup) : dateGroup}
                                   </h3>
@@ -640,7 +768,7 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                                     تعديل التاريخ
                                   </button>
                                 )}
-                                <div className="text-slate-400">
+                                <div className="text-slate-400 cursor-pointer">
                                   {expandedGroups[dateGroup] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                                 </div>
                               </div>
@@ -650,8 +778,7 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                             {bulkEditGroup === dateGroup && (
                               <div className="bg-indigo-50 p-4 border-t border-indigo-100 flex items-center gap-3">
                                 <label className="text-xs font-black text-indigo-900 shrink-0">تغيير تاريخ هذه المجموعة إلى:</label>
-                                <input 
-                                  type="date" 
+                                <EgyptianDateInput 
                                   value={bulkEditNewDate}
                                   onChange={(e) => setBulkEditNewDate(e.target.value)}
                                   className="bg-white border border-indigo-200 rounded-lg px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-indigo-400"
@@ -676,15 +803,18 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                                         />
                                       )}
                                       <button
-                                        onClick={() => canManageTasks || task.assignee === currentUser ? handleToggleStatus(task) : null}
-                                        disabled={!canManageTasks && task.assignee !== currentUser}
-                                        className={`shrink-0 rounded-full transition-colors ${(canManageTasks || task.assignee === currentUser) ? 'cursor-pointer hover:scale-110' : 'cursor-default'} ${task.status === 'completed' ? 'text-emerald-500' : 'text-slate-300 hover:text-indigo-500'}`}
+                                        onClick={() => canManageTasks || isAssignedToMe(task.assignee) ? handleToggleStatus(task) : null}
+                                        disabled={!canManageTasks && !isAssignedToMe(task.assignee)}
+                                        className={`shrink-0 rounded-full transition-colors ${(canManageTasks || isAssignedToMe(task.assignee)) ? 'cursor-pointer hover:scale-110' : 'cursor-default'} ${task.status === 'completed' ? 'text-emerald-500' : 'text-slate-300 hover:text-indigo-500'}`}
                                       >
                                         <CheckCircle2 className="w-5 h-5" />
                                       </button>
                                       
                                       <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 flex-1 min-w-0 overflow-hidden">
                                         <div className="flex items-center gap-2 shrink-0">
+                                          <div className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-600">
+                                            <Eye className="w-3 h-3" />
+                                          </div>
                                           {task.linkedCases && task.linkedCases.length > 0 ? (
                                             task.linkedCases.map(caseId => {
                                               const linkedCase = cases.find(c => c.id === caseId);
@@ -711,6 +841,11 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                                           </div>
                                         )}
                                       </div>
+                                      {task.description && (
+                                        <div className="w-full text-xs font-bold text-slate-500 mt-1 pl-8 whitespace-pre-wrap">
+                                          {task.description}
+                                        </div>
+                                      )}
                                     </div>
 
                                     <div className="flex items-center gap-2 shrink-0 mr-4">
@@ -806,7 +941,11 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                       if (isSelected) {
                         setNewTask({ ...newTask, linkedCases: newTask.linkedCases.filter(id => id !== c.id) });
                       } else {
-                        setNewTask({ ...newTask, linkedCases: [...(newTask.linkedCases || []), c.id] });
+                        let newSessionDate = newTask.sessionDate;
+                        if (!newSessionDate && c['تاريخ الجلسة']) {
+                           newSessionDate = c['تاريخ الجلسة'];
+                        }
+                        setNewTask({ ...newTask, linkedCases: [...(newTask.linkedCases || []), c.id], sessionDate: newSessionDate });
                       }
                     }}
                     className={`w-full text-right p-3 mb-1 rounded-xl border flex items-center justify-between transition ${isSelected ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-transparent hover:bg-slate-50'}`}

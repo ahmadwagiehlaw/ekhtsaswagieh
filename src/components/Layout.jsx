@@ -43,10 +43,22 @@ export default function Layout() {
   const isDetailsPage = location.pathname.startsWith('/case/');
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-[80px] pt-[70px]">
+    <div 
+      className="min-h-screen bg-slate-50 font-sans text-slate-800"
+      style={{ 
+        paddingTop: 'calc(70px + env(safe-area-inset-top, 0px))',
+        paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' 
+      }}
+    >
       
       {/* Top Header */}
-      <header className="fixed top-0 inset-x-0 h-[64px] bg-navy-900 shadow-md z-40 flex items-center justify-between px-4 sm:px-6 no-print">
+      <header 
+        className="fixed top-0 inset-x-0 bg-navy-900 shadow-md z-40 flex items-center justify-between px-4 sm:px-6 no-print"
+        style={{ 
+          height: 'calc(64px + env(safe-area-inset-top, 0px))', 
+          paddingTop: 'env(safe-area-inset-top, 0px)' 
+        }}
+      >
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
             <Scale className="w-4 h-4 sm:w-5 sm:h-5 text-navy-900" />
@@ -138,7 +150,13 @@ export default function Layout() {
       )}
 
       {/* Bottom Navigation (Dark Theme) */}
-      <nav className="fixed bottom-0 inset-x-0 bg-navy-900 border-t border-navy-800 px-2 sm:px-6 py-2.5 flex justify-around items-center z-40 pb-safe shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.3)] no-print">
+      <nav 
+        className="fixed bottom-0 inset-x-0 bg-navy-900 border-t border-navy-800 px-2 sm:px-6 flex justify-around items-center z-40 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.3)] no-print"
+        style={{ 
+          height: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+        }}
+      >
           
           <NavLink 
             to="/" 

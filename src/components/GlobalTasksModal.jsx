@@ -17,6 +17,7 @@ export default function GlobalTasksModal({ isOpen, onClose }) {
     priority: 'normal', // 'normal' | 'important' | 'urgent'
     type: 'general', // 'general' | 'case'
     caseId: '', // optional
+    description: '',
   });
 
   if (!isOpen) return null;
@@ -36,7 +37,7 @@ export default function GlobalTasksModal({ isOpen, onClose }) {
       });
       toast('تمت إضافة المهمة بنجاح', 'success');
       setIsAdding(false);
-      setNewTask({ title: '', assignee: '', dueDate: '', priority: 'normal', type: 'general', caseId: '' });
+      setNewTask({ title: '', assignee: '', dueDate: '', priority: 'normal', type: 'general', caseId: '', description: '' });
     } catch (e) {
       toast('حدث خطأ أثناء إضافة المهمة', 'error');
     }
@@ -131,6 +132,15 @@ export default function GlobalTasksModal({ isOpen, onClose }) {
                  {settings?.employees?.map(e => <option key={e.name} value={e.name}>{e.name}</option>)}
               </select>
             </div>
+            <div>
+              <textarea
+                placeholder="تفاصيل أو وصف المهمة (اختياري)..."
+                value={newTask.description}
+                onChange={e => setNewTask({...newTask, description: e.target.value})}
+                className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[60px]"
+                rows={2}
+              />
+            </div>
             <div className="flex flex-col sm:flex-row gap-3">
                <div className="flex-1 flex gap-2">
                  <select 
@@ -220,9 +230,14 @@ export default function GlobalTasksModal({ isOpen, onClose }) {
                                 </span>
                               )}
                            </div>
-                           <h4 className={`text-sm font-black ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-navy-900'}`}>
-                              {task.title}
+                           <h4 className={`text-sm font-black ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-navy-900'} leading-tight`}>
+                             {task.title}
                            </h4>
+                           {task.description && (
+                             <p className="text-xs font-bold text-slate-500 mt-1 whitespace-pre-wrap">
+                               {task.description}
+                             </p>
+                           )}
                         </div>
                      </div>
                      {canManageTasks && (
