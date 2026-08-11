@@ -145,6 +145,8 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
   const opponentsCount = {};
   const yearCount      = {};
   const judgmentsCount = {};
+  const criticalSuspended = [];
+  const criticalConsidered = [];
 
   const today        = new Date();
   today.setHours(0, 0, 0, 0);
@@ -288,20 +290,45 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
       activeCasesCount++;
     }
 
-    // ── Appellant / Appellee entity counts ───────────────────
-    // Count if session date is upcoming or in current month
+    // ── Appellant / Appellee active counts ───────────────────
+    if (!hasHukm) {
+      if (isAppellant) appellantCount++;
+      if (isAppellee)  appelleeCount++;
+    }
+
+    // ── Critical Appellant Judgments (وقف جزائي / اعتبار كأن لم يكن) ──────
+    const isCriticalSuspended = isAppellant && (
+      (hasHukm && (
+        String(latestJudgmentSession.judgment?.result || latestJudgmentSession.judgmentClassification || '').includes('وقف جزائي')
+      )) ||
+      (!hasHukm && (
+        lastDecisionRaw.includes('وقف جزائي') || deadlineDecision.includes('وقف جزائي')
+      ))
+    );
+
+    const isCriticalConsidered = isAppellant && (
+      (hasHukm && (
+        String(latestJudgmentSession.judgment?.result || latestJudgmentSession.judgmentClassification || '').includes('اعتبار')
+      )) ||
+      (!hasHukm && (
+        lastDecisionRaw.includes('اعتبار') || deadlineDecision.includes('اعتبار')
+      ))
+    );
+
+    if (!hasHukm || hasHukm) { // Any matching case
+      if (isCriticalSuspended) {
+        criticalSuspended.push(c);
+      }
+      if (isCriticalConsidered) {
+        criticalConsidered.push(c);
+      }
+    }
+
+    // Month-level session counts (for trend badge on header)
     if (lastSessionDate) {
       const lm = lastSessionDate.getMonth(), ly = lastSessionDate.getFullYear();
-      const isFuture = lastSessionDate > today;
       const isThisMonth = (lm === currentMonth && ly === currentYear);
       const isPrevMonth = (lm === prevMonth && ly === prevMonthYear);
-
-      if (isFuture || isThisMonth) {
-        if (isAppellant) appellantCount++;
-        if (isAppellee)  appelleeCount++;
-      }
-
-      // Month-level session counts (for trend badge on header)
       const notJudgedYet = !hasHukm || (hasHukm && (getSafeDateObj(latestJudgmentSession.date) || new Date(0)) >= today);
       if (isThisMonth && notJudgedYet) activeThisMonth++;
       if (isPrevMonth && notJudgedYet) prevMonthActive++;
@@ -314,9 +341,7 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
     }
   });
 
-  // ── Global Tasks Alerts (Grouped) ─────────────────────────
-  // REMOVED: User requested that standard tasks should not appear in the critical procedural alerts section.
-  // They are now strictly tracked in the Agenda/Tasks module.
+
 
   const topYears     = Object.entries(yearCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const topOpponents = Object.entries(opponentsCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -334,6 +359,7 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
     ongoingCount,       // إجمالي المتداول: not reserved, not judged
     reservedCount,      // محجوز للحكم: last decision=للحكم, no judgment recorded
     judgedCount,        // المحكوم فيها: hasJudgment=true
+    totalActiveCases: ongoingCount + reservedCount, // إجمالي الاختصاص (القضايا النشطة)
     activeThisMonth,
     prevMonthActive,
     topOpponents,
@@ -341,5 +367,7 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
     topJudgments,
     alerts,
     last6Months,
+    criticalSuspended,
+    criticalConsidered,
   };
 }

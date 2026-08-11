@@ -294,15 +294,8 @@ export const AppProvider = ({ children }) => {
         // Supreme Court Transitions
         if (newSessionType === 'فحص' && newDecision === 'إحالة للموضوع') {
           payload['نوع الجلسة'] = 'موضوع';
-        } else if (newSessionType === 'موضوع' && hasJudgmentData) {
-          payload['نوع الجلسة'] = 'حكم';
         }
-        // Note: If type is 'فحص' and hasJudgmentData is true, it intentionally remains 'فحص' per user rules.
-      } else {
-        // First Degree Transitions
-        if ((newSessionType === 'مفوضين' || newSessionType === 'مرافعة') && hasJudgmentData) {
-          payload['نوع الجلسة'] = 'حكم';
-        }
+        // Removed aggressive 'حكم' override to allow manual corrections and preliminary judgments
       }
 
       const isNew = !cases.some(c => c.id === caseId);
@@ -403,10 +396,6 @@ export const AppProvider = ({ children }) => {
       if (isSupreme) {
         if (newSessionType === 'فحص' && newDecision === 'إحالة للموضوع') {
           payload['نوع الجلسة'] = 'موضوع';
-        }
-      } else {
-        if ((newSessionType === 'مفوضين' || newSessionType === 'مرافعة') && hasJudgmentData) {
-          payload['نوع الجلسة'] = 'حكم';
         }
       }
 
