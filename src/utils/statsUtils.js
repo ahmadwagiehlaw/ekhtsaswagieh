@@ -25,25 +25,25 @@ function normalizeResult(raw, isAppellant, isAppellee) {
   return r;
 }
 
-function addToJudgments(target, computeAs) {
+function addToJudgments(target, computeAs, c = null) {
   target.total++;
-  if (computeAs === 'صالح')                                   target.good++;
-  else if (computeAs === 'ضد')                               target.bad++;
+  if (computeAs === 'صالح')                                  { target.good++; if(c) target.lists.good.push(c); }
+  else if (computeAs === 'ضد')                               { target.bad++; if(c) target.lists.bad.push(c); }
   else if (computeAs.includes('وقف جزائي')) {
-    target.stop++;
+    target.stop++; if(c) target.lists.stop.push(c);
     target.penaltyStop = (target.penaltyStop || 0) + 1;
     if (computeAs.includes('(ضد)')) target.bad++;
     if (computeAs.includes('(صالح)')) target.good++;
   }
-  else if (computeAs.includes('وقف'))                        target.stop++;
-  else if (computeAs.includes('خبير') || computeAs.includes('خبراء')) target.expert++;
-  else if (computeAs === 'اعتبار')                           target.consideration++;
-  else if (computeAs === 'مختلط')                            target.mixed = (target.mixed || 0) + 1;
+  else if (computeAs.includes('وقف'))                        { target.stop++; if(c) target.lists.stop.push(c); }
+  else if (computeAs.includes('خبير') || computeAs.includes('خبراء')) { target.expert++; if(c) target.lists.expert.push(c); }
+  else if (computeAs === 'اعتبار')                           { target.consideration++; if(c) target.lists.consideration.push(c); }
+  else if (computeAs === 'مختلط')                            { target.mixed = (target.mixed || 0) + 1; if(c) target.lists.mixed.push(c); }
   else                                                        target.other++;
 }
 
 const emptyJudgments = () =>
-  ({ total: 0, good: 0, bad: 0, stop: 0, penaltyStop: 0, expert: 0, consideration: 0, other: 0, mixed: 0 });
+  ({ total: 0, good: 0, bad: 0, stop: 0, penaltyStop: 0, expert: 0, consideration: 0, other: 0, mixed: 0, lists: { good: [], bad: [], stop: [], consideration: [], expert: [], mixed: [] } });
 
 // ─────────────────────────────────────────────────────────────
 // computeMonthStats: returns per-month stats for any month/year
@@ -104,17 +104,17 @@ export function computeMonthStats(cases, settings, targetMonth, targetYear) {
       if (s.hasJudgment) {
         const raw       = s.judgment?.result || s.judgmentClassification || 'غير مصنف';
         const computeAs = normalizeResult(raw, isAppellant, isAppellee);
-        addToJudgments(judgments, computeAs);
+        addToJudgments(judgments, computeAs, c);
       } else {
         // Implicit examination judgments if not explicitly recorded
         const dec = String(s.decision || '').trim();
         const type = String(s.type || '').trim();
         if (dec.includes('رفض') && type.includes('فحص')) {
           const computeAs = isAppellant ? 'ضد' : isAppellee ? 'صالح' : 'ضد';
-          addToJudgments(judgments, computeAs);
+          addToJudgments(judgments, computeAs, c);
         } else if (dec.includes('قبول') && type.includes('فحص')) {
           const computeAs = isAppellant ? 'صالح' : isAppellee ? 'ضد' : 'صالح';
-          addToJudgments(judgments, computeAs);
+          addToJudgments(judgments, computeAs, c);
         }
       }
     });
@@ -130,17 +130,20 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
   const appRole = settings?.roles?.[0] || 'طاعن';
   const apeRole = settings?.roles?.[1] || 'مطعون ضدنا';
 
-  let activeCasesCount    = 0;  // جلستها تاريخها بعد اليوم (future sessions)
-  let ongoingCount        = 0;  // متداول: لها جلسة, ليست للحكم, لا يوجد حكم مسجل
-  let reservedCount       = 0;  // محجوز للحكم: آخر قرار=للحكم, لا يوجد حكم مسجل
-  let judgedCount         = 0;  // محكوم فيها: حكم مسجل وتاريخه سابق
+  let activeCasesCount    = 0;
+  let ongoingCount        = 0;
+  let reservedCount       = 0;
+  let judgedCount         = 0;
   let appellantCount      = 0;
   let appelleeCount       = 0;
-  let noInterestCount     = 0;
-  let outOfJurisdictionCount = 0;
   let activeThisMonth     = 0;
   let prevMonthActive     = 0;
   let alerts              = [];
+  
+  const activeCases       = [];
+  const ongoingCases      = [];
+  const reservedCases     = [];
+  const judgedCases       = [];
 
   const opponentsCount = {};
   const yearCount      = {};
@@ -165,8 +168,6 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
   cases.forEach(c => {
     const role = String(c['الصفة'] || c['صفة'] || '').trim();
 
-    if (role === 'لا شأن')          noInterestCount++;
-    if (role === 'خارج الاختصاص')   outOfJurisdictionCount++;
     if (role === 'لا شأن' || role === 'خارج الاختصاص') return;
 
     // Strict role check
@@ -225,7 +226,8 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
     if (hasHukm) {
       // Judgment has been recorded by the user
       const hukmDate = getSafeDateObj(latestJudgmentSession.date);
-      judgedCount++; // Count as judged regardless of date (judgment was recorded)
+      judgedCount++;
+      judgedCases.push(c); // Count as judged regardless of date (judgment was recorded)
 
       // Overall judgment distribution
       let computeAs = 'غير مصنف';
@@ -262,11 +264,13 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
       // No judgment recorded yet, but last decision says "للحكم"
       // = محجوز للحكم
       reservedCount++;
+      reservedCases.push(c);
 
     } else {
       // Active ongoing case (has sessions, not reserved, not judged)
       // = إجمالي المتداول
       ongoingCount++;
+      ongoingCases.push(c);
 
       // Deadline alerts (وقف جزائي)
       if (lastSessionDate) {
@@ -288,6 +292,7 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
     // ── القضايا النشطة: cases with FUTURE session date ──────
     if (lastSessionDate && lastSessionDate > today) {
       activeCasesCount++;
+      activeCases.push(c);
     }
 
     // ── Appellant / Appellee active counts ───────────────────
@@ -348,18 +353,17 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
   const topJudgments = Object.entries(judgmentsCount).sort((a, b) => b[1] - a[1]);
 
   return {
-    all: cases.length,
-    netTotal: cases.length - noInterestCount - outOfJurisdictionCount,
-    noInterest: noInterestCount,
-    outOfJurisdiction: outOfJurisdictionCount,
-    appellant: appellantCount,
-    appellee: appelleeCount,
-    // Fixed status counts
-    activeCasesCount,   // القضايا النشطة: lastSessionDate > today
-    ongoingCount,       // إجمالي المتداول: not reserved, not judged
-    reservedCount,      // محجوز للحكم: last decision=للحكم, no judgment recorded
-    judgedCount,        // المحكوم فيها: hasJudgment=true
-    totalActiveCases: ongoingCount + reservedCount, // إجمالي الاختصاص (القضايا النشطة)
+    netTotal: cases.length,
+    activeCasesCount,
+    ongoingCount,
+    reservedCount,
+    judgedCount,
+    activeCases,
+    ongoingCases,
+    reservedCases,
+    judgedCases,
+    appellantCount,
+    appelleeCount,
     activeThisMonth,
     prevMonthActive,
     topOpponents,

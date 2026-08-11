@@ -312,28 +312,42 @@ const JudicialAgendaReportModal = ({ title, casesList, onClose }) => {
             <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-white text-xl font-black">×</button>
           </div>
         </div>
-        <div className="overflow-y-auto flex-1 p-6 space-y-3 bg-slate-50">
+        <div className="overflow-y-auto flex-1 p-0 bg-slate-50">
           {casesList.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 text-slate-400 font-bold text-sm">لا توجد قضايا مطابقة لهذا التصنيف حالياً.</div>
-          ) : casesList.map(c => (
-            <div key={c.id} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:border-amber-300 transition">
-              <div className="flex justify-between items-start gap-3 border-b border-slate-100 pb-3 mb-3">
-                <div>
-                  <span className="text-xs font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg">رقم {c['رقم الدعوى']} لسنة {c['السنة']} ق</span>
-                  <h3 className="font-black text-sm mt-2">{c['المدعي'] || 'غير محدد'}</h3>
-                  <p className="text-xs text-slate-500 font-bold mt-1">{c['المدعى_عليه'] || c['المدعى عليه'] || ''}</p>
-                </div>
-                <button onClick={() => { onClose(); navigate(`/case/${c.id}`); }}
-                  className="bg-slate-50 hover:bg-amber-100 text-slate-500 hover:text-amber-700 p-2 rounded-xl text-xs font-black transition flex items-center gap-1 shrink-0">
-                  <Eye className="w-3.5 h-3.5" /> تفاصيل
-                </button>
-              </div>
-              <div className="bg-amber-50/50 border border-amber-100 p-3 rounded-xl text-xs font-black text-slate-800">
-                <p className="text-[10px] text-amber-700 mb-1">القرار الأخير:</p>
-                {c['القرار'] || 'لا يوجد قرار مسجل'}
-              </div>
-            </div>
-          ))}
+            <div className="text-center py-12 text-slate-400 font-bold text-sm">لا توجد قضايا مطابقة لهذا التصنيف حالياً.</div>
+          ) : (
+            <table className="w-full text-right border-collapse">
+              <thead className="bg-slate-100 sticky top-0 border-b border-slate-200">
+                <tr>
+                  <th className="p-3 text-xs font-black text-slate-500">رقم الدعوى</th>
+                  <th className="p-3 text-xs font-black text-slate-500">الخصم / الموكل</th>
+                  <th className="p-3 text-xs font-black text-slate-500">تاريخ الجلسة</th>
+                  <th className="p-3 text-xs font-black text-slate-500 w-1/3">القرار / المنطوق</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {casesList.map(c => (
+                  <tr key={c.id} onClick={() => { onClose(); navigate(`/case/${c.id}`); }} className="hover:bg-amber-50/50 cursor-pointer transition bg-white group">
+                    <td className="p-3">
+                      <span className="text-xs font-black text-[#0f172a]">رقم {c['رقم الدعوى']}</span>
+                      <span className="text-[10px] text-slate-500 block">لسنة {c['السنة']} ق</span>
+                    </td>
+                    <td className="p-3">
+                      <p className="text-[11px] font-black text-slate-700">{c['المدعي'] || c['الطاعن'] || 'غير محدد'}</p>
+                      <p className="text-[10px] text-slate-500">{c['المدعى_عليه'] || c['المدعى عليه'] || 'غير محدد'}</p>
+                    </td>
+                    <td className="p-3 text-[11px] font-bold text-slate-600">
+                      {c['آخر جلسة'] || c['تاريخ الجلسة'] || ''}
+                    </td>
+                    <td className="p-3">
+                      <p className="text-[11px] font-bold text-slate-700">{c['القرار'] || 'لا يوجد قرار'}</p>
+                      <span className="text-[10px] text-amber-600 opacity-0 group-hover:opacity-100 transition block mt-1">عرض التفاصيل &larr;</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
@@ -407,6 +421,7 @@ export default function Dashboard() {
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const [isGlobalTaskModalOpen, setIsGlobalTaskModalOpen] = useState(false);
   const [adminTasksTab, setAdminTasksTab] = useState('pending');
+  const [bottomTab, setBottomTab] = useState('priority');
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showCustomize, setShowCustomize] = useState(false);
   const [hiddenWidgets, setHiddenWidgets] = useState(() => {
@@ -910,21 +925,22 @@ export default function Dashboard() {
           })}
         </div>
 
-        {/* Judgment detail chips - compact */}
+        {/* Judgment detail chips - clickable */}
         {selectedMonthStats.judgments.total > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-3 border-t border-slate-700/30">
             {[
-              { l: 'صالح', v: selectedMonthStats.judgments.good, pv: prevMonthStats.judgments.good, color: 'text-emerald-400', bad: false },
-              { l: 'ضد', v: selectedMonthStats.judgments.bad, pv: prevMonthStats.judgments.bad, color: 'text-rose-400', bad: true },
-              { l: 'مختلط', v: selectedMonthStats.judgments.mixed, pv: prevMonthStats.judgments.mixed, color: 'text-indigo-400', bad: false },
-              { l: 'وقف', v: selectedMonthStats.judgments.stop, pv: prevMonthStats.judgments.stop, color: 'text-orange-400', bad: true },
-              { l: 'اعتبار', v: selectedMonthStats.judgments.consideration, pv: prevMonthStats.judgments.consideration, color: 'text-yellow-400', bad: true },
-              { l: 'خبراء', v: selectedMonthStats.judgments.expert, pv: prevMonthStats.judgments.expert, color: 'text-purple-400', bad: false },
+              { l: 'صالح', v: selectedMonthStats.judgments.good, cases: selectedMonthStats.judgments.lists.good, color: 'text-emerald-400' },
+              { l: 'ضد', v: selectedMonthStats.judgments.bad, cases: selectedMonthStats.judgments.lists.bad, color: 'text-rose-400' },
+              { l: 'مختلط', v: selectedMonthStats.judgments.mixed, cases: selectedMonthStats.judgments.lists.mixed, color: 'text-indigo-400' },
+              { l: 'وقف', v: selectedMonthStats.judgments.stop, cases: selectedMonthStats.judgments.lists.stop, color: 'text-orange-400' },
+              { l: 'اعتبار', v: selectedMonthStats.judgments.consideration, cases: selectedMonthStats.judgments.lists.consideration, color: 'text-yellow-400' },
+              { l: 'خبراء', v: selectedMonthStats.judgments.expert, cases: selectedMonthStats.judgments.lists.expert, color: 'text-purple-400' },
             ].map(item => (
-              <div key={item.l} className="flex-1 min-w-[45px] bg-slate-900/20 rounded-lg py-1.5 px-2 text-center border border-slate-700/20 flex flex-col items-center justify-center gap-0.5">
+              <button key={item.l} onClick={() => setAgendaModal({ isOpen: true, title: `أحكام (${item.l}) لشهر ${viewMonthLabel}`, casesList: item.cases })}
+                className="flex-1 min-w-[45px] bg-slate-900/20 hover:bg-slate-800 rounded-lg py-1.5 px-2 text-center border border-slate-700/20 hover:border-slate-600 transition flex flex-col items-center justify-center gap-0.5 cursor-pointer shadow-sm active:scale-95">
                 <p className={`text-sm font-black ${item.color} leading-none`}>{item.v}</p>
                 <p className="text-[9px] font-bold text-slate-400 leading-none">{item.l}</p>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -941,7 +957,7 @@ export default function Dashboard() {
           bgFrom="from-sky-50" bgTo="to-blue-50/40"
           iconBg="bg-sky-100"
           border="border-sky-200"
-          onClick={() => navigate('/files')}
+          onClick={() => setAgendaModal({ isOpen: true, title: 'القضايا النشطة', casesList: stats.activeCases })}
           extra={
             stats.netTotal > 0 && (
               <p className="text-[9px] font-bold text-slate-400">
@@ -959,7 +975,7 @@ export default function Dashboard() {
           bgFrom="from-amber-50" bgTo="to-orange-50/40"
           iconBg="bg-amber-100"
           border="border-amber-200"
-          onClick={() => navigate('/files')}
+          onClick={() => setAgendaModal({ isOpen: true, title: 'إجمالي المتداول', casesList: stats.ongoingCases })}
         />
         <KPICard
           icon={Clock}
@@ -970,7 +986,7 @@ export default function Dashboard() {
           bgFrom="from-violet-50" bgTo="to-purple-50/40"
           iconBg="bg-violet-100"
           border="border-violet-200"
-          onClick={() => navigate('/files')}
+          onClick={() => setAgendaModal({ isOpen: true, title: 'محجوز للحكم', casesList: stats.reservedCases })}
         />
         <KPICard
           icon={Scale}
@@ -981,7 +997,7 @@ export default function Dashboard() {
           bgFrom="from-emerald-50" bgTo="to-green-50/40"
           iconBg="bg-emerald-100"
           border="border-emerald-200"
-          onClick={() => navigate('/files')}
+          onClick={() => setAgendaModal({ isOpen: true, title: 'المحكوم فيها', casesList: stats.judgedCases })}
           extra={
             stats.judgedCount > 0 && (
               <p className="text-[9px] font-bold text-slate-400">
@@ -990,16 +1006,6 @@ export default function Dashboard() {
             )
           }
         />
-      </div>
-
-      {/* لا شأن / خارج الاختصاص — slim row */}
-      <div className="grid grid-cols-2 gap-2">
-        {[['لا شأن', stats.noInterest], ['خارج الاختصاص', stats.outOfJurisdiction]].map(([l, v]) => (
-          <div key={l} className="bg-slate-50/50 rounded-xl p-2.5 border border-dashed border-slate-200 flex justify-between items-center opacity-70">
-            <span className="text-xs font-bold text-slate-500">{l}</span>
-            <span className="text-sm font-black text-slate-700">{v}</span>
-          </div>
-        ))}
       </div>
 
       {/* ── Charts Row ────────────────────────────────────── */}
@@ -1057,268 +1063,268 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Appellant vs Appellee bar */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-black text-xs text-slate-600">توزيع صفة الموكل</h3>
-          <div className="flex gap-4 text-xs font-black">
-            <span className="text-emerald-600">{settings?.roles?.[0] || 'طاعن'}: {stats.appellant}</span>
-            <span className="text-rose-600">{settings?.roles?.[1] || 'مطعون ضدنا'}: {stats.appellee}</span>
-          </div>
-        </div>
-        <div className="w-full flex h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-          <div className="bg-gradient-to-l from-emerald-400 to-emerald-500 h-full transition-all duration-1000 rounded-r-full"
-            style={{ width: `${(stats.appellant / (stats.appellant + stats.appellee || 1)) * 100}%` }} />
-          <div className="bg-gradient-to-l from-rose-500 to-rose-400 h-full transition-all duration-1000 rounded-l-full"
-            style={{ width: `${(stats.appellee / (stats.appellant + stats.appellee || 1)) * 100}%` }} />
-        </div>
+
+      {/* ── Tabs Navigation ── */}
+      <div className="flex flex-wrap gap-2 mb-4 bg-slate-100 p-1.5 rounded-2xl w-fit">
+        {[
+          { id: 'priority', icon: Star, label: 'أولوية المستشار' },
+          { id: 'trend', icon: Activity, label: 'مسار الجلسات والمفكرة' },
+          { id: 'details', icon: PieChart, label: 'إحصائيات تفصيلية' },
+          { id: 'tasks', icon: ClipboardList, label: 'تقارير الموظفين' }
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setBottomTab(tab.id)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all ${bottomTab === tab.id ? 'bg-white shadow-sm text-navy-900' : 'text-slate-500 hover:text-navy-900'}`}>
+            <tab.icon className={`w-4 h-4 ${bottomTab === tab.id ? 'text-amber-500' : ''}`} /> {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* ── Smart Priority Files ── */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <Star className="w-5 h-5 text-amber-500 fill-amber-400" />
-            <div>
-              <h3 className="font-black text-sm text-[#0f172a]">أولوية المستشار ⭐</h3>
-              <p className="text-[10px] font-bold text-slate-400 mt-0.5">الملفات المميزة بنجمة أو قضايا الطعن الجاري جلساتها هذا الشهر</p>
+      {bottomTab === 'priority' && (
+        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4 animate-fade-in">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <Star className="w-5 h-5 text-amber-500 fill-amber-400" />
+              <div>
+                <h3 className="font-black text-sm text-[#0f172a]">أولوية المستشار ⭐</h3>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">الملفات المميزة بنجمة أو قضايا الطعن الجاري جلساتها هذا الشهر</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold bg-amber-50 text-amber-600 px-3 py-1 rounded-full">{priorityCases.length} ملفات</span>
+          </div>
+          {priorityCases.length === 0 ? (
+            <p className="text-center py-6 text-xs text-slate-400 font-bold">لا توجد قضايا ذات أولوية حالياً.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {priorityCases.map(c => {
+                const role = String(c['الصفة'] || c['صفة'] || '').trim();
+                const lastSessionStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || '';
+                return (
+                  <div key={c.id} onClick={() => navigate(`/case/${c.id}`)}
+                    className="border border-slate-200 hover:border-amber-200 bg-slate-50/40 p-3.5 rounded-2xl transition cursor-pointer flex justify-between gap-3 shadow-sm hover:shadow">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Star className={`w-3.5 h-3.5 shrink-0 ${c.isImportant ? 'text-amber-500 fill-amber-500' : 'text-slate-300'}`} />
+                        <span className="text-xs font-black text-[#0f172a] truncate">رقم {c['رقم الدعوى']} لسنة {c['السنة']} ق</span>
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${role.includes('طاعن') ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
+                          {role.includes('طاعن') ? 'طاعن' : 'مطعون ضده'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] font-bold text-slate-500 mt-1 truncate">الخصم: {c['المدعى_عليه'] || c['المدعى عليه'] || 'غير محدد'}</p>
+                    </div>
+                    <div className="text-left shrink-0">
+                      <span className="text-[9px] text-slate-400 block">الجلسة القادمة</span>
+                      <span className="text-xs font-black text-slate-700 block mt-0.5">{lastSessionStr || 'غير محدد'}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {bottomTab === 'trend' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fade-in">
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-slate-400" />
+              <h3 className="font-black text-xs text-slate-600">مسار الجلسات (آخر 6 أشهر)</h3>
+            </div>
+            <TrendLine data={stats.last6Months} color="#f59e0b" />
+            <div className="flex justify-between px-1">
+              {stats.last6Months.map((m, i) => (
+                <div key={i} className="flex flex-col items-center">
+                  <span className="text-[9px] font-bold text-slate-400">{m.label}</span>
+                  <span className="text-[9px] font-black text-amber-600">{m.count}</span>
+                </div>
+              ))}
             </div>
           </div>
-          <span className="text-[10px] font-bold bg-amber-50 text-amber-600 px-3 py-1 rounded-full">{priorityCases.length} ملفات</span>
+          <QuickScratchpad />
         </div>
-        {priorityCases.length === 0 ? (
-          <p className="text-center py-6 text-xs text-slate-400 font-bold">لا توجد قضايا ذات أولوية حالياً.</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {priorityCases.map(c => {
-              const role = String(c['الصفة'] || c['صفة'] || '').trim();
-              const lastSessionStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || '';
-              return (
-                <div key={c.id} onClick={() => navigate(`/case/${c.id}`)}
-                  className="border border-slate-200 hover:border-amber-200 bg-slate-50/40 p-3.5 rounded-2xl transition cursor-pointer flex justify-between gap-3 shadow-sm hover:shadow">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Star className={`w-3.5 h-3.5 shrink-0 ${c.isImportant ? 'text-amber-500 fill-amber-500' : 'text-slate-300'}`} />
-                      <span className="text-xs font-black text-[#0f172a] truncate">رقم {c['رقم الدعوى']} لسنة {c['السنة']} ق</span>
-                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${role.includes('طاعن') ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
-                        {role.includes('طاعن') ? 'طاعن' : 'مطعون ضده'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] font-bold text-slate-500 mt-1 truncate">الخصم: {c['المدعى_عليه'] || c['المدعى عليه'] || 'غير محدد'}</p>
-                  </div>
-                  <div className="text-left shrink-0">
-                    <span className="text-[9px] text-slate-400 block">الجلسة القادمة</span>
-                    <span className="text-xs font-black text-slate-700 block mt-0.5">{lastSessionStr || 'غير محدد'}</span>
-                  </div>
+      )}
+
+      {bottomTab === 'details' && (
+        <div className="animate-fade-in">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-black text-slate-400 uppercase tracking-wider">إحصائيات تفصيلية</h2>
+            <button onClick={() => setShowCustomize(!showCustomize)}
+              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition ${showCustomize ? 'bg-[#0f172a] text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+              <Settings2 className="w-3.5 h-3.5" /> تخصيص
+            </button>
+          </div>
+          {showCustomize && (
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-3 flex flex-wrap gap-2 animate-fade-in">
+              {[
+                { id: 'entities', label: 'الجهات رافعة الدعوى' },
+                { id: 'years', label: 'توزيع الملفات بالسنة' },
+                { id: 'judgment-list', label: 'قائمة تصنيف الأحكام' },
+              ].map(w => (
+                <button key={w.id} onClick={() => toggleWidget(w.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition border ${isVisible(w.id) ? 'bg-white border-slate-200 text-navy-900 shadow-sm' : 'bg-slate-100 border-transparent text-slate-400'}`}>
+                  {isVisible(w.id) ? <Eye className="w-3.5 h-3.5 text-emerald-500" /> : <EyeOff className="w-3.5 h-3.5" />}
+                  {w.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className={`grid gap-3 ${[isVisible('entities'), isVisible('years'), isVisible('judgment-list')].filter(Boolean).length >= 2 ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'}`}>
+            {isVisible('entities') && (
+              <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-slate-400" />
+                  <h3 className="font-black text-xs text-slate-600">الجهات رافعة الدعوى</h3>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ── Charts & Scratchpad Row ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-slate-400" />
-            <h3 className="font-black text-xs text-slate-600">مسار الجلسات (آخر 6 أشهر)</h3>
-          </div>
-          <TrendLine data={stats.last6Months} color="#f59e0b" />
-          <div className="flex justify-between px-1">
-            {stats.last6Months.map((m, i) => (
-              <div key={i} className="flex flex-col items-center">
-                <span className="text-[9px] font-bold text-slate-400">{m.label}</span>
-                <span className="text-[9px] font-black text-amber-600">{m.count}</span>
+                {stats.topOpponents.length > 0 ? (
+                  <div className="space-y-3">
+                    {stats.topOpponents.map(([name, count], i) => {
+                      const mx = stats.topOpponents[0][1];
+                      return (
+                        <div key={name} className="space-y-1">
+                          <div className="flex items-center justify-between text-[11px] font-bold">
+                            <div className="flex items-center gap-1.5 overflow-hidden">
+                              <span className="w-4 h-4 rounded-md bg-slate-100 text-slate-500 flex items-center justify-center text-[9px] shrink-0">{i + 1}</span>
+                              <span className="truncate text-navy-900">{name}</span>
+                            </div>
+                            <span className="text-slate-500 shrink-0 ml-2">{count}</span>
+                          </div>
+                          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-l from-amber-400 to-amber-500 rounded-full" style={{ width: `${(count / mx) * 100}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : <p className="text-xs text-slate-400 font-bold text-center py-4">لا توجد بيانات</p>}
               </div>
-            ))}
+            )}
+            {isVisible('years') && (
+              <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4 text-slate-400" />
+                  <h3 className="font-black text-xs text-slate-600">توزيع الملفات (بالسنة)</h3>
+                </div>
+                <div className="space-y-3">
+                  {stats.topYears.map(([year, count]) => {
+                    const mx = stats.topYears[0][1];
+                    return (
+                      <div key={year} className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px] font-bold">
+                          <span className="text-navy-900">سنة {year}</span><span className="text-slate-500">{count}</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-l from-blue-400 to-indigo-500 rounded-full" style={{ width: `${(count / mx) * 100}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {isVisible('judgment-list') && (
+              <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+                <div className="flex items-center gap-2">
+                  <PieChart className="w-4 h-4 text-slate-400" />
+                  <h3 className="font-black text-xs text-slate-600">تصنيف الأحكام الكلية</h3>
+                </div>
+                {stats.topJudgments.length > 0 ? (
+                  <div className="space-y-3">
+                    {stats.topJudgments.map(([name, count]) => {
+                      const total = stats.topJudgments.reduce((s, c) => s + c[1], 0);
+                      const pct = Math.round((count / total) * 100);
+                      const color = getJColor(name);
+                      return (
+                        <div key={name} className="space-y-1">
+                          <div className="flex items-center justify-between text-[11px] font-bold">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                              <span className="text-navy-900">{name}</span>
+                            </div>
+                            <span className="text-slate-500">{count} ({pct}%)</span>
+                          </div>
+                          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : <p className="text-xs text-slate-400 font-bold text-center py-4">لا توجد أحكام مسجلة</p>}
+              </div>
+            )}
           </div>
         </div>
-        <QuickScratchpad />
-      </div>
+      )}
 
-      {/* ── Toggleable Widgets ─────────────────────────────── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-black text-slate-400 uppercase tracking-wider">إحصائيات تفصيلية</h2>
-          <button onClick={() => setShowCustomize(!showCustomize)}
-            className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition ${showCustomize ? 'bg-[#0f172a] text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-            <Settings2 className="w-3.5 h-3.5" /> تخصيص
-          </button>
-        </div>
-        {showCustomize && (
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-3 flex flex-wrap gap-2 animate-fade-in">
-            {[
-              { id: 'entities', label: 'الجهات رافعة الدعوى' },
-              { id: 'years', label: 'توزيع الملفات بالسنة' },
-              { id: 'judgment-list', label: 'قائمة تصنيف الأحكام' },
-            ].map(w => (
-              <button key={w.id} onClick={() => toggleWidget(w.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition border ${isVisible(w.id) ? 'bg-white border-slate-200 text-navy-900 shadow-sm' : 'bg-slate-100 border-transparent text-slate-400'}`}>
-                {isVisible(w.id) ? <Eye className="w-3.5 h-3.5 text-emerald-500" /> : <EyeOff className="w-3.5 h-3.5" />}
-                {w.label}
+      {bottomTab === 'tasks' && (
+        <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm space-y-4 animate-fade-in">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <Activity className="w-6 h-6 text-indigo-600" />
+              <div>
+                <h2 className="font-black text-lg text-navy-900">تقارير أداء الموظفين</h2>
+                <p className="text-[11px] font-bold text-slate-500">سجل بجميع المهام المنفذة مؤخراً</p>
+              </div>
+            </div>
+            <button onClick={() => setIsGlobalTaskModalOpen(true)}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-sm flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" /> إنشاء مهمة عامة
+            </button>
+          </div>
+          <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit">
+            {[['pending', 'مهام قيد التنفيذ'], ['completed', 'مهام تم تنفيذها']].map(([key, label]) => (
+              <button key={key} onClick={() => setAdminTasksTab(key)}
+                className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${adminTasksTab === key ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-navy-900'}`}>
+                {label}
               </button>
             ))}
           </div>
-        )}
-        <div className={`grid gap-3 ${[isVisible('entities'), isVisible('years'), isVisible('judgment-list')].filter(Boolean).length >= 2 ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'}`}>
-
-          {isVisible('entities') && (
-            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-slate-400" />
-                <h3 className="font-black text-xs text-slate-600">الجهات رافعة الدعوى</h3>
-              </div>
-              {stats.topOpponents.length > 0 ? (
-                <div className="space-y-3">
-                  {stats.topOpponents.map(([name, count], i) => {
-                    const mx = stats.topOpponents[0][1];
-                    return (
-                      <div key={name} className="space-y-1">
-                        <div className="flex items-center justify-between text-[11px] font-bold">
-                          <div className="flex items-center gap-1.5 overflow-hidden">
-                            <span className="w-4 h-4 rounded-md bg-slate-100 text-slate-500 flex items-center justify-center text-[9px] shrink-0">{i + 1}</span>
-                            <span className="truncate text-navy-900">{name}</span>
-                          </div>
-                          <span className="text-slate-500 shrink-0 ml-2">{count}</span>
-                        </div>
-                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-l from-amber-400 to-amber-500 rounded-full" style={{ width: `${(count / mx) * 100}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : <p className="text-xs text-slate-400 font-bold text-center py-4">لا توجد بيانات</p>}
-            </div>
-          )}
-
-          {isVisible('years') && (
-            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-slate-400" />
-                <h3 className="font-black text-xs text-slate-600">توزيع الملفات (بالسنة)</h3>
-              </div>
-              <div className="space-y-3">
-                {stats.topYears.map(([year, count]) => {
-                  const mx = stats.topYears[0][1];
-                  return (
-                    <div key={year} className="space-y-1">
-                      <div className="flex items-center justify-between text-[11px] font-bold">
-                        <span className="text-navy-900">سنة {year}</span><span className="text-slate-500">{count}</span>
-                      </div>
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-l from-blue-400 to-indigo-500 rounded-full" style={{ width: `${(count / mx) * 100}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {isVisible('judgment-list') && (
-            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-              <div className="flex items-center gap-2">
-                <PieChart className="w-4 h-4 text-slate-400" />
-                <h3 className="font-black text-xs text-slate-600">تصنيف الأحكام الكلية</h3>
-              </div>
-              {stats.topJudgments.length > 0 ? (
-                <div className="space-y-3">
-                  {stats.topJudgments.map(([name, count]) => {
-                    const total = stats.topJudgments.reduce((s, c) => s + c[1], 0);
-                    const pct = Math.round((count / total) * 100);
-                    const color = getJColor(name);
-                    return (
-                      <div key={name} className="space-y-1">
-                        <div className="flex items-center justify-between text-[11px] font-bold">
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                            <span className="text-navy-900">{name}</span>
-                          </div>
-                          <span className="text-slate-500">{count} ({pct}%)</span>
-                        </div>
-                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : <p className="text-xs text-slate-400 font-bold text-center py-4">لا توجد أحكام مسجلة</p>}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Employee Tasks ────────────────────────────────── */}
-      <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm space-y-4">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <Activity className="w-6 h-6 text-indigo-600" />
-            <div>
-              <h2 className="font-black text-lg text-navy-900">تقارير أداء الموظفين</h2>
-              <p className="text-[11px] font-bold text-slate-500">سجل بجميع المهام المنفذة مؤخراً</p>
-            </div>
-          </div>
-          <button onClick={() => setIsGlobalTaskModalOpen(true)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-sm flex items-center gap-2">
-            <ClipboardList className="w-4 h-4" /> إنشاء مهمة عامة
-          </button>
-        </div>
-        <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit">
-          {[['pending', 'مهام قيد التنفيذ'], ['completed', 'مهام تم تنفيذها']].map(([key, label]) => (
-            <button key={key} onClick={() => setAdminTasksTab(key)}
-              className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${adminTasksTab === key ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-navy-900'}`}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-          {(() => {
-            const allTasks = [];
-            cases.forEach(c => { if (c.tasks) c.tasks.forEach(t => allTasks.push({ ...t, caseId: c.id, caseNum: c['رقم الدعوى'] || c.id, year: c['السنة'], type: 'case' })); });
-            globalTasks.forEach(t => allTasks.push({ ...t, type: 'global', caseNum: t.linkedCases?.length ? `مرتبطة بـ ${t.linkedCases.length} ملفات` : 'مهمة عامة' }));
-            const displayed = allTasks
-              .filter(t => adminTasksTab === 'completed' ? t.status === 'completed' : t.status !== 'completed')
-              .sort((a, b) => new Date(b.completedAt || b.createdAt) - new Date(a.completedAt || a.createdAt));
-            if (displayed.length === 0) return (
-              <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
-                <p className="text-xs font-bold text-slate-500">{adminTasksTab === 'completed' ? 'لم يتم تنفيذ أي مهام حتى الآن.' : 'لا توجد مهام قيد التنفيذ حالياً.'}</p>
-              </div>
-            );
-            return displayed.map(task => {
-              const d = new Date(task.completedAt || task.createdAt);
-              return (
-                <div key={`${task.caseId}-${task.id}`} className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col sm:flex-row justify-between gap-4 hover:bg-slate-100 transition">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-navy-900 text-white px-2 py-0.5 rounded-md text-[10px] font-bold">{task.assignee}</span>
-                      <h4 className="font-black text-sm text-navy-900">{task.title}</h4>
-                    </div>
-                    <p className="text-[11px] font-bold text-slate-500 mb-2">رقم الدعوى: {task.caseNum} {task.year && `لسنة ${task.year}`}</p>
-                    {task.notes && <p className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-1.5 rounded-lg border border-indigo-100 inline-block">ملاحظة: {task.notes}</p>}
-                  </div>
-                  <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 shrink-0">
-                    {task.status === 'completed' ? (
-                      <>
-                        <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md flex items-center gap-1 border border-emerald-100"><CheckCircle2 className="w-3 h-3" /> تم التنفيذ</span>
-                        <span className="text-[10px] font-bold text-slate-400">{d.toLocaleDateString('ar-EG')}</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-md border border-amber-100">قيد التنفيذ</span>
-                        <span className="text-[10px] font-bold text-slate-400">{d.toLocaleDateString('ar-EG')}</span>
-                        <button onClick={() => handleDeleteTaskAdmin(task.type, task.caseId, task.id)} className="text-[10px] font-bold text-rose-500 hover:text-white hover:bg-rose-500 px-2 py-1 rounded-md transition">حذف</button>
-                      </>
-                    )}
-                  </div>
+          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+            {(() => {
+              const allTasks = [];
+              cases.forEach(c => { if (c.tasks) c.tasks.forEach(t => allTasks.push({ ...t, caseId: c.id, caseNum: c['رقم الدعوى'] || c.id, year: c['السنة'], type: 'case' })); });
+              globalTasks.forEach(t => allTasks.push({ ...t, type: 'global', caseNum: t.linkedCases?.length ? `مرتبطة بـ ${t.linkedCases.length} ملفات` : 'مهمة عامة' }));
+              const displayed = allTasks
+                .filter(t => adminTasksTab === 'completed' ? t.status === 'completed' : t.status !== 'completed')
+                .sort((a, b) => new Date(b.completedAt || b.createdAt) - new Date(a.completedAt || a.createdAt));
+              if (displayed.length === 0) return (
+                <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
+                  <p className="text-xs font-bold text-slate-500">{adminTasksTab === 'completed' ? 'لم يتم تنفيذ أي مهام حتى الآن.' : 'لا توجد مهام قيد التنفيذ حالياً.'}</p>
                 </div>
               );
-            });
-          })()}
+              return displayed.map(task => {
+                const d = new Date(task.completedAt || task.createdAt);
+                return (
+                  <div key={`${task.caseId}-${task.id}`} className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col sm:flex-row justify-between gap-4 hover:bg-slate-100 transition">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="bg-navy-900 text-white px-2 py-0.5 rounded-md text-[10px] font-bold">{task.assignee}</span>
+                        <h4 className="font-black text-sm text-navy-900">{task.title}</h4>
+                      </div>
+                      <p className="text-[11px] font-bold text-slate-500 mb-2">رقم الدعوى: {task.caseNum} {task.year && `لسنة ${task.year}`}</p>
+                      {task.notes && <p className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-1.5 rounded-lg border border-indigo-100 inline-block">ملاحظة: {task.notes}</p>}
+                    </div>
+                    <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 shrink-0">
+                      {task.status === 'completed' ? (
+                        <>
+                          <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md flex items-center gap-1 border border-emerald-100"><CheckCircle2 className="w-3 h-3" /> تم التنفيذ</span>
+                          <span className="text-[10px] font-bold text-slate-400">{d.toLocaleDateString('ar-EG')}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-md border border-amber-100">قيد التنفيذ</span>
+                          <span className="text-[10px] font-bold text-slate-400">{d.toLocaleDateString('ar-EG')}</span>
+                          <button onClick={() => handleDeleteTaskAdmin(task.type, task.caseId, task.id)} className="text-[10px] font-bold text-rose-500 hover:text-white hover:bg-rose-500 px-2 py-1 rounded-md transition">حذف</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Modals */}
       {isAdvancedSearchOpen && (
