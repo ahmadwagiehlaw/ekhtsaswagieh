@@ -23,13 +23,7 @@ const ALL_COLUMNS = [
 
 // ─── Judgment Data ───────────────────────────────────────────────
 
-const JUDGMENT_TYPES = {
-  'حكم منه للخصومة': ['اعتبار كأن لم تكن', 'سقوط الخصومة', 'انقضاء الخصومة', 'شطب'],
-  'غير منه للخصومة': ['وقف جزائي', 'وقف تعليقي', 'إحالة للموضوع', 'إحالة لمحكمة أخرى'],
-  'تمهيدي': ['ندب خبير','تكليف خبير','إعادة للمحكمة المختصة','إحالة للنيابة','تعجيل من الوقف'],
-  'صالح': ['رفض الدعوى','عدم القبول شكلاً','عدم جواز نظر الدعوى','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)','وقف تنفيذي','رفض الشق العاجل', 'رفض'],
-  'ضد': ['رفض الدعوى','عدم القبول شكلاً','عدم جواز نظر الدعوى','عدم الاختصاص','انتفاء قرار','إلغاء القرار','تعويض','رفض الطعن','قبول الطعن','عدم القبول موضوعاً','تعديل الحكم المطعون فيه','رفض (دائرة فحص)','قبول طعن (إحالة للموضوع)','وقف تنفيذي','رفض الشق العاجل', 'رفض'],
-};
+
 
 const JUDGMENT_RESULTS = [
   { value: 'صالح',  label: 'صالح',  color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
@@ -756,7 +750,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                             className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
                           >
                             <option value="">-- نوع الحكم --</option>
-                            {(JUDGMENT_TYPES[editData['_judgmentCategory']] || []).map(t => <option key={t} value={t}>{t}</option>)}
+                            {(settings?.judgmentTypes || ['قبول', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'شطب', 'إلغاء', 'تأييد']).map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
                           {/* Row 3: Final checkbox */}
                           <label className="flex items-center gap-1 text-[9px] font-bold text-rose-700 cursor-pointer">

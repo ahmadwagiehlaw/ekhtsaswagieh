@@ -104,6 +104,7 @@ export default function Settings() {
   const [rulesSearchQuery, setRulesSearchQuery] = useState('');
   const [expandedRuleGroups, setExpandedRuleGroups] = useState(['قواعد عامة']); // Default expand first/general group
   const [localMemoCalculationMode, setLocalMemoCalculationMode] = useState(settings?.memoCalculationMode || 'session_date');
+  const [localScratchpadPosition, setLocalScratchpadPosition] = useState(settings?.scratchpadPosition || 'right');
   const [deletePassword, setDeletePassword] = useState('');
   const backupInputRef = useRef(null);
   const [backupRestoreStatus, setBackupRestoreStatus] = useState(null); // { type: 'success'|'error'|'preview', data: ... }
@@ -335,7 +336,8 @@ export default function Settings() {
 
       judgmentDefaults: localJudgmentDefaults,
       deadlineRules: localDeadlineRules,
-      memoCalculationMode: localMemoCalculationMode
+      memoCalculationMode: localMemoCalculationMode,
+      scratchpadPosition: localScratchpadPosition
     });
     setIsProcessing(false);
     toast('تم حفظ الإعدادات المتقدمة بنجاح', 'success');

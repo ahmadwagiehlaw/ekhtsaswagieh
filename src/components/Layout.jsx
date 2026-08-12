@@ -7,6 +7,7 @@ import AddCaseModal from './AddCaseModal';
 import NotificationCenter from './NotificationCenter';
 import TasksManagerModal from './TasksManagerModal';
 import OnboardingModal from './OnboardingModal';
+import QuickScratchpad from './QuickScratchpad';
 
 export default function Layout() {
   const { settings, isAdmin, currentUserPermissions } = useAppContext();
@@ -143,6 +144,9 @@ export default function Layout() {
           <Plus className="w-6 h-6" />
         </button>
       )}
+
+      {/* Global Quick Scratchpad */}
+      <QuickScratchpad />
 
       {/* Add Case Modal */}
       {isAddModalOpen && (

@@ -357,57 +357,6 @@ const JudicialAgendaReportModal = ({ title, casesList, onClose }) => {
 // ─────────────────────────────────────────────────────────────
 // Quick Notes Scratchpad
 // ─────────────────────────────────────────────────────────────
-const QuickScratchpad = () => {
-  const [notes, setNotes] = useState(() => { try { return JSON.parse(localStorage.getItem('dash-scratchpad-notes') || '[]'); } catch { return []; } });
-  const [newNote, setNewNote] = useState('');
-  useEffect(() => { localStorage.setItem('dash-scratchpad-notes', JSON.stringify(notes)); }, [notes]);
-  const addNote = () => {
-    if (!newNote.trim()) return;
-    setNotes([{ id: Date.now().toString(), text: newNote.trim(), reminderDate: '', createdAt: new Date().toISOString() }, ...notes]);
-    setNewNote('');
-  };
-  const todayStr = new Date().toISOString().split('T')[0];
-  return (
-    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col h-full min-h-[280px]">
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-        <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-amber-500" />
-          <h3 className="font-black text-sm text-[#0f172a]">مفكرة التنبيهات السريعة</h3>
-        </div>
-        <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">حفظ محلي</span>
-      </div>
-      <div className="flex gap-2 mb-3">
-        <input type="text" value={newNote} onChange={e => setNewNote(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') addNote(); }}
-          placeholder="اكتب ملاحظة سريعة..." className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-amber-400 transition" />
-        <button onClick={addNote} className="bg-amber-500 hover:bg-amber-600 text-white font-black px-4 py-2 rounded-xl text-xs transition">إضافة</button>
-      </div>
-      <div className="space-y-2 overflow-y-auto flex-1">
-        {notes.length === 0 ? (
-          <p className="text-center text-xs text-slate-300 font-bold py-6">لا توجد ملاحظات. اكتب ملاحظتك بالأعلى.</p>
-        ) : notes.map(note => {
-          const isAlert = note.reminderDate && note.reminderDate <= todayStr;
-          return (
-            <div key={note.id} className={`p-3 rounded-xl border flex flex-col gap-1.5 transition ${isAlert ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-100'}`}>
-              <div className="flex justify-between items-start gap-2">
-                <p className={`text-xs font-bold flex-1 ${isAlert ? 'text-rose-900' : 'text-slate-700'}`}>
-                  {isAlert && '⏰ '}{note.text}
-                </p>
-                <button onClick={() => setNotes(notes.filter(n => n.id !== note.id))} className="text-slate-400 hover:text-rose-500 font-black text-sm">×</button>
-              </div>
-              <div className="flex items-center justify-between text-[9px] text-slate-400">
-                <span>{new Date(note.createdAt).toLocaleDateString('ar-EG')}</span>
-                <input type="date" value={note.reminderDate || ''} onChange={e => setNotes(notes.map(n => n.id === note.id ? {...n, reminderDate: e.target.value} : n))}
-                  className={`border rounded px-1.5 py-0.5 text-[10px] font-bold focus:outline-none ${isAlert ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-slate-200 text-slate-600'}`} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
 // ─────────────────────────────────────────────────────────────
 // Main Dashboard
 // ─────────────────────────────────────────────────────────────
@@ -424,7 +373,7 @@ export default function Dashboard() {
   const [bottomTab, setBottomTab] = useState('priority');
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showCustomize, setShowCustomize] = useState(false);
-  const [isScratchpadOpen, setIsScratchpadOpen] = useState(false);
+
   const [showQuickFilters, setShowQuickFilters] = useState(false);
   const [hiddenWidgets, setHiddenWidgets] = useState(() => {
     try { return JSON.parse(localStorage.getItem('dash-hidden-v3') || '["entities","years"]'); } catch { return ['entities','years']; }
@@ -1473,35 +1422,7 @@ export default function Dashboard() {
           onClose={() => setShowPrintModal(false)}
         />
       )}
-      {/* Floating Action Button for Quick Scratchpad */}
-      <button 
-        onClick={() => setIsScratchpadOpen(!isScratchpadOpen)}
-        className="fixed bottom-6 left-6 bg-amber-500 hover:bg-amber-600 text-white rounded-full p-4 shadow-xl hover:shadow-2xl transition-all z-40 flex items-center justify-center group transform hover:scale-110"
-      >
-        <FileText className="w-6 h-6" />
-        <span className="absolute -top-10 bg-slate-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">المفكرة السريعة</span>
-      </button>
 
-      {/* Slide-over for Quick Scratchpad */}
-      {isScratchpadOpen && (
-        <div className="fixed inset-0 z-50 flex justify-start">
-          <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={() => setIsScratchpadOpen(false)}></div>
-          <div className="relative w-full max-w-sm h-full bg-slate-50 shadow-2xl animate-fade-in flex flex-col border-r border-slate-200">
-            <div className="p-4 bg-white border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-amber-500" />
-                <h3 className="font-black text-sm text-slate-700">مفكرة التنبيهات السريعة</h3>
-              </div>
-              <button onClick={() => setIsScratchpadOpen(false)} className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <QuickScratchpad />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

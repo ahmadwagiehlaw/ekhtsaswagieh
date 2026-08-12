@@ -776,17 +776,18 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                         <td className="px-2 py-2 cursor-text" onClick={() => !isEditing && startEdit(cObj, '_type')} title="انقر للتعديل">
                           {isEditing ? (
                             <div>
-                              <input
+                              <select
                                 autoFocus={editingFocusField === '_type'}
-                                list={`jtype-${cObj.id}`}
-                                value={editData._type}
+                                value={editData._type || ''}
                                 onChange={e => {
                                   const v = e.target.value;
                                   setEditData(d => applyDefaultRules('_type', v, { ...d, _type: v }));
                                 }}
-                                placeholder="نوع الحكم..."
-                                className="w-full text-[10px] font-bold p-1 rounded border border-rose-200"
-                              />
+                                className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
+                              >
+                                <option value="">-- نوع الحكم --</option>
+                                {(settings?.judgmentTypes || ['قبول', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'شطب', 'إلغاء', 'تأييد']).map(t => <option key={t} value={t}>{t}</option>)}
+                              </select>
 
                             </div>
                           ) : (
