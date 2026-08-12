@@ -4,7 +4,7 @@ import {
   Search, TrendingUp, CalendarDays, AlertTriangle, Building2, Scale,
   PieChart, ClipboardList, CheckCircle2, ChevronLeft, Activity, Sparkles,
   Printer, Settings2, Eye, EyeOff, BarChart3, FileText, Clock, Gavel,
-  ChevronRight, Calendar, LogOut, X, Star
+  ChevronRight, Calendar, LogOut, X, Star, Filter
 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { calculateDashboardStats, computeMonthStats } from '../utils/statsUtils';
@@ -424,6 +424,8 @@ export default function Dashboard() {
   const [bottomTab, setBottomTab] = useState('priority');
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showCustomize, setShowCustomize] = useState(false);
+  const [isScratchpadOpen, setIsScratchpadOpen] = useState(false);
+  const [showQuickFilters, setShowQuickFilters] = useState(false);
   const [hiddenWidgets, setHiddenWidgets] = useState(() => {
     try { return JSON.parse(localStorage.getItem('dash-hidden-v3') || '["entities","years"]'); } catch { return ['entities','years']; }
   });
@@ -477,6 +479,104 @@ export default function Dashboard() {
     localStorage.setItem('dash-hidden-v3', JSON.stringify(next));
   };
   const isVisible = (id) => !hiddenWidgets.includes(id);
+
+  
+  // Quick Filter logic
+  const handleQuickFilter = (type) => {
+    let title = '';
+    let filteredCases = [];
+    const todayObj = new Date();
+    todayObj.setHours(0,0,0,0);
+    const currMonth = todayObj.getMonth();
+    const currYear = todayObj.getFullYear();
+
+    switch (type) {
+      case 'memos':
+        title = 'مذكرات الشهر';
+        filteredCases = cases.filter(c => {
+          const procs = Array.isArray(c.procedures) ? c.procedures : Object.values(c.procedures || {});
+          return procs.some(p => {
+             if (!p.title || (!p.title.includes('مذكرة') && !p.title.includes('مذكرات'))) return false;
+             let dStr = p.date || p.createdAt;
+             const d = getSafeDateObj(dStr);
+             return d && d.getMonth() === currMonth && d.getFullYear() === currYear;
+          });
+        });
+        break;
+      case 'stop_appellant':
+        title = 'الوقف الجزائي (طاعن/مدعي)';
+        filteredCases = stats.criticalSuspended;
+        break;
+      case 'stop_appellee':
+        title = 'الوقف (مطعون ضدنا)';
+        filteredCases = cases.filter(c => {
+          const role = String(c['الصفة'] || c['صفة'] || '').trim();
+          const isAppellee  = role.includes('مطعون ضد') || role.includes('مدعى علي') || role.includes(settings?.roles?.[1] || 'مطعون ضدنا');
+          if (!isAppellee) return false;
+          const s = Array.isArray(c.sessions) ? c.sessions : Object.values(c.sessions || {});
+          s.sort((a,b) => (getSafeDateObj(b.date)?.getTime() || 0) - (getSafeDateObj(a.date)?.getTime() || 0));
+          const latest = s[0];
+          if (!latest) return false;
+          if (latest.hasJudgment) {
+             const cAs = latest.judgmentClassification || latest.judgment?.result || '';
+             return cAs.includes('وقف');
+          }
+          const dec = String(latest.decision || '').trim();
+          return dec.includes('وقف');
+        });
+        break;
+      case 'consideration':
+        title = 'اعتبار الدعوى كأن لم تكن';
+        filteredCases = stats.criticalConsidered;
+        break;
+      case 'judgments_this_month':
+        title = 'أحكام الشهر';
+        filteredCases = stats.judgedCases.filter(c => {
+           const s = Array.isArray(c.sessions) ? c.sessions : Object.values(c.sessions || {});
+           const judged = s.find(s => s.hasJudgment);
+           if (!judged) return false;
+           const d = getSafeDateObj(judged.date);
+           return d && d.getMonth() === currMonth && d.getFullYear() === currYear;
+        });
+        break;
+      case 'bad_judgments_this_month':
+        title = 'الأحكام الضد هذا الشهر';
+        filteredCases = stats.criticalAgainst.filter(c => {
+           const s = Array.isArray(c.sessions) ? c.sessions : Object.values(c.sessions || {});
+           const judged = s.find(s => s.hasJudgment);
+           if (!judged) return false;
+           const d = getSafeDateObj(judged.date);
+           return d && d.getMonth() === currMonth && d.getFullYear() === currYear;
+        });
+        break;
+      case 'next_session':
+        // Find the absolute closest session date >= today
+        let closestDate = null;
+        const futureCases = [];
+        cases.forEach(c => {
+          const sList = Array.isArray(c.sessions) ? c.sessions : Object.values(c.sessions || {});
+          sList.forEach(s => {
+             const d = getSafeDateObj(s.date);
+             if (d && d >= todayObj) {
+                if (!closestDate || d < closestDate) {
+                   closestDate = d;
+                   futureCases.length = 0; // reset
+                   futureCases.push(c);
+                } else if (d.getTime() === closestDate.getTime()) {
+                   if (!futureCases.includes(c)) futureCases.push(c);
+                }
+             }
+          });
+        });
+        filteredCases = futureCases;
+        title = closestDate ? `جلسات قادمة (${closestDate.toLocaleDateString('ar-EG')})` : 'أقرب جلسة قادمة';
+        break;
+      default:
+        break;
+    }
+
+    setAgendaModal({ isOpen: true, title, casesList: filteredCases });
+  };
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -754,28 +854,39 @@ export default function Dashboard() {
         <div className="absolute bottom-0 left-0 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl -translate-x-10 translate-y-10 pointer-events-none" />
 
         <div className="relative z-10 max-w-2xl mx-auto space-y-3">
-          <form onSubmit={handleSearch} className="relative">
-            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              placeholder="ابحث برقم الدعوى أو الخصم..."
-              className="w-full bg-slate-800/50 text-white placeholder-slate-400 border border-slate-700/50 rounded-2xl py-3 pl-14 pr-14 text-sm font-bold focus:outline-none focus:border-amber-500/50 focus:bg-slate-800 transition-all" />
-            <button type="submit" className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white hover:bg-amber-600 transition shadow-md">
-              <Search className="w-5 h-5" />
+          <form onSubmit={handleSearch} className="flex gap-2">
+            <div className="relative flex-1">
+              <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                placeholder="ابحث برقم الدعوى أو الخصم..."
+                className="w-full bg-slate-800/50 text-white placeholder-slate-400 border border-slate-700/50 rounded-xl py-3 pl-12 pr-12 text-sm font-bold focus:outline-none focus:border-amber-500/50 focus:bg-slate-800 transition-all" />
+              <button type="submit" className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg flex items-center justify-center text-amber-500 hover:text-amber-400 hover:bg-slate-700 transition">
+                <Search className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* Smart Search Icon Button */}
+            <button type="button" onClick={() => setIsAdvancedSearchOpen(true)} className="w-12 h-[46px] bg-slate-800/80 hover:bg-slate-700 text-amber-400 rounded-xl flex items-center justify-center transition border border-slate-700 shadow-sm shrink-0" title="بحث ذكي">
+              <Sparkles className="w-5 h-5" />
+            </button>
+
+            {/* Quick Filters Toggle Button */}
+            <button type="button" onClick={() => setShowQuickFilters(!showQuickFilters)} className={`w-12 h-[46px] rounded-xl flex items-center justify-center transition border shadow-sm shrink-0 ${showQuickFilters ? 'bg-amber-500 text-white border-amber-500' : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700'}`} title="الفلاتر السريعة">
+              <Filter className="w-5 h-5" />
             </button>
           </form>
 
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-            <button onClick={() => setIsAdvancedSearchOpen(true)} className="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 border border-slate-700">
-              <Sparkles className="w-3 h-3" /> بحث ذكي
-            </button>
-            <button onClick={() => setAgendaModal({ isOpen: true, title: 'أحكام الوقف الجزائي (طاعنين)', casesList: stats.criticalSuspended })}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[11px] font-bold transition border border-slate-700">
-              موقوفة (طاعن) · {stats.criticalSuspended.length}
-            </button>
-            <button onClick={() => setAgendaModal({ isOpen: true, title: 'أحكام الاعتبار كأن لم تكن (طاعنين)', casesList: stats.criticalConsidered })}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[11px] font-bold transition border border-slate-700">
-              اعتبار (طاعن) · {stats.criticalConsidered.length}
-            </button>
-          </div>
+          {/* Quick Filters Row */}
+          {showQuickFilters && (
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-2 animate-fade-in">
+              <button type="button" onClick={() => handleQuickFilter('memos')} className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[10px] font-bold transition border border-slate-700">مذكرات الشهر</button>
+              <button type="button" onClick={() => handleQuickFilter('stop_appellant')} className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[10px] font-bold transition border border-slate-700">وقف جزائي (طاعن)</button>
+              <button type="button" onClick={() => handleQuickFilter('stop_appellee')} className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[10px] font-bold transition border border-slate-700">وقف (مطعون ضده)</button>
+              <button type="button" onClick={() => handleQuickFilter('consideration')} className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[10px] font-bold transition border border-slate-700">الاعتبار</button>
+              <button type="button" onClick={() => handleQuickFilter('judgments_this_month')} className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[10px] font-bold transition border border-slate-700">أحكام الشهر</button>
+              <button type="button" onClick={() => handleQuickFilter('bad_judgments_this_month')} className="bg-slate-800 hover:bg-rose-900/50 text-rose-400 px-3 py-1.5 rounded-lg text-[10px] font-bold transition border border-rose-900/50">أحكام ضد (الشهر)</button>
+              <button type="button" onClick={() => handleQuickFilter('next_session')} className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-500 px-3 py-1.5 rounded-lg text-[10px] font-bold transition border border-amber-500/20">أقرب جلسة قادمة</button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -828,39 +939,6 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── High-Risk Critical Judgments Panel ── */}
-      {(stats.criticalSuspended.length > 0 || stats.criticalConsidered.length > 0) && (
-        <div className="bg-gradient-to-br from-rose-50 to-orange-50 border border-rose-200 rounded-3xl p-4 sm:p-5 shadow-sm">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5 animate-bounce" />
-            <div className="w-full space-y-3">
-              <div>
-                <h3 className="font-black text-rose-950 text-sm">أحكام الخطورة العالية (خاص بالطعون) ⚠️</h3>
-                <p className="text-[10px] font-bold text-rose-700/80 mt-0.5">تتطلب مراجعة فورية لحماية حقوق الموكلين</p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button onClick={() => setAgendaModal({ isOpen: true, title: 'أحكام الوقف الجزائي (طاعنين)', casesList: stats.criticalSuspended })}
-                  className="bg-white hover:bg-rose-50 border border-rose-200 rounded-2xl p-4 text-right flex items-center justify-between transition shadow-sm">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-500 block">أحكام الوقف الجزائي</span>
-                    <span className="text-2xl font-black text-rose-600 block mt-1">{stats.criticalSuspended.length}</span>
-                  </div>
-                  <span className="text-xs font-black bg-rose-100 px-2.5 py-1 rounded-xl">عرض الأجندة &larr;</span>
-                </button>
-                <button onClick={() => setAgendaModal({ isOpen: true, title: 'أحكام الاعتبار كأن لم تكن (طاعنين)', casesList: stats.criticalConsidered })}
-                  className="bg-white hover:bg-rose-50 border border-rose-200 rounded-2xl p-4 text-right flex items-center justify-between transition shadow-sm">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-500 block">أحكام الاعتبار كأن لم يكن</span>
-                    <span className="text-2xl font-black text-rose-600 block mt-1">{stats.criticalConsidered.length}</span>
-                  </div>
-                  <span className="text-xs font-black bg-rose-100 px-2.5 py-1 rounded-xl">عرض الأجندة &larr;</span>
-                </button>
               </div>
             </div>
           </div>
@@ -935,13 +1013,21 @@ export default function Dashboard() {
               { l: 'وقف', v: selectedMonthStats.judgments.stop, cases: selectedMonthStats.judgments.lists.stop, color: 'text-orange-400' },
               { l: 'اعتبار', v: selectedMonthStats.judgments.consideration, cases: selectedMonthStats.judgments.lists.consideration, color: 'text-yellow-400' },
               { l: 'خبراء', v: selectedMonthStats.judgments.expert, cases: selectedMonthStats.judgments.lists.expert, color: 'text-purple-400' },
-            ].map(item => (
+            ].map(item => {
+              const isCritical = (item.l === 'وقف' && stats.criticalSuspended.length > 0) || (item.l === 'اعتبار' && stats.criticalConsidered.length > 0);
+              return (
               <button key={item.l} onClick={() => setAgendaModal({ isOpen: true, title: `أحكام (${item.l}) لشهر ${viewMonthLabel}`, casesList: item.cases })}
-                className="flex-1 min-w-[45px] bg-slate-900/20 hover:bg-slate-800 rounded-lg py-1.5 px-2 text-center border border-slate-700/20 hover:border-slate-600 transition flex flex-col items-center justify-center gap-0.5 cursor-pointer shadow-sm active:scale-95">
+                className={`relative flex-1 min-w-[45px] bg-slate-900/20 hover:bg-slate-800 rounded-lg py-1.5 px-2 text-center border transition flex flex-col items-center justify-center gap-0.5 cursor-pointer shadow-sm active:scale-95 ${isCritical ? 'border-rose-500/30 hover:border-rose-500/60' : 'border-slate-700/20 hover:border-slate-600'}`}>
+                {isCritical && (
+                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500 border border-slate-900"></span>
+                  </span>
+                )}
                 <p className={`text-sm font-black ${item.color} leading-none`}>{item.v}</p>
                 <p className="text-[9px] font-bold text-slate-400 leading-none">{item.l}</p>
               </button>
-            ))}
+            )})}
           </div>
         )}
       </div>
@@ -1026,39 +1112,96 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex-1 space-y-1.5 overflow-hidden">
-                {donutSegments.slice(0, 7).map(seg => (
-                  <div key={seg.name} className="flex items-center justify-between gap-2">
+                {donutSegments.slice(0, 7).map(seg => {
+                  const isCritical = (seg.name.includes('وقف') && stats.criticalSuspended.length > 0) || (seg.name.includes('اعتبار') && stats.criticalConsidered.length > 0);
+                  return (
+                  <div key={seg.name} className="flex items-center justify-between gap-2 relative">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
-                      <span className="text-xs font-bold text-slate-700 truncate">{seg.name}</span>
+                      <div className="w-2.5 h-2.5 rounded-full shrink-0 relative" style={{ backgroundColor: seg.color }}>
+                        {isCritical && <span className="absolute inset-0 rounded-full bg-rose-500 animate-ping"></span>}
+                      </div>
+                      <span className={`text-xs font-bold truncate ${isCritical ? 'text-rose-600' : 'text-slate-700'}`}>{seg.name}</span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <span className="text-xs font-black text-slate-600">{seg.value}</span>
                       <span className="text-[9px] text-slate-400">({Math.round(seg.value / donutTotal * 100)}%)</span>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             </div>
           ) : <p className="text-xs text-slate-400 font-bold text-center py-8">لا توجد أحكام مسجلة حتى الآن</p>}
         </div>
 
-        {/* 6-Month trend */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-2">
-            <Activity className="w-4 h-4 text-slate-400" />
-            <h3 className="font-black text-xs text-slate-600">مسار الجلسات (آخر 6 أشهر)</h3>
+        {/* Performance Chart (Appellant vs Appellee) */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-center">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-slate-400" />
+              <h3 className="font-black text-xs text-slate-600">معدل الأداء (الصالح والضد)</h3>
+            </div>
           </div>
-          <div className="mt-3">
-            <TrendLine data={stats.last6Months} color="#f59e0b" />
-          </div>
-          <div className="flex justify-between mt-1 px-1">
-            {stats.last6Months.map((m, i) => (
-              <div key={i} className="flex flex-col items-center">
-                <span className="text-[9px] font-bold text-slate-400">{m.label}</span>
-                <span className="text-[9px] font-black text-amber-600">{m.count}</span>
+          
+          <div className="space-y-4">
+            {/* Appellant Bar */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-end">
+                <span className="text-[10px] font-bold text-slate-600">قضايا الطاعنين</span>
+                <span className="text-[10px] font-black text-slate-400">{stats.performanceSplit.appellant.total} حكم</span>
               </div>
-            ))}
+              <div className="h-4 flex rounded-full overflow-hidden bg-slate-100">
+                {stats.performanceSplit.appellant.total > 0 ? (
+                  <>
+                    <div style={{ width: `${(stats.performanceSplit.appellant.good / stats.performanceSplit.appellant.total) * 100}%` }} className="bg-emerald-500 hover:opacity-90 transition-opacity relative group cursor-pointer">
+                       <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">صالح: {stats.performanceSplit.appellant.good}</div>
+                    </div>
+                    <div style={{ width: `${(stats.performanceSplit.appellant.bad / stats.performanceSplit.appellant.total) * 100}%` }} className="bg-rose-500 hover:opacity-90 transition-opacity relative group cursor-pointer">
+                       <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">ضد: {stats.performanceSplit.appellant.bad}</div>
+                    </div>
+                    <div style={{ width: `${(stats.performanceSplit.appellant.mixed / stats.performanceSplit.appellant.total) * 100}%` }} className="bg-blue-500 hover:opacity-90 transition-opacity relative group cursor-pointer">
+                       <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">مختلط: {stats.performanceSplit.appellant.mixed}</div>
+                    </div>
+                    <div style={{ width: `${(stats.performanceSplit.appellant.procedural / stats.performanceSplit.appellant.total) * 100}%` }} className="bg-slate-300 hover:opacity-90 transition-opacity relative group cursor-pointer">
+                       <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">إجرائي: {stats.performanceSplit.appellant.procedural}</div>
+                    </div>
+                  </>
+                ) : <div className="w-full bg-slate-100"></div>}
+              </div>
+            </div>
+            
+            {/* Appellee Bar */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-end">
+                <span className="text-[10px] font-bold text-slate-600">قضايا المطعون ضدهم</span>
+                <span className="text-[10px] font-black text-slate-400">{stats.performanceSplit.appellee.total} حكم</span>
+              </div>
+              <div className="h-4 flex rounded-full overflow-hidden bg-slate-100">
+                {stats.performanceSplit.appellee.total > 0 ? (
+                  <>
+                    <div style={{ width: `${(stats.performanceSplit.appellee.good / stats.performanceSplit.appellee.total) * 100}%` }} className="bg-emerald-500 hover:opacity-90 transition-opacity relative group cursor-pointer">
+                       <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">صالح: {stats.performanceSplit.appellee.good}</div>
+                    </div>
+                    <div style={{ width: `${(stats.performanceSplit.appellee.bad / stats.performanceSplit.appellee.total) * 100}%` }} className="bg-rose-500 hover:opacity-90 transition-opacity relative group cursor-pointer">
+                       <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">ضد: {stats.performanceSplit.appellee.bad}</div>
+                    </div>
+                    <div style={{ width: `${(stats.performanceSplit.appellee.mixed / stats.performanceSplit.appellee.total) * 100}%` }} className="bg-blue-500 hover:opacity-90 transition-opacity relative group cursor-pointer">
+                       <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">مختلط: {stats.performanceSplit.appellee.mixed}</div>
+                    </div>
+                    <div style={{ width: `${(stats.performanceSplit.appellee.procedural / stats.performanceSplit.appellee.total) * 100}%` }} className="bg-slate-300 hover:opacity-90 transition-opacity relative group cursor-pointer">
+                       <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">إجرائي: {stats.performanceSplit.appellee.procedural}</div>
+                    </div>
+                  </>
+                ) : <div className="w-full bg-slate-100"></div>}
+              </div>
+            </div>
+            
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-3 pt-3">
+              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500"></div><span className="text-[9px] font-bold text-slate-500">صالح</span></div>
+              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-rose-500"></div><span className="text-[9px] font-bold text-slate-500">ضد</span></div>
+              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-500"></div><span className="text-[9px] font-bold text-slate-500">مختلط</span></div>
+              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-300"></div><span className="text-[9px] font-bold text-slate-500">إجرائي/أخرى</span></div>
+            </div>
           </div>
         </div>
       </div>
@@ -1068,7 +1211,7 @@ export default function Dashboard() {
       <div className="flex flex-wrap gap-2 mb-4 bg-slate-100 p-1.5 rounded-2xl w-fit">
         {[
           { id: 'priority', icon: Star, label: 'أولوية المستشار' },
-          { id: 'trend', icon: Activity, label: 'مسار الجلسات والمفكرة' },
+          
           { id: 'details', icon: PieChart, label: 'إحصائيات تفصيلية' },
           { id: 'tasks', icon: ClipboardList, label: 'تقارير الموظفين' }
         ].map(tab => (
@@ -1123,26 +1266,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {bottomTab === 'trend' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fade-in">
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-slate-400" />
-              <h3 className="font-black text-xs text-slate-600">مسار الجلسات (آخر 6 أشهر)</h3>
-            </div>
-            <TrendLine data={stats.last6Months} color="#f59e0b" />
-            <div className="flex justify-between px-1">
-              {stats.last6Months.map((m, i) => (
-                <div key={i} className="flex flex-col items-center">
-                  <span className="text-[9px] font-bold text-slate-400">{m.label}</span>
-                  <span className="text-[9px] font-black text-amber-600">{m.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <QuickScratchpad />
-        </div>
-      )}
+
 
       {bottomTab === 'details' && (
         <div className="animate-fade-in">
@@ -1233,17 +1357,20 @@ export default function Dashboard() {
                       const total = stats.topJudgments.reduce((s, c) => s + c[1], 0);
                       const pct = Math.round((count / total) * 100);
                       const color = getJColor(name);
+                      const isCritical = (name.includes('وقف') && stats.criticalSuspended.length > 0) || (name.includes('اعتبار') && stats.criticalConsidered.length > 0);
                       return (
-                        <div key={name} className="space-y-1">
+                        <div key={name} className="space-y-1 relative">
                           <div className="flex items-center justify-between text-[11px] font-bold">
                             <div className="flex items-center gap-1.5">
-                              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                              <span className="text-navy-900">{name}</span>
+                              <div className="w-2 h-2 rounded-full shrink-0 relative" style={{ backgroundColor: color }}>
+                                {isCritical && <span className="absolute inset-0 rounded-full bg-rose-500 animate-ping"></span>}
+                              </div>
+                              <span className={isCritical ? 'text-rose-600' : 'text-navy-900'}>{name}</span>
                             </div>
                             <span className="text-slate-500">{count} ({pct}%)</span>
                           </div>
                           <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                            <div className={`h-full rounded-full ${isCritical ? 'bg-rose-500' : ''}`} style={{ width: `${pct}%`, backgroundColor: isCritical ? undefined : color }} />
                           </div>
                         </div>
                       );
@@ -1345,6 +1472,35 @@ export default function Dashboard() {
           selectedMonth={viewMonth.month} selectedYear={viewMonth.year}
           onClose={() => setShowPrintModal(false)}
         />
+      )}
+      {/* Floating Action Button for Quick Scratchpad */}
+      <button 
+        onClick={() => setIsScratchpadOpen(!isScratchpadOpen)}
+        className="fixed bottom-6 left-6 bg-amber-500 hover:bg-amber-600 text-white rounded-full p-4 shadow-xl hover:shadow-2xl transition-all z-40 flex items-center justify-center group transform hover:scale-110"
+      >
+        <FileText className="w-6 h-6" />
+        <span className="absolute -top-10 bg-slate-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">المفكرة السريعة</span>
+      </button>
+
+      {/* Slide-over for Quick Scratchpad */}
+      {isScratchpadOpen && (
+        <div className="fixed inset-0 z-50 flex justify-start">
+          <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={() => setIsScratchpadOpen(false)}></div>
+          <div className="relative w-full max-w-sm h-full bg-slate-50 shadow-2xl animate-fade-in flex flex-col border-r border-slate-200">
+            <div className="p-4 bg-white border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-amber-500" />
+                <h3 className="font-black text-sm text-slate-700">مفكرة التنبيهات السريعة</h3>
+              </div>
+              <button onClick={() => setIsScratchpadOpen(false)} className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <QuickScratchpad />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

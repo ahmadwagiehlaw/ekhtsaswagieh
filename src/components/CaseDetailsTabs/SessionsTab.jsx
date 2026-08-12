@@ -420,13 +420,14 @@ export default function SessionsTab({
                           <div className="mb-2">
                             <label className="text-[9px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
                             <div>
-                              <input
-                                list={`jtype-${session.id}`}
+                              <select
                                 value={type}
                                 onChange={e => handleTypeChange(e.target.value)}
-                                placeholder="نوع الحكم..."
                                 className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400"
-                              />
+                              >
+                                <option value="">-- اختر نوع الحكم --</option>
+                                {(settings?.judgmentTypes || ['قبول', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'شطب', 'إلغاء', 'تأييد']).map(t => <option key={t} value={t}>{t}</option>)}
+                              </select>
 
                             </div>
                           </div>

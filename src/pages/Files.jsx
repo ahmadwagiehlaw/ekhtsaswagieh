@@ -46,6 +46,7 @@ export default function Files() {
   const [showRecentlyModifiedOnly, setShowRecentlyModifiedOnly] = useSessionState('files_showRecentlyModifiedOnly', false);
   const [showRecentlyViewedOnly, setShowRecentlyViewedOnly] = useSessionState('files_showRecentlyViewedOnly', false);
   const [showRecentlyAddedOnly, setShowRecentlyAddedOnly] = useSessionState('files_showRecentlyAddedOnly', false);
+  const [showMissingRoleOnly, setShowMissingRoleOnly] = useSessionState('files_showMissingRoleOnly', false);
   const [quickDateFilter, setQuickDateFilter] = useSessionState('files_quickDateFilter', '');
   const [isDateSearchOpen, setIsDateSearchOpen] = useSessionState('files_isDateSearchOpen', false);
   const [isSelectionReportModalOpen, setIsSelectionReportModalOpen] = useState(false);
@@ -73,6 +74,7 @@ export default function Files() {
         setShowRecentlyModifiedOnly(pinned.showRecentlyModifiedOnly ?? false);
         setShowRecentlyViewedOnly(pinned.showRecentlyViewedOnly ?? false);
         setShowRecentlyAddedOnly(pinned.showRecentlyAddedOnly ?? false);
+        setShowMissingRoleOnly(pinned.showMissingRoleOnly ?? false);
         setQuickDateFilter(pinned.quickDateFilter ?? '');
         setSortBy(pinned.sortBy ?? 'none');
       }
@@ -690,13 +692,14 @@ export default function Files() {
                       setShowRecentlyModifiedOnly(false);
                       setShowRecentlyViewedOnly(false);
                       setShowRecentlyAddedOnly(false);
+                      setShowMissingRoleOnly(false);
                       setQuickDateFilter('');
                       if (isPinned) {
                         // Update pin to reflect cleared state
                         const toSave = {
                           roleFilter: 'all', showOngoingOnly: false, showWithAttachmentsOnly: false,
                           showImportantOnly: false, showSessionlessOnly: false, showPastSessionsOnly: false,
-                          showRecentlyModifiedOnly: false, showRecentlyViewedOnly: false, showRecentlyAddedOnly: false,
+                          showRecentlyModifiedOnly: false, showRecentlyViewedOnly: false, showRecentlyAddedOnly: false, showMissingRoleOnly: false,
                           quickDateFilter: '', sortBy
                         };
                         localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
@@ -748,6 +751,15 @@ export default function Files() {
               >
                 <Sparkles className={`w-3.5 h-3.5 ${showImportantOnly ? 'fill-amber-700' : ''}`} />
                 <span>قضايا هامة</span>
+              </button>
+
+              <button
+                onClick={() => setShowMissingRoleOnly(!showMissingRoleOnly)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showMissingRoleOnly ? 'bg-rose-100 text-rose-700 border-rose-200 animate-pulse' : 'bg-slate-50 text-rose-600 border-rose-100 hover:bg-rose-50'}`}
+                title="الملفات التي لم يُسجل لها صفة وتؤثر على الإحصائيات"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>مجهولة الصفة ⚠️</span>
               </button>
 
               <button

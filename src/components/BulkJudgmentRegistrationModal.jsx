@@ -192,17 +192,14 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
 
           <div className="space-y-1.5">
             <label className="text-xs font-black text-slate-600 block">نوع الحكم</label>
-            <div>
-              <input
-                list="jtype-bulk"
-                type="text"
-                value={formData._type}
-                onChange={e => handleFieldChange('_type', e.target.value)}
-                placeholder="مثال: رفض الطعن، وقف تنفيذي، إلخ..."
-                className="w-full text-sm font-bold p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition outline-none"
-              />
-
-            </div>
+            <select
+              value={formData._type}
+              onChange={e => handleFieldChange('_type', e.target.value)}
+              className="w-full text-sm font-bold p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition outline-none"
+            >
+              <option value="">-- اختر نوع الحكم --</option>
+              {(settings?.judgmentTypes || ['قبول', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'شطب', 'إلغاء', 'تأييد']).map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

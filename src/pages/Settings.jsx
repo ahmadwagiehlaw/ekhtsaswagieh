@@ -92,7 +92,10 @@ export default function Settings() {
 
   const [localJudgmentDefaults, setLocalJudgmentDefaults] = useState((settings?.judgmentDefaults || []).map(migrateJudgmentRule));
   const [localJudgmentCategories, setLocalJudgmentCategories] = useState(settings?.judgmentCategories || ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي']);
-  const [localJudgmentClassifications, setLocalJudgmentClassifications] = useState(settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء']);
+  const [localJudgmentClassifications, setLocalJudgmentClassifications] = useState(settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'وقف جزائي', 'اعتبار', 'خبراء']);
+  const [localJudgmentTypes, setLocalJudgmentTypes] = useState(settings?.judgmentTypes || [
+    'قبول', 'إلغاء', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'شطب', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'إحالة', 'إحالة للخبراء'
+  ]);
   const [localDeadlineRules, setLocalDeadlineRules] = useState(settings?.deadlineRules || [
     { name: 'الطعن العادي', days: 60, targetRole: 'طاعنين', description: 'ميعاد الطعن العادي 60 يوماً' },
     { name: 'تعجيل من الوقف الجزائي', days: 15, triggerAfterDays: 30, targetRole: 'طاعنين', description: 'يجب التعجيل خلال 15 يوماً بعد مرور شهر من الوقف' }
@@ -223,6 +226,7 @@ export default function Settings() {
     setLocalCaseClassifications(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
     setLocalJudgmentCategories(settings?.judgmentCategories || ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي']);
     setLocalJudgmentClassifications(settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء']);
+    setLocalJudgmentTypes(settings?.judgmentTypes || ['قبول', 'إلغاء', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'شطب', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'إحالة', 'إحالة للخبراء']);
     setLocalCourtDegree(settings?.courtDegree || 'أول درجة');
     setLocalCourtSpecialization(settings?.courtSpecialization || 'قضاء إداري');
 
@@ -325,6 +329,7 @@ export default function Settings() {
       caseClassifications: localCaseClassifications,
       judgmentCategories: localJudgmentCategories,
       judgmentClassifications: localJudgmentClassifications,
+      judgmentTypes: localJudgmentTypes,
       courtDegree: localCourtDegree,
       courtSpecialization: localCourtSpecialization,
 
@@ -1648,6 +1653,32 @@ export default function Settings() {
             </div>
           </div>
 
+          {/* Judgment Types Management */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <ClipboardList className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-black text-sm text-navy-900">إدارة أنواع الأحكام</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {localJudgmentTypes.map((type, i) => (
+                <div key={i} className="flex items-center gap-1 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+                  <span>{type}</span>
+                  <button onClick={() => setLocalJudgmentTypes(localJudgmentTypes.filter((_, idx) => idx !== i))} className="text-indigo-400 hover:text-rose-500 mr-2">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={async () => {
+                  const newType = await showPrompt('إضافة نوع', 'أدخل نوع الحكم الجديد (مثال: قبول، رفض، إلغاء):');
+                  if (newType?.trim()) setLocalJudgmentTypes([...localJudgmentTypes, newType.trim()]);
+                }}
+                className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
+              >
+                <Plus className="w-3 h-3" /> إضافة نوع
+              </button>
+            </div>
+          </div>
 
           {/* Default Judgment Settings Management */}
           <details className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-0">
@@ -1656,12 +1687,47 @@ export default function Settings() {
                 <SettingsIcon className="w-5 h-5 text-indigo-600" />
                 <h3 className="font-black text-sm text-navy-900"><span className="text-[12px] opacity-70 group-open:hidden ml-1">▼</span><span className="text-[12px] opacity-70 hidden group-open:inline ml-1">▲</span> قواعد التعبئة التلقائية للأحكام</h3>
               </div>
-              <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}><button
-                onClick={() => setLocalJudgmentDefaults([...localJudgmentDefaults, { name: '', conditions: { role: '', category: '', classification: '', type: '', sessionType: '', decision: '' }, actions: { category: '', classification: '', type: '', text: '' } }])}
-                className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-indigo-100"
-              >
-                <Plus className="w-4 h-4" /> إضافة قاعدة
-              </button></div></summary>
+              <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }} className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const confirmLoad = window.confirm('هل أنت متأكد من تحميل القواعد الافتراضية الذكية (للطاعن والمطعون ضده)؟ سيتم إضافتها للقواعد الحالية.');
+                    if (confirmLoad) {
+                      const defaults = [
+                        { name: 'استنتاج ذكي: قبول/إلغاء للطاعن', conditions: { role: 'طاعن', type: 'قبول' }, actions: { classification: 'صالح' } },
+                        { name: 'استنتاج ذكي: قبول/إلغاء للطاعن', conditions: { role: 'طاعن', type: 'إلغاء' }, actions: { classification: 'صالح' } },
+                        { name: 'استنتاج ذكي: قبول/إلغاء للمطعون ضده', conditions: { role: 'مطعون ضده', type: 'قبول' }, actions: { classification: 'ضد' } },
+                        { name: 'استنتاج ذكي: قبول/إلغاء للمطعون ضده', conditions: { role: 'مطعون ضده', type: 'إلغاء' }, actions: { classification: 'ضد' } },
+                        
+                        { name: 'استنتاج ذكي: رفض/عدم قبول للطاعن', conditions: { role: 'طاعن', type: 'رفض' }, actions: { classification: 'ضد' } },
+                        { name: 'استنتاج ذكي: رفض/عدم قبول للطاعن', conditions: { role: 'طاعن', type: 'عدم قبول' }, actions: { classification: 'ضد' } },
+                        { name: 'استنتاج ذكي: رفض/عدم قبول للمطعون ضده', conditions: { role: 'مطعون ضده', type: 'رفض' }, actions: { classification: 'صالح' } },
+                        { name: 'استنتاج ذكي: رفض/عدم قبول للمطعون ضده', conditions: { role: 'مطعون ضده', type: 'عدم قبول' }, actions: { classification: 'صالح' } },
+                        
+                        { name: 'استنتاج ذكي: سقوط/شطب للطاعن', conditions: { role: 'طاعن', type: 'سقوط الخصومة' }, actions: { classification: 'ضد' } },
+                        { name: 'استنتاج ذكي: سقوط/شطب للطاعن', conditions: { role: 'طاعن', type: 'شطب' }, actions: { classification: 'ضد' } },
+                        { name: 'استنتاج ذكي: سقوط/شطب للمطعون ضده', conditions: { role: 'مطعون ضده', type: 'سقوط الخصومة' }, actions: { classification: 'صالح' } },
+                        { name: 'استنتاج ذكي: سقوط/شطب للمطعون ضده', conditions: { role: 'مطعون ضده', type: 'شطب' }, actions: { classification: 'صالح' } },
+                        
+                        { name: 'استنتاج ذكي: اعتبار للطاعن (خطر)', conditions: { role: 'طاعن', type: 'اعتبار الدعوى كأن لم تكن' }, actions: { classification: 'ضد' } },
+                        { name: 'استنتاج ذكي: اعتبار للمطعون ضده', conditions: { role: 'مطعون ضده', type: 'اعتبار الدعوى كأن لم تكن' }, actions: { classification: 'صالح' } },
+                        
+                        { name: 'استنتاج ذكي: وقف جزائي للطاعن (خطر)', conditions: { role: 'طاعن', type: 'وقف جزائي' }, actions: { classification: 'إجرائي' } },
+                        { name: 'استنتاج ذكي: وقف جزائي للمطعون ضده', conditions: { role: 'مطعون ضده', type: 'وقف جزائي' }, actions: { classification: 'إجرائي' } },
+                      ];
+                      setLocalJudgmentDefaults([...localJudgmentDefaults, ...defaults]);
+                    }
+                  }}
+                  className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-emerald-100"
+                >
+                  <Plus className="w-4 h-4" /> توليد القواعد الافتراضية
+                </button>
+                <button
+                  onClick={() => setLocalJudgmentDefaults([...localJudgmentDefaults, { name: '', conditions: { role: '', category: '', classification: '', type: '', sessionType: '', decision: '' }, actions: { category: '', classification: '', type: '', text: '' } }])}
+                  className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-indigo-100"
+                >
+                  <Plus className="w-4 h-4" /> إضافة قاعدة
+                </button>
+              </div></summary>
             <div className="pt-2 space-y-4">
 
               <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
@@ -1846,17 +1912,18 @@ export default function Settings() {
                                           </div>
                                           <div>
                                             <label className="text-[8px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
-                                            <input
-                                              type="text"
+                                            <select
                                               value={rule.conditions.type}
                                               onChange={(e) => {
                                                 const newRules = [...localJudgmentDefaults];
                                                 newRules[idx].conditions.type = e.target.value;
                                                 setLocalJudgmentDefaults(newRules);
                                               }}
-                                              placeholder="- أي نوع -"
                                               className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                                            />
+                                            >
+                                              <option value="">- أي نوع -</option>
+                                              {localJudgmentTypes.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
                                           </div>
                                           <div>
                                             <label className="text-[8px] font-bold text-slate-500 block mb-0.5">نوع الجلسة</label>
@@ -1929,17 +1996,18 @@ export default function Settings() {
                                         </div>
                                         <div>
                                           <label className="text-[8px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
-                                          <input
-                                            type="text"
-                                            placeholder="النوع (اختياري)"
-                                            value={rule.actions.type}
-                                            onChange={(e) => {
-                                              const newRules = [...localJudgmentDefaults];
-                                              newRules[idx].actions.type = e.target.value;
-                                              setLocalJudgmentDefaults(newRules);
-                                            }}
-                                            className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
-                                          />
+                                          <select
+                                              value={rule.actions.type}
+                                              onChange={(e) => {
+                                                const newRules = [...localJudgmentDefaults];
+                                                newRules[idx].actions.type = e.target.value;
+                                                setLocalJudgmentDefaults(newRules);
+                                              }}
+                                              className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
+                                            >
+                                              <option value="">-- بدون تغيير --</option>
+                                              {localJudgmentTypes.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
                                         </div>
                                         <div>
                                           <label className="text-[8px] font-bold text-slate-500 block mb-0.5">منطوق الحكم</label>
