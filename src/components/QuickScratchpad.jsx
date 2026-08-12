@@ -1,28 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, X } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../lib/firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 export default function QuickScratchpad() {
   const [isOpen, setIsOpen] = useState(false);
-  const [notes, setNotes] = useState(() => { 
-    try { 
-      return JSON.parse(localStorage.getItem('dash-scratchpad-notes') || '[]'); 
-    } catch { 
-      return []; 
-    } 
-  });
+  const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
 
   const { settings } = useAppContext();
+  const { currentUser, userData } = useAuth();
+  
+  const tenantId = userData?.tenantId;
+  const uid = currentUser?.uid;
   const isLeft = settings?.scratchpadPosition === 'left';
 
-  useEffect(() => { 
-    localStorage.setItem('dash-scratchpad-notes', JSON.stringify(notes)); 
-  }, [notes]);
+  // Load from Firebase
+  useEffect(() => {
+    if (!tenantId || !uid) return;
+    const scratchpadRef = doc(db, 'tenants', tenantId, 'scratchpads', uid);
+    const unsub = onSnapshot(scratchpadRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setNotes(docSnap.data().notes || []);
+      }
+    });
+    return () => unsub();
+  }, [tenantId, uid]);
+
+  const saveNotes = async (updatedNotes) => {
+    setNotes(updatedNotes);
+    if (!tenantId || !uid) return;
+    const scratchpadRef = doc(db, 'tenants', tenantId, 'scratchpads', uid);
+    try {
+      await setDoc(scratchpadRef, { notes: updatedNotes }, { merge: true });
+    } catch (err) {
+      console.error('Error saving notes:', err);
+    }
+  };
 
   const addNote = () => {
     if (!newNote.trim()) return;
-    setNotes([{ id: Date.now().toString(), text: newNote.trim(), reminderDate: '', createdAt: new Date().toISOString() }, ...notes]);
+    const updatedNotes = [{ id: Date.now().toString(), text: newNote.trim(), reminderDate: '', createdAt: new Date().toISOString() }, ...notes];
+    saveNotes(updatedNotes);
     setNewNote('');
   };
 
@@ -38,12 +59,12 @@ export default function QuickScratchpad() {
           border-y border-amber-600/50 hover:border-amber-400
           ${isLeft ? 'border-r' : 'border-l'}
           ${isOpen 
-            ? (isLeft ? 'left-[320px] rounded-r-none rounded-l-xl w-10 h-16' : 'right-[320px] rounded-l-none rounded-r-xl w-10 h-16')
-            : (isLeft ? 'left-0 rounded-r-xl rounded-l-none w-10 h-20 opacity-90 hover:opacity-100 hover:w-12' : 'right-0 rounded-l-xl rounded-r-none w-10 h-20 opacity-90 hover:opacity-100 hover:w-12')}
+            ? (isLeft ? 'left-[320px] rounded-l-none rounded-r-lg w-8 h-12' : 'right-[320px] rounded-r-none rounded-l-lg w-8 h-12')
+            : (isLeft ? 'left-0 rounded-r-lg rounded-l-none w-8 h-16 opacity-80 hover:opacity-100 hover:w-10' : 'right-0 rounded-l-lg rounded-r-none w-8 h-16 opacity-80 hover:opacity-100 hover:w-10')}
         `}
         title="مفكرة التنبيهات السريعة"
       >
-        <FileText className={`w-5 h-5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+        <FileText className={`w-4 h-4 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {/* ── Slide-over Panel ── */}
@@ -64,7 +85,7 @@ export default function QuickScratchpad() {
 
         <div className="p-4 flex flex-col h-full flex-1 overflow-hidden">
           <div className="flex items-center justify-between pb-3 mb-3">
-            <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">حفظ محلي</span>
+            <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">مزامنة سحابية ☁️</span>
           </div>
           
           <div className="flex gap-2 mb-4">
@@ -93,14 +114,14 @@ export default function QuickScratchpad() {
                     <p className={`text-xs font-bold flex-1 leading-relaxed ${isAlert ? 'text-rose-900' : 'text-slate-700'}`}>
                       {isAlert && '⏰ '}{note.text}
                     </p>
-                    <button onClick={() => setNotes(notes.filter(n => n.id !== note.id))} className="text-slate-300 hover:text-rose-500 hover:bg-rose-100 w-6 h-6 rounded-md flex items-center justify-center transition font-black text-sm shrink-0">×</button>
+                    <button onClick={() => saveNotes(notes.filter(n => n.id !== note.id))} className="text-slate-300 hover:text-rose-500 hover:bg-rose-100 w-6 h-6 rounded-md flex items-center justify-center transition font-black text-sm shrink-0">×</button>
                   </div>
                   <div className="flex items-center justify-between border-t border-slate-100 pt-2 mt-1">
                     <span className="text-[9px] font-bold text-slate-400">{new Date(note.createdAt).toLocaleDateString('ar-EG')}</span>
                     <input 
                       type="date" 
                       value={note.reminderDate || ''} 
-                      onChange={e => setNotes(notes.map(n => n.id === note.id ? {...n, reminderDate: e.target.value} : n))}
+                      onChange={e => saveNotes(notes.map(n => n.id === note.id ? {...n, reminderDate: e.target.value} : n))}
                       className={`border rounded-lg px-2 py-1 text-[10px] font-bold outline-none transition ${isAlert ? 'border-rose-300 bg-rose-50 text-rose-700 focus:border-rose-500' : 'border-slate-200 text-slate-600 bg-slate-50 focus:border-amber-400'}`} 
                     />
                   </div>

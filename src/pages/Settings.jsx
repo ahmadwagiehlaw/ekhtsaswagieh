@@ -1146,6 +1146,20 @@ export default function Settings() {
                 </div>
               </div>
 
+              <div className="flex flex-col gap-4 border-b border-slate-100 pb-4">
+                <div className="flex flex-col gap-2 flex-1">
+                  <label className="text-xs font-bold text-slate-700">موقع المفكرة العائمة:</label>
+                  <select
+                    value={localScratchpadPosition}
+                    onChange={e => setLocalScratchpadPosition(e.target.value)}
+                    className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
+                  >
+                    <option value="right">يمين الشاشة</option>
+                    <option value="left">يسار الشاشة</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3">
                 <div>
                   <h4 className="text-xs font-black text-navy-900">الرسائل التأكيدية</h4>
