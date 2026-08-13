@@ -10,14 +10,14 @@ function addToJudgments(target, computeAs, c = null) {
     target.stop++; if(c) target.lists.stop.push(c);
     target.penaltyStop = (target.penaltyStop || 0) + 1;
   }
-  else if (computeAs === 'خبراء' || computeAs === 'خبير')    { target.expert++; if(c) target.lists.expert.push(c); }
+  
   else if (computeAs === 'اعتبار' || computeAs === 'اعتبار كأن لم تكن') { target.consideration++; if(c) target.lists.consideration.push(c); }
   else if (computeAs === 'مختلط')                            { target.mixed = (target.mixed || 0) + 1; if(c) target.lists.mixed.push(c); }
   else                                                        target.other++;
 }
 
 const emptyJudgments = () =>
-  ({ total: 0, good: 0, bad: 0, stop: 0, penaltyStop: 0, expert: 0, consideration: 0, other: 0, mixed: 0, lists: { good: [], bad: [], stop: [], consideration: [], expert: [], mixed: [] } });
+  ({ total: 0, good: 0, bad: 0, stop: 0, penaltyStop: 0, consideration: 0, other: 0, mixed: 0, lists: { good: [], bad: [], stop: [], consideration: [], mixed: [] } });
 
 // ─────────────────────────────────────────────────────────────
 // computeMonthStats: returns per-month stats for any month/year

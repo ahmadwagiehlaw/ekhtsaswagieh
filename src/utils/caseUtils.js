@@ -39,10 +39,7 @@ export const calculateLitigationStage = (caseData) => {
   const judgmentType = stampData ? stampData.type : '';
   const hasFinalJudgment = stampData ? stampData.isFinal : false;
 
-  // Rule 1: Archive / Location
-  if (fileLocation === 'شعبة الشغل' || fileLocation === 'شعبة القسم') {
-    return 'الشعبة';
-  }
+
 
   // Rule 2: Referral
   if (judgmentType === 'عدم اختصاص وإحالة' || judgmentType === 'إحالة للنيابة' || judgmentType === 'إعادة للمحكمة المختصة' || judgmentType === 'عدم اختصاص واحالة') {

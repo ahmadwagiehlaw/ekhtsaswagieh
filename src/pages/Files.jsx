@@ -141,7 +141,7 @@ export default function Files() {
     const isSpecialLocation = (loc) => {
       if (!loc) return false;
       if (archiveLocations.includes(loc)) return false;
-      return loc.includes('شعبة') || loc.includes('تحت التحديد') || loc.includes('القسم');
+      return loc === 'شعبة تحت التحديد' || loc === 'تحت التحديد';
     };
 
     if (activeShoba === 'متداول') {

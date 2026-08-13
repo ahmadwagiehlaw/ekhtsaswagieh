@@ -931,7 +931,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
             </div>
             <div className="p-5 space-y-3">
               <div className="flex flex-wrap gap-2">
-                {['غير موجود', 'أصلي', 'مؤقت', 'شعبة الحفظ', 'شعبة الشغل', 'الأحكام', 'في البيت'].map(loc => (
+                {['في المكتب', 'أصلي', 'مؤقت', 'شعبة الشغل', 'شعبة تحت التحديد', 'شعبة الحفظ', 'الأحكام', 'غير موجود'].map(loc => (
                   <button
                     key={loc}
                     onClick={() => setNewLocation(loc)}
@@ -943,7 +943,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
               </div>
               <input
                 type="text"
-                value={!['غير موجود', 'أصلي', 'مؤقت', 'شعبة الحفظ', 'شعبة الشغل', 'الأحكام', 'في البيت'].includes(newLocation) ? newLocation : ''}
+                value={!['في المكتب', 'أصلي', 'مؤقت', 'شعبة الشغل', 'شعبة تحت التحديد', 'شعبة الحفظ', 'الأحكام', 'غير موجود'].includes(newLocation) ? newLocation : ''}
                 onChange={(e) => setNewLocation(e.target.value)}
                 placeholder="أو اكتب مكان آخر..."
                 className="w-full mt-2 bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"

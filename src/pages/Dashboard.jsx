@@ -211,7 +211,7 @@ const PrintReportModal = ({ stats, settings, selectedMonthStats, selectedMonth, 
                   { l: 'مختلط', v: selectedMonthStats.judgments.mixed, c: '#6366f1', bg: '#e0e7ff' },
                   { l: 'وقف', v: selectedMonthStats.judgments.stop, c: '#f97316', bg: '#ffedd5' },
                   { l: 'اعتبار', v: selectedMonthStats.judgments.consideration, c: '#eab308', bg: '#fef9c3' },
-                  { l: 'خبراء', v: selectedMonthStats.judgments.expert, c: '#8b5cf6', bg: '#ede9fe' },
+                  
                 ].map((j, i) => (
                   <div key={i} className="rounded-xl p-3 text-center" style={{ backgroundColor: j.bg }}>
                     <p className="text-xl font-black" style={{ color: j.c }}>{j.v}</p>
@@ -961,7 +961,7 @@ export default function Dashboard() {
               { l: 'مختلط', v: selectedMonthStats.judgments.mixed, cases: selectedMonthStats.judgments.lists.mixed, color: 'text-indigo-400' },
               { l: 'وقف', v: selectedMonthStats.judgments.stop, cases: selectedMonthStats.judgments.lists.stop, color: 'text-orange-400' },
               { l: 'اعتبار', v: selectedMonthStats.judgments.consideration, cases: selectedMonthStats.judgments.lists.consideration, color: 'text-yellow-400' },
-              { l: 'خبراء', v: selectedMonthStats.judgments.expert, cases: selectedMonthStats.judgments.lists.expert, color: 'text-purple-400' },
+              
             ].map(item => {
               const isCritical = (item.l === 'وقف' && stats.criticalSuspended.length > 0) || (item.l === 'اعتبار' && stats.criticalConsidered.length > 0);
               return (
