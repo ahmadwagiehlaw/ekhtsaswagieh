@@ -15,7 +15,7 @@ import { printViewingTasksList } from '../utils/printViewingTasks';
 import useSessionState from '../hooks/useSessionState';
 
 export default function Files() {
-  const { cases, schema, settings, deleteCaseFromFirebase, saveCaseToFirebase, globalHideNoInterest, setGlobalHideNoInterest, globalTasks } = useAppContext();
+  const { cases, schema, settings, deleteCaseFromFirebase, saveCaseToFirebase, globalHideNoInterest, setGlobalHideNoInterest, globalTasks, viewingTasks } = useAppContext();
   const { toast, showConfirm } = useUI();
   const navigate = useNavigate();
   const location = useLocation();
@@ -575,7 +575,7 @@ export default function Files() {
             <button
               onClick={() => {
                 const casesToPrint = selectedCaseIds.length > 0 ? cases.filter(c => selectedCaseIds.includes(c.id)) : filteredCases;
-                const vTasks = globalTasks?.filter(t => t.type === 'viewing' && t.status !== 'completed' && t.linkedCases?.some(id => casesToPrint.find(c => c.id === id)));
+                const vTasks = viewingTasks?.filter(t => t.status !== 'completed' && t.linkedCases?.some(id => casesToPrint.find(c => c.id === id)));
                 if(!vTasks || vTasks.length === 0) { toast('لا توجد مهام إطلاع معلقة للملفات المحددة', 'error'); return; }
                 printViewingTasksList(vTasks, cases, settings);
               }}
@@ -958,7 +958,7 @@ export default function Files() {
             }
           }
 
-          const hasViewingTask = globalTasks?.some(t => t.type === 'viewing' && t.status !== 'completed' && t.linkedCases?.includes(c.id));
+          const hasViewingTask = viewingTasks?.some(t => t.status !== 'completed' && t.linkedCases?.includes(c.id));
 
           return (
             <div

@@ -6,7 +6,7 @@ import { uploadToR2 } from '../lib/r2';
 import imageCompression from 'browser-image-compression';
 
 export default function AddSessionModal({ isOpen, onClose, caseData }) {
-  const { saveCaseToFirebase, saveGlobalTask, settings, isAdmin, currentUserPermissions, currentUser } = useAppContext();
+  const { saveCaseToFirebase, saveViewingTask, settings, isAdmin, currentUserPermissions, currentUser } = useAppContext();
   const canEditData = isAdmin || currentUserPermissions?.canEditData;
   const { toast, showPrompt } = useUI();
   const [sessionDate, setSessionDate] = useState('');
@@ -101,7 +101,7 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
       updateData[typeKey] = latestSession.type || '';
     }
 
-    if (createViewingTask && saveGlobalTask) {
+    if (createViewingTask && saveViewingTask) {
       const caseNumber = caseData['رقم الدعوى'] || caseData['رقم القضية'] || '';
       const caseYear = caseData['السنة'] || caseData['سنة'] || '';
       const taskObj = {
@@ -122,7 +122,7 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
           decision: decision
         }
       };
-      await saveGlobalTask(taskObj);
+      await saveViewingTask(taskObj);
     }
 
     const success = await saveCaseToFirebase(caseData.id, updateData);

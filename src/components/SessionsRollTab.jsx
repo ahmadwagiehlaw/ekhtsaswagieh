@@ -64,7 +64,7 @@ const getRowBg = (fileLocation, isSelected) => {
 };
 
 export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
-  const { cases, saveCaseToFirebase, settings, deleteCaseFromFirebase, globalTasks } = useAppContext();
+  const { cases, saveCaseToFirebase, settings, deleteCaseFromFirebase, globalTasks, viewingTasks } = useAppContext();
   const { showPrompt, toast } = useUI();
   const navigate = useNavigate();
 
@@ -482,7 +482,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
             <Printer className="w-3.5 h-3.5" /> طباعة
           </button>
           <button onClick={() => {
-            const vTasks = globalTasks?.filter(t => t.type === 'viewing' && t.status !== 'completed' && t.linkedCases?.some(id => filteredCases.find(c => c.id === id)));
+            const vTasks = viewingTasks?.filter(t => t.status !== 'completed' && t.linkedCases?.some(id => filteredCases.find(c => c.id === id)));
             if(!vTasks || vTasks.length === 0) { toast('لا توجد مهام إطلاع معلقة للرول الحالي', 'error'); return; }
             printViewingTasksList(vTasks, cases, settings);
           }} className="flex items-center gap-1 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition">

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { onSnapshot, setDoc, doc, writeBatch, getDocs, deleteDoc, addDoc } from 'firebase/firestore';
-import { db, getSettingsRef, getSchemaRef, getCasesRef, getRollsRef, getTasksRef, getActivityLogsRef } from '../lib/firebase';
+import { db, getSettingsRef, getSchemaRef, getCasesRef, getRollsRef, getTasksRef, getViewingTasksRef, getActivityLogsRef } from '../lib/firebase';
 import { useAuth } from './AuthContext';
 import { getSafeDateObj } from '../utils/dateUtils';
 
@@ -13,6 +13,7 @@ export const AppProvider = ({ children }) => {
   const [deletedCases, setDeletedCases] = useState([]);
   const [rolls, setRolls] = useState([]);
   const [globalTasks, setGlobalTasks] = useState([]);
+  const [viewingTasks, setViewingTasks] = useState([]);
   const [schema, setSchema] = useState([]);
   
   const defaultSettings = { 
@@ -99,6 +100,7 @@ export const AppProvider = ({ children }) => {
       setDeletedCases([]);
       setRolls([]);
       setGlobalTasks([]);
+      setViewingTasks([]);
       setSchema([]);
       setLoading(false);
       return;
@@ -219,12 +221,22 @@ export const AppProvider = ({ children }) => {
       setGlobalTasks(tasksData);
     });
 
+    const unsubViewingTasks = onSnapshot(getViewingTasksRef(tenantId), (snapshot) => {
+      const data = [];
+      snapshot.forEach(doc => {
+        data.push({ id: doc.id, ...doc.data() });
+      });
+      data.sort((a, b) => getSafeDateObj(b.createdAt) - getSafeDateObj(a.createdAt));
+      setViewingTasks(data);
+    });
+
     return () => {
       unsubCases();
       unsubSchema();
       unsubSettings();
       unsubRolls();
       unsubTasks();
+      unsubViewingTasks();
     };
   }, [tenantId]);
 
@@ -627,6 +639,66 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // ─── Viewing Tasks (مهام الإطلاع) — منفصلة تماماً ───────────────
+
+  const saveViewingTask = async (idOrData, dataObj) => {
+    if (!tenantId) return false;
+    let id, data;
+    if (typeof idOrData === 'object' && idOrData !== null) {
+      data = idOrData;
+      id = data.id || crypto.randomUUID();
+    } else {
+      id = idOrData || crypto.randomUUID();
+      data = dataObj || {};
+    }
+    data.id = id;
+    const isNew = !viewingTasks.some(t => t.id === id);
+    try {
+      await setDoc(doc(getViewingTasksRef(tenantId), id), data, { merge: true });
+      if (data.status !== 'completed' || isNew) {
+        await logActivity(
+          isNew ? 'إضافة' : 'تعديل',
+          'مهمة إطلاع',
+          id,
+          isNew ? `تمت إضافة مهمة إطلاع: ${data.title || data.notes || ''}` : `تم تعديل مهمة إطلاع: ${data.title || data.notes || ''}`
+        );
+      }
+      return true;
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  };
+
+  const deleteViewingTask = async (id) => {
+    if (!tenantId) return false;
+    try {
+      const t = viewingTasks.find(x => x.id === id);
+      await deleteDoc(doc(getViewingTasksRef(tenantId), id));
+      await logActivity('حذف', 'مهمة إطلاع', id, `تم حذف مهمة إطلاع: ${t?.title || t?.notes || ''}`);
+      return true;
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  };
+
+  const completeViewingTask = async (taskId, isCompleted = true) => {
+    const t = viewingTasks.find(task => task.id === taskId);
+    if (!t) return false;
+    const now = new Date().toISOString();
+    const updatedTask = {
+      ...t,
+      status: isCompleted ? 'completed' : 'pending',
+      completedAt: isCompleted ? now : null
+    };
+    await saveViewingTask(updatedTask);
+    if (isCompleted) {
+      await logActivity('إنجاز', 'مهمة إطلاع', taskId, `تم إنجاز مهمة الإطلاع`);
+    }
+    return true;
+  };
+
   const userEmail = currentUser?.email || '';
   const username = userEmail.split('@')[0];
     
@@ -669,14 +741,21 @@ export const AppProvider = ({ children }) => {
       restoreCaseFromFirebase,
       saveRollToFirebase,
       deleteRollFromFirebase,
+      // ─── المهام العادية ───
       globalTasks,
       saveGlobalTask,
       deleteGlobalTask,
       PREDEFINED_TASKS,
-      completeGlobalTask
+      completeGlobalTask,
+      // ─── مهام الإطلاع (منفصلة تماماً) ───
+      viewingTasks,
+      saveViewingTask,
+      deleteViewingTask,
+      completeViewingTask,
   }), [
     cases, rawCases, deletedCases, plaintiffsList, defendantsList, rolls, schema, settings, isAdmin, isEmployee, 
-    currentUser, currentUserName, currentUserPermissions, loading, globalHideNoInterest
+    currentUser, currentUserName, currentUserPermissions, loading, globalHideNoInterest,
+    globalTasks, viewingTasks
   ]);
 
   return (

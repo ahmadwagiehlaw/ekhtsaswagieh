@@ -28,7 +28,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
   const { id: paramId } = useParams();
   const id = isModal ? modalCaseId : paramId;
   const navigate = useNavigate();
-  const { cases, schema, isAdmin, saveCaseToFirebase, settings, rolls, checkDuplicateCase, deleteCaseFromFirebase, restoreCaseFromFirebase, saveSettingsToFirebase, saveGlobalTask, globalTasks, currentUser, currentUserPermissions } = useAppContext();
+  const { cases, schema, isAdmin, saveCaseToFirebase, settings, rolls, checkDuplicateCase, deleteCaseFromFirebase, restoreCaseFromFirebase, saveSettingsToFirebase, saveGlobalTask, globalTasks, viewingTasks, currentUser, currentUserPermissions } = useAppContext();
 
   const roleOptions = settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل'];
   const currentCourtDegree = settings?.courtDegree || 'أول درجة';
@@ -646,7 +646,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
             {/* Viewing Task Button */}
             <button
               onClick={() => {
-                const hasViewingTask = globalTasks?.some(t => t.type === 'viewing' && t.status !== 'completed' && t.linkedCases?.includes(caseData.id));
+                const hasViewingTask = viewingTasks?.some(t => t.status !== 'completed' && t.linkedCases?.includes(caseData.id));
                 if (hasViewingTask) {
                   toast('تم العثور على مهمة إطلاع حالية، جاري فتح سجل المهام...', 'success');
                   setIsCaseTasksModalOpen(true);

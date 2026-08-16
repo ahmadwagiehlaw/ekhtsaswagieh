@@ -41,7 +41,7 @@ const getResultStyle = (result) => {
 const PREDEFINED_DECISIONS = ['للحكم', 'تصريح', 'للإعلان', 'للاطلاع', 'للإخطار', 'لورود التقرير', 'لتنفيذ قرار الإعادة', 'للاستعلام', 'استبعاد', 'إحالة للموضوع', 'رفض'];
 
 export default function SessionTable({ dayCases, date, onDateClick, onFilteredCasesChange }) {
-  const { saveCaseToFirebase, settings, currentUser, cases, globalTasks } = useAppContext();
+  const { saveCaseToFirebase, settings, currentUser, cases, globalTasks, viewingTasks } = useAppContext();
   const { showPrompt, toast } = useUI();
   const navigate = useNavigate();
   
@@ -622,7 +622,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
               else if (fileLocation === 'مؤقت') rowBgColor = 'bg-amber-50/80 hover:bg-amber-100/80';
               else if (fileLocation === 'خارج الاختصاص') rowBgColor = 'bg-indigo-50/80 hover:bg-indigo-100/80';
               
-              const hasViewingTask = globalTasks?.some(t => t.type === 'viewing' && t.status !== 'completed' && t.linkedCases?.includes(cObj.id));
+              const hasViewingTask = viewingTasks?.some(t => t.status !== 'completed' && t.linkedCases?.includes(cObj.id));
 
               return (
                 <tr 

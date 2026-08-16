@@ -5,7 +5,7 @@ import { formatDateString } from '../utils/dateUtils';
 import SmartDocumentsTab from '../components/SmartDocumentsTab';
 
 export default function Reports() {
-  const { cases, settings, globalTasks, PREDEFINED_TASKS } = useAppContext();
+  const { cases, settings, globalTasks, viewingTasks, PREDEFINED_TASKS } = useAppContext();
   
   const [activeTab, setActiveTab] = useState('documents');
   const [reportType, setReportType] = useState('memos'); // 'memos', 'judgments', 'prep'
@@ -156,7 +156,7 @@ export default function Reports() {
       setGeneratedData(results);
     // Viewing Tasks report
     } else if (reportType === 'viewing_tasks') {
-      const vTasks = globalTasks?.filter(t => t.type === 'viewing' && t.status !== 'completed') || [];
+      const vTasks = viewingTasks?.filter(t => t.status !== 'completed') || [];
       vTasks.forEach(t => {
         const linkedCase = cases.find(c => c.id === t.linkedCases?.[0]) || {};
         const sessionDate = t.caseContext?.date || linkedCase['تاريخ الجلسة'] || linkedCase['أخر جلسة'] || linkedCase['آخر جلسة'] || '';
@@ -190,7 +190,7 @@ export default function Reports() {
 
   useEffect(() => {
     generateReport();
-  }, [reportType, targetMonth, targetYear, targetDate, cases, judgmentResultFilter, taskTypeFilter, globalTasks]);
+  }, [reportType, targetMonth, targetYear, targetDate, cases, judgmentResultFilter, taskTypeFilter, globalTasks, viewingTasks]);
 
   const handlePrint = () => {
     window.print();

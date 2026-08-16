@@ -61,7 +61,8 @@ const EgyptianDateInput = ({ value, onChange, className }) => {
 };
 
 export default function TasksManagerModal({ isOpen, onClose }) {
-  const { globalTasks, saveGlobalTask, completeGlobalTask, PREDEFINED_TASKS, deleteGlobalTask, settings, isAdmin, currentUser, currentUserName, cases, currentUserPermissions } = useAppContext();
+  const { globalTasks, saveGlobalTask, completeGlobalTask, PREDEFINED_TASKS, deleteGlobalTask, settings, isAdmin, currentUser, currentUserName, cases, currentUserPermissions,
+    viewingTasks, saveViewingTask, deleteViewingTask, completeViewingTask } = useAppContext();
 
   const canManageTasks = isAdmin || currentUserPermissions?.canManageTasks;
   const { toast, showConfirm } = useUI();
@@ -133,8 +134,8 @@ export default function TasksManagerModal({ isOpen, onClose }) {
       description: task.description || ''
     });
     setIsAdding(true);
-    const isViewing = task.type === 'viewing' || task.title?.includes('إطلاع') || task.title?.includes('تصوير');
-    setActiveMainTab(isViewing ? 'viewing' : 'general');
+    // If editing from viewing tab stay in viewing tab
+    setActiveMainTab(activeMainTab);
   };
 
   const handleSaveTask = async () => {
@@ -148,26 +149,29 @@ export default function TasksManagerModal({ isOpen, onClose }) {
     }
 
     try {
-      const taskToSave = {
-        ...newTask,
-        type: activeMainTab === 'viewing' ? 'viewing' : 'general',
-        title: activeMainTab === 'viewing' ? 'إطلاع وتصوير مستندات' : newTask.title,
-      };
-
-      if (editingTaskId) {
-        const existingTask = globalTasks.find(t => t.id === editingTaskId);
-        await saveGlobalTask({ ...existingTask, ...taskToSave, updatedAt: new Date().toISOString() }, editingTaskId);
-        toast('تم تعديل المهمة بنجاح', 'success');
+      if (activeMainTab === 'viewing') {
+        // ─── مهمة إطلاع — نظام مستقل ───
+        const taskToSave = { ...newTask, type: 'viewing', title: 'إطلاع وتصوير مستندات' };
+        if (editingTaskId) {
+          const existingTask = viewingTasks.find(t => t.id === editingTaskId);
+          await saveViewingTask({ ...existingTask, ...taskToSave, updatedAt: new Date().toISOString() });
+          toast('تم تعديل مهمة الإطلاع بنجاح', 'success');
+        } else {
+          await saveViewingTask({ ...taskToSave, id: `viewing-${Date.now()}`, status: 'pending', createdAt: new Date().toISOString(), createdBy: currentUser || 'مجهول' });
+          toast('تمت إضافة مهمة الإطلاع بنجاح', 'success');
+        }
       } else {
-        await saveGlobalTask({
-          ...taskToSave,
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-          createdBy: currentUser || 'مجهول'
-        });
-        toast('تمت إضافة المهمة بنجاح', 'success');
+        // ─── مهمة عادية — نظام مستقل ───
+        const taskToSave = { ...newTask, type: 'general' };
+        if (editingTaskId) {
+          const existingTask = globalTasks.find(t => t.id === editingTaskId);
+          await saveGlobalTask({ ...existingTask, ...taskToSave, updatedAt: new Date().toISOString() }, editingTaskId);
+          toast('تم تعديل المهمة بنجاح', 'success');
+        } else {
+          await saveGlobalTask({ ...taskToSave, status: 'pending', createdAt: new Date().toISOString(), createdBy: currentUser || 'مجهول' });
+          toast('تمت إضافة المهمة بنجاح', 'success');
+        }
       }
-      
       setIsAdding(false);
       setEditingTaskId(null);
       setNewTask({ title: '', assignee: '', dueDate: '', sessionDate: '', priority: 'normal', type: 'general', caseId: '', linkedCases: [], notes: '', description: '' });
@@ -178,14 +182,14 @@ export default function TasksManagerModal({ isOpen, onClose }) {
 
   const handleToggleStatus = async (task) => {
     try {
-      if (task.status !== 'completed') {
-        await completeGlobalTask(task.id, task.notes);
+      if (activeMainTab === 'viewing') {
+        await completeViewingTask(task.id, task.status !== 'completed');
       } else {
-        await saveGlobalTask({
-          ...task,
-          status: 'pending',
-          completedAt: null
-        }, task.id);
+        if (task.status !== 'completed') {
+          await completeGlobalTask(task.id, task.notes);
+        } else {
+          await saveGlobalTask({ ...task, status: 'pending', completedAt: null }, task.id);
+        }
       }
     } catch (e) {
       toast('حدث خطأ', 'error');
@@ -195,7 +199,12 @@ export default function TasksManagerModal({ isOpen, onClose }) {
   const handleDelete = async (id) => {
     const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذه المهمة نهائياً؟', 'delete_task');
     if (confirmed) {
-      const success = await deleteGlobalTask(id);
+      let success;
+      if (activeMainTab === 'viewing') {
+        success = await deleteViewingTask(id);
+      } else {
+        success = await deleteGlobalTask(id);
+      }
       if (success) toast('تم حذف المهمة بنجاح', 'success');
     }
   };
@@ -224,7 +233,12 @@ export default function TasksManagerModal({ isOpen, onClose }) {
     if (confirmed) {
       let count = 0;
       for (const id of selectedTaskIds) {
-        const success = await deleteGlobalTask(id);
+        let success;
+        if (activeMainTab === 'viewing') {
+          success = await deleteViewingTask(id);
+        } else {
+          success = await deleteGlobalTask(id);
+        }
         if (success) count++;
       }
       setSelectedTaskIds([]);
@@ -238,10 +252,12 @@ export default function TasksManagerModal({ isOpen, onClose }) {
     if (confirmed) {
       let count = 0;
       for (const id of selectedTaskIds) {
-        const t = globalTasks.find(task => task.id === id);
-        if (t && t.status !== 'completed') {
-          await completeGlobalTask(id, t.notes);
-          count++;
+        if (activeMainTab === 'viewing') {
+          const t = viewingTasks.find(task => task.id === id);
+          if (t && t.status !== 'completed') { await completeViewingTask(id, true); count++; }
+        } else {
+          const t = globalTasks.find(task => task.id === id);
+          if (t && t.status !== 'completed') { await completeGlobalTask(id, t.notes); count++; }
         }
       }
       setSelectedTaskIds([]);
@@ -250,12 +266,17 @@ export default function TasksManagerModal({ isOpen, onClose }) {
   };
 
   // 1. Filtering Logic Update
-  const isViewingTask = (t) => t.type === 'viewing' || t.title?.includes('إطلاع') || t.title?.includes('تصوير');
+  const generalTasks = globalTasks.filter(t =>
+    t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.assignee?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const filteredViewingTasks = viewingTasks.filter(t =>
+    t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.assignee?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.notes?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const generalTasks = globalTasks.filter(t => !isViewingTask(t) && (t.title?.toLowerCase().includes(searchQuery.toLowerCase()) || t.assignee?.toLowerCase().includes(searchQuery.toLowerCase())));
-  const viewingTasks = globalTasks.filter(t => isViewingTask(t) && (t.title?.toLowerCase().includes(searchQuery.toLowerCase()) || t.assignee?.toLowerCase().includes(searchQuery.toLowerCase())));
-
-  const activeTaskList = activeMainTab === 'general' ? generalTasks : viewingTasks;
+  const activeTaskList = activeMainTab === 'general' ? generalTasks : filteredViewingTasks;
   const displayTasks = activeTaskList.filter(t => activeSubTab === 'pending' ? t.status !== 'completed' : t.status === 'completed');
 
   const pendingCount = activeTaskList.filter(t => t.status !== 'completed').length;
@@ -278,10 +299,9 @@ export default function TasksManagerModal({ isOpen, onClose }) {
     if (!bulkEditGroup || !bulkEditNewDate) return;
     const tasksToUpdate = groupedViewingTasks[bulkEditGroup];
     if (!tasksToUpdate) return;
-    
     let count = 0;
     for (const t of tasksToUpdate) {
-      await saveGlobalTask({ ...t, sessionDate: bulkEditNewDate }, t.id);
+      await saveViewingTask({ ...t, sessionDate: bulkEditNewDate });
       count++;
     }
     toast(`تم تحديث تاريخ الجلسة لـ ${count} ملفات بنجاح`, 'success');

@@ -4,7 +4,7 @@ import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 
 export default function BulkViewingTaskModal({ isOpen, onClose, selectedCaseIds, cases, sessionDate }) {
-  const { saveGlobalTask, saveSettingsToFirebase, settings, currentUser } = useAppContext();
+  const { saveViewingTask, saveSettingsToFirebase, settings, currentUser } = useAppContext();
   const { toast, showPrompt } = useUI();
 
   const [selectedDocs, setSelectedDocs] = useState([]);
@@ -82,7 +82,7 @@ export default function BulkViewingTaskModal({ isOpen, onClose, selectedCaseIds,
       };
 
       try {
-        await saveGlobalTask(taskObj);
+        await saveViewingTask(taskObj);
         successCount++;
       } catch (error) {
         console.error("Error saving task:", error);

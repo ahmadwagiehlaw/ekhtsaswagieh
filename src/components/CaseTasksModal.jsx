@@ -6,7 +6,8 @@ import { formatDateString } from '../utils/dateUtils';
 import UploadDocumentModal from './UploadDocumentModal';
 
 export default function CaseTasksModal({ isOpen, onClose, caseData }) {
-  const { globalTasks, saveGlobalTask, deleteGlobalTask, completeGlobalTask, currentUser, settings, isAdmin, currentUserPermissions } = useAppContext();
+  const { globalTasks, saveGlobalTask, deleteGlobalTask, completeGlobalTask, currentUser, settings, isAdmin, currentUserPermissions,
+    viewingTasks, saveViewingTask, deleteViewingTask, completeViewingTask } = useAppContext();
   const { toast, showConfirm } = useUI();
   
   const canManageTasks = isAdmin || currentUserPermissions?.canManageTasks;
@@ -28,7 +29,10 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
 
   if (!isOpen || !caseData) return null;
 
-  const caseTasks = globalTasks.filter(t => t.linkedCases?.includes(caseData.id));
+  // مهام القضية: مهام عادية (globalTasks) + مهام إطلاع (viewingTasks) — فصل تام
+  const caseRegularTasks = globalTasks.filter(t => t.linkedCases?.includes(caseData.id));
+  const caseViewingTasks = viewingTasks.filter(t => t.linkedCases?.includes(caseData.id));
+  const caseTasks = [...caseRegularTasks, ...caseViewingTasks];
   const pendingTasks = caseTasks.filter(t => t.status === 'pending');
   const completedTasks = caseTasks.filter(t => t.status === 'completed');
 
@@ -41,6 +45,8 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
       return;
     }
 
+    const isViewingType = (editingTaskId ? (globalTasks.find(t => t.id === editingTaskId)?.type || newTask.type) : newTask.type) === 'viewing';
+
     const taskObj = {
       id: editingTaskId || `task-${Date.now()}`,
       title: newTask.title,
@@ -49,11 +55,11 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
       assignee: newTask.assignee || '',
       dueDate: newTask.dueDate || '',
       priority: newTask.priority,
-      status: editingTaskId ? (globalTasks.find(t => t.id === editingTaskId)?.status || 'pending') : 'pending',
-      type: editingTaskId ? (globalTasks.find(t => t.id === editingTaskId)?.type || newTask.type || 'general') : (newTask.type || 'general'),
+      status: editingTaskId ? (caseTasks.find(t => t.id === editingTaskId)?.status || 'pending') : 'pending',
+      type: editingTaskId ? (caseTasks.find(t => t.id === editingTaskId)?.type || newTask.type || 'general') : (newTask.type || 'general'),
       linkedCases: [caseData.id],
-      createdAt: editingTaskId ? (globalTasks.find(t => t.id === editingTaskId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
-      createdBy: editingTaskId ? (globalTasks.find(t => t.id === editingTaskId)?.createdBy || currentUser) : (currentUser || 'مجهول'),
+      createdAt: editingTaskId ? (caseTasks.find(t => t.id === editingTaskId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
+      createdBy: editingTaskId ? (caseTasks.find(t => t.id === editingTaskId)?.createdBy || currentUser) : (currentUser || 'مجهول'),
       caseContext: {
         roll: caseData['الرول'] || caseData['رول الجلسة'] || '',
         date: caseData['تاريخ الجلسة'] || '',
@@ -61,7 +67,13 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
       }
     };
 
-    const success = await saveGlobalTask(taskObj);
+    let success;
+    if (isViewingType) {
+      success = await saveViewingTask(taskObj);
+    } else {
+      success = await saveGlobalTask(taskObj);
+    }
+
     if (success) {
       toast(editingTaskId ? "تم تعديل المهمة بنجاح" : "تمت إضافة المهمة بنجاح", "success");
       setNewTask({ title: '', notes: '', description: '', assignee: '', dueDate: '', priority: 'normal' });
@@ -74,9 +86,15 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
   };
 
   const handleDelete = async (taskId) => {
+    const task = caseTasks.find(t => t.id === taskId);
     const confirmed = await showConfirm("تأكيد الحذف", "هل أنت متأكد من حذف هذه المهمة نهائياً؟");
     if (confirmed) {
-      const success = await deleteGlobalTask(taskId);
+      let success;
+      if (task?.type === 'viewing') {
+        success = await deleteViewingTask(taskId);
+      } else {
+        success = await deleteGlobalTask(taskId);
+      }
       if (success) toast("تم حذف المهمة بنجاح", "success");
     }
   };
@@ -95,7 +113,13 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
     if (confirmed) {
       let count = 0;
       for (const id of selectedTaskIds) {
-        const success = await deleteGlobalTask(id);
+        const task = caseTasks.find(t => t.id === id);
+        let success;
+        if (task?.type === 'viewing') {
+          success = await deleteViewingTask(id);
+        } else {
+          success = await deleteGlobalTask(id);
+        }
         if (success) count++;
       }
       setSelectedTaskIds([]);
@@ -105,7 +129,12 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
 
   const handleToggleStatus = async (task) => {
     const newStatus = task.status === 'pending' ? 'completed' : 'pending';
-    const success = await completeGlobalTask(task.id, newStatus === 'completed');
+    let success;
+    if (task.type === 'viewing') {
+      success = await completeViewingTask(task.id, newStatus === 'completed');
+    } else {
+      success = await completeGlobalTask(task.id, newStatus === 'completed');
+    }
     if (success) {
       toast(newStatus === 'completed' ? "تم إنجاز المهمة" : "تمت إعادة المهمة", "success");
     }
@@ -407,7 +436,11 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
         initialDocType="تصوير مستندات"
         onSuccess={async () => {
           if (activeUploadTask) {
-            await completeGlobalTask(activeUploadTask.id, true);
+            if (activeUploadTask.type === 'viewing') {
+              await completeViewingTask(activeUploadTask.id, true);
+            } else {
+              await completeGlobalTask(activeUploadTask.id, true);
+            }
             toast("تم الإرفاق وإنجاز المهمة بنجاح", "success");
           }
         }}

@@ -136,7 +136,7 @@ function CaseCard({ caseObj, idx, globalTasks, getFieldValue, settings, editingC
 //  Main Component
 // ──────────────────────────────────────────────────────────────────
 export default function Agenda() {
-  const { cases, globalTasks = [], settings, saveCaseToFirebase } = useAppContext();
+  const { cases, globalTasks = [], viewingTasks = [], settings, saveCaseToFirebase } = useAppContext();
   const { toast } = useUI();
   const navigate = useNavigate();
 
@@ -420,7 +420,7 @@ export default function Agenda() {
                   {filteredDateCases.length !== selectedDateCases.length && <span className="text-[10px] text-indigo-600 font-black bg-indigo-50 px-2 py-1 rounded-lg">{filteredDateCases.length} من {selectedDateCases.length}</span>}
                   <button onClick={() => {
                     const currentCases = viewMode === 'table' ? (tableFilteredCases || filteredDateCases) : filteredDateCases;
-                    const vTasks = globalTasks?.filter(t => t.type === 'viewing' && t.status !== 'completed' && t.linkedCases?.some(id => currentCases.find(c => c.id === id)));
+                    const vTasks = viewingTasks?.filter(t => t.status !== 'completed' && t.linkedCases?.some(id => currentCases.find(c => c.id === id)));
                     if(!vTasks || vTasks.length === 0) { toast('لا توجد مهام إطلاع معلقة للرول الحالي', 'error'); return; }
                     printViewingTasksList(vTasks, cases, settings);
                   }} className="flex items-center gap-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-3 py-1.5 rounded-xl text-[11px] font-black transition shadow-sm"><Camera className="w-3.5 h-3.5" /> طباعة الإطلاع</button>

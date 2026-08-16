@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { parseISO, isAfter, isBefore, addDays, format, isToday, isTomorrow, startOfDay } from 'date-fns';
 
 export default function NotificationCenter() {
-  const { cases, globalTasks, completeGlobalTask, deleteGlobalTask } = useAppContext();
+  const { cases, globalTasks, completeGlobalTask, deleteGlobalTask, viewingTasks, completeViewingTask, deleteViewingTask } = useAppContext();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -44,9 +44,9 @@ export default function NotificationCenter() {
       }
     });
 
-    const isViewingTask = (t) => t.type === 'viewing' || t.title?.includes('إطلاع') || t.title?.includes('تصوير');
+    const isViewingTask = (t) => t.type === 'viewing';
 
-    // 3. Global Tasks (Pending & Due Soon)
+    // 3. Global Tasks (Pending & Due Soon) — المهام العادية فقط
     globalTasks.forEach(task => {
       if (task.status !== 'completed' && task.dueDate && !isViewingTask(task)) {
         const tDate = parseISO(task.dueDate);
@@ -68,7 +68,7 @@ export default function NotificationCenter() {
     // Sort by date
     notifs.sort((a, b) => a.date - b.date);
     setNotifications(notifs);
-  }, [cases, globalTasks]);
+  }, [cases, globalTasks, viewingTasks]);
 
   const getRelativeDateStr = (dateObj) => {
     if (isToday(dateObj)) return 'اليوم';
@@ -152,9 +152,9 @@ export default function NotificationCenter() {
                           onClick={async (e) => {
                             e.stopPropagation();
                             if (notif.type === 'viewing_group') {
-                               const tasksToComplete = globalTasks.filter(t => t.type === 'viewing' && t.status !== 'completed' && t.dueDate && t.dueDate.split('T')[0] === notif.date.toISOString().split('T')[0]);
+                               const tasksToComplete = viewingTasks.filter(t => t.status !== 'completed' && t.dueDate && t.dueDate.split('T')[0] === notif.date.toISOString().split('T')[0]);
                                for (let t of tasksToComplete) {
-                                  await completeGlobalTask(t.id, 'تم إنجاز مهام الإطلاع المجمعة');
+                                  await completeViewingTask(t.id, true);
                                }
                             } else {
                                await completeGlobalTask(notif.taskId, 'تم إنجازها من التنبيهات');
@@ -169,9 +169,9 @@ export default function NotificationCenter() {
                           onClick={async (e) => {
                             e.stopPropagation();
                             if (notif.type === 'viewing_group') {
-                               const tasksToDelete = globalTasks.filter(t => t.type === 'viewing' && t.status !== 'completed' && t.dueDate && t.dueDate.split('T')[0] === notif.date.toISOString().split('T')[0]);
+                               const tasksToDelete = viewingTasks.filter(t => t.status !== 'completed' && t.dueDate && t.dueDate.split('T')[0] === notif.date.toISOString().split('T')[0]);
                                for (let t of tasksToDelete) {
-                                  await deleteGlobalTask(t.id);
+                                  await deleteViewingTask(t.id);
                                }
                             } else {
                                await deleteGlobalTask(notif.taskId);
