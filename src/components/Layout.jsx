@@ -157,11 +157,12 @@ export default function Layout() {
 
       <OnboardingModal />
 
-      {/* Floating Action Button */}
+      {/* Floating Action Button (Add Case) */}
       {!isDetailsPage && canEditData && (
         <button 
           onClick={() => setIsAddModalOpen(true)}
-          className="fixed bottom-24 left-6 md:left-12 w-14 h-14 bg-amber-500 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-amber-600 hover:-translate-y-1 transition-all z-40"
+          className="fixed bottom-24 left-6 md:left-8 w-14 h-14 bg-amber-500 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-amber-600 hover:-translate-y-1 transition-all z-40"
+          title="إضافة دعوى جديدة"
         >
           <Plus className="w-6 h-6" />
         </button>
@@ -200,11 +201,11 @@ export default function Layout() {
         <button
           id="global-search-fab"
           onClick={() => setIsGlobalSearchOpen(true)}
-          className="fixed bottom-24 left-24 md:left-32 w-12 h-12 bg-indigo-600 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-indigo-700 hover:-translate-y-1 transition-all z-40 no-print"
+          className={`fixed ${isDetailsPage ? 'bottom-56' : 'bottom-40'} left-6 md:left-8 w-14 h-14 bg-indigo-600 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-indigo-700 hover:-translate-y-1 transition-all z-40 no-print`}
           title="بحث في الدعاوى (اضغط /)"
           aria-label="فتح البحث الشامل"
         >
-          <Search className="w-5 h-5" />
+          <Search className="w-6 h-6" />
         </button>
       )}
 

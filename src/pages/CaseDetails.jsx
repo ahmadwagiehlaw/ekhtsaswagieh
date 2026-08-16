@@ -1016,7 +1016,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
       {/* Floating Document Button */}
       <button
         onClick={() => setIsPrintModalOpen(true)}
-        className="fixed bottom-24 left-6 md:left-12 w-14 h-14 bg-indigo-500 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-indigo-600 hover:-translate-y-1 transition-all z-40 print:hidden animate-in fade-in zoom-in"
+        className={`${isModal ? 'absolute' : 'fixed'} bottom-40 left-6 md:left-8 w-14 h-14 bg-indigo-500 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-indigo-600 hover:-translate-y-1 transition-all z-40 print:hidden animate-in fade-in zoom-in`}
         title="إنشاء وثائق"
       >
         <FileText className="w-6 h-6" />
@@ -1028,7 +1028,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
           setActiveTab('documents');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        className="fixed bottom-6 left-6 md:left-12 w-14 h-14 bg-amber-500 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-amber-600 hover:-translate-y-1 transition-all z-40 print:hidden animate-in fade-in zoom-in"
+        className={`${isModal ? 'absolute' : 'fixed'} bottom-24 left-6 md:left-8 w-14 h-14 bg-amber-500 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-amber-600 hover:-translate-y-1 transition-all z-40 print:hidden animate-in fade-in zoom-in`}
         title="مجلد المستندات والمرفقات"
       >
         <FolderOpen className="w-6 h-6" />
