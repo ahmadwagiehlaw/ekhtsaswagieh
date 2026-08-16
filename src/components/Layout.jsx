@@ -8,6 +8,9 @@ import NotificationCenter from './NotificationCenter';
 import TasksManagerModal from './TasksManagerModal';
 import OnboardingModal from './OnboardingModal';
 import QuickScratchpad from './QuickScratchpad';
+import GlobalCaseSearchPanel from './GlobalCaseSearchPanel';
+import { lazy, Suspense } from 'react';
+const CaseDetails = lazy(() => import('../pages/CaseDetails'));
 
 export default function Layout() {
   const { settings, isAdmin, currentUserPermissions } = useAppContext();
@@ -19,6 +22,8 @@ export default function Layout() {
   const navigate = useNavigate();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isTasksModalOpen, setIsTasksModalOpen] = useState(false);
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
+  const [previewCaseId, setPreviewCaseId] = useState(null); // case opened from global search panel
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   useEffect(() => {
@@ -42,6 +47,23 @@ export default function Layout() {
 
   // Hide bottom nav on case details page for full screen view, just like the original app
   const isDetailsPage = location.pathname.startsWith('/case/');
+  const isFilesPage = location.pathname === '/files';
+
+  // Global "/" shortcut — opens search panel on all pages except /files
+  // (on /files the page itself handles the shortcut to focus its own input)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (isFilesPage) return; // Files page handles it internally
+      if (e.key !== '/') return;
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      const isEditable = tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable;
+      if (isEditable) return;
+      e.preventDefault();
+      setIsGlobalSearchOpen(true);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFilesPage]);
 
   return (
     <div 
@@ -147,6 +169,44 @@ export default function Layout() {
 
       {/* Global Quick Scratchpad */}
       <QuickScratchpad />
+
+      {/* Global Case Search Panel — shown on all pages except /files */}
+      <GlobalCaseSearchPanel
+        isOpen={isGlobalSearchOpen}
+        onClose={() => setIsGlobalSearchOpen(false)}
+        onSelectCase={(id) => {
+          setPreviewCaseId(id);
+          // Keep search panel open so user can go back to results
+        }}
+      />
+
+      {/* Case Details Modal — opened from global search panel */}
+      {previewCaseId && (
+        <Suspense fallback={
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white" />
+          </div>
+        }>
+          <CaseDetails
+            isModal={true}
+            modalCaseId={previewCaseId}
+            onCloseModal={() => setPreviewCaseId(null)}
+          />
+        </Suspense>
+      )}
+
+      {/* Global Search Floating Button — hidden on /files */}
+      {!isFilesPage && (
+        <button
+          id="global-search-fab"
+          onClick={() => setIsGlobalSearchOpen(true)}
+          className="fixed bottom-24 left-24 md:left-32 w-12 h-12 bg-indigo-600 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-indigo-700 hover:-translate-y-1 transition-all z-40 no-print"
+          title="بحث في الدعاوى (اضغط /)"
+          aria-label="فتح البحث الشامل"
+        >
+          <Search className="w-5 h-5" />
+        </button>
+      )}
 
       {/* Add Case Modal */}
       {isAddModalOpen && (

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, Filter, FolderClosed, Plus, Clock, FileText, Upload, Download, Loader2, Info, Building2, Gavel, FileBox, X, CalendarDays, Printer, CheckSquare, Square, ClipboardList, AlertTriangle, Sparkles, MapPin, User, Files as FilesIcon, ArrowUpDown, SlidersHorizontal, Edit3, Trash2, Pin, PinOff, Eye, Camera } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
@@ -58,6 +58,9 @@ export default function Files() {
   const [isSortPanelOpen, setIsSortPanelOpen] = useSessionState('files_isSortPanelOpen', false);
   const [isPinned, setIsPinned] = useState(false);
 
+  // Ref for the main search input (used by "/" keyboard shortcut)
+  const searchInputRef = useRef(null);
+
   // Load pinned filters from localStorage on mount
   useEffect(() => {
     try {
@@ -103,6 +106,23 @@ export default function Files() {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // "/" keyboard shortcut — focus & select-all on the search input
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key !== '/') return;
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      const isEditable = tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable;
+      if (isEditable) return;
+      e.preventDefault();
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+        searchInputRef.current.select();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const itemsPerPage = 20;
 
@@ -630,9 +650,10 @@ export default function Files() {
             )}
             <div className="relative w-full sm:flex-1 max-w-xs">
               <input
+                ref={searchInputRef}
                 id="search-cases-input"
                 type="text"
-                placeholder="بحث في القضايا..."
+                placeholder="بحث في القضايا... (اضغط / للبحث)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2 pl-28 pr-10 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition"

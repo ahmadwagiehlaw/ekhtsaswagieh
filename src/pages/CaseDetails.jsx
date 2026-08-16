@@ -444,6 +444,17 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
           <Printer className="w-5 h-5" />
         </button>
 
+        {/* Open in full page — only shown in modal mode */}
+        {isModal && (
+          <button
+            onClick={() => { onCloseModal?.(); navigate(`/case/${id}`); }}
+            className="w-10 h-10 mr-1 rounded-xl bg-slate-50 text-slate-500 border border-slate-200 shadow-sm flex items-center justify-center transition hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200"
+            title="فتح في صفحة كاملة"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </button>
+        )}
+
         {(canEditData || canDeleteData) ? (
           isEditing ? (
             <div className="flex gap-2">
@@ -1044,8 +1055,8 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
 
   if (isModal) {
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-        <div className="bg-slate-50 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-y-auto custom-scrollbar relative">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="bg-slate-50 rounded-3xl w-full max-w-5xl h-[96vh] flex flex-col shadow-2xl border border-slate-200 overflow-y-auto custom-scrollbar relative">
            {content}
         </div>
       </div>
