@@ -196,18 +196,41 @@ export default function Layout() {
         </Suspense>
       )}
 
-      {/* Global Search Floating Button — hidden on /files */}
-      {!isFilesPage && (
-        <button
-          id="global-search-fab"
-          onClick={() => setIsGlobalSearchOpen(true)}
-          className={`fixed ${isDetailsPage ? 'bottom-56' : 'bottom-40'} left-6 md:left-8 w-14 h-14 bg-indigo-600 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-indigo-700 hover:-translate-y-1 transition-all z-40 no-print`}
-          title="بحث في الدعاوى (اضغط /)"
-          aria-label="فتح البحث الشامل"
-        >
-          <Search className="w-6 h-6" />
-        </button>
-      )}
+      {/* Global Search Pull-out Tab — bookmark style, hidden on /files */}
+      {!isFilesPage && (() => {
+        const isRight = (settings?.searchTabPosition || 'right') === 'right';
+        return (
+          <button
+            id="global-search-tab"
+            onClick={() => setIsGlobalSearchOpen(true)}
+            className={`
+              fixed z-[45] no-print
+              flex flex-col items-center justify-center gap-1.5 py-2
+              bg-indigo-500 hover:bg-indigo-600 text-white
+              shadow-xl hover:shadow-2xl
+              border-y border-indigo-600/50 hover:border-indigo-400
+              w-8 hover:w-10 transition-all duration-300
+              ${isRight ? 'right-0 rounded-l-lg border-l' : 'left-0 rounded-r-lg border-r'}
+              ${isGlobalSearchOpen ? 'opacity-0 pointer-events-none' : 'opacity-80 hover:opacity-100'}
+            `}
+            style={{ top: 'calc(50% + 85px)', height: '80px', transform: 'translateY(-50%)' }}
+            title="البحث السريع (اضغط /)"
+            aria-label="فتح البحث السريع"
+          >
+            <Search className="w-4 h-4 shrink-0" />
+            <span
+              className="text-[10px] font-bold shrink-0"
+              style={{
+                writingMode: 'vertical-rl',
+                transform: isRight ? 'rotate(180deg)' : 'rotate(0deg)',
+                letterSpacing: '0.05em'
+              }}
+            >
+              بحث
+            </span>
+          </button>
+        );
+      })()}
 
       {/* Add Case Modal */}
       {isAddModalOpen && (

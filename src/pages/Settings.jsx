@@ -106,6 +106,7 @@ export default function Settings() {
   const [expandedRuleGroups, setExpandedRuleGroups] = useState(['قواعد عامة']); // Default expand first/general group
   const [localMemoCalculationMode, setLocalMemoCalculationMode] = useState(settings?.memoCalculationMode || 'session_date');
   const [localScratchpadPosition, setLocalScratchpadPosition] = useState(settings?.scratchpadPosition || 'right');
+  const [localSearchTabPosition, setLocalSearchTabPosition] = useState(settings?.searchTabPosition || 'right');
   const [deletePassword, setDeletePassword] = useState('');
   const backupInputRef = useRef(null);
   const [backupRestoreStatus, setBackupRestoreStatus] = useState(null); // { type: 'success'|'error'|'preview', data: ... }
@@ -338,7 +339,8 @@ export default function Settings() {
       judgmentDefaults: localJudgmentDefaults,
       deadlineRules: localDeadlineRules,
       memoCalculationMode: localMemoCalculationMode,
-      scratchpadPosition: localScratchpadPosition
+      scratchpadPosition: localScratchpadPosition,
+      searchTabPosition: localSearchTabPosition
     });
     setIsProcessing(false);
     toast('تم حفظ الإعدادات المتقدمة بنجاح', 'success');
@@ -1153,6 +1155,20 @@ export default function Settings() {
                   <select
                     value={localScratchpadPosition}
                     onChange={e => setLocalScratchpadPosition(e.target.value)}
+                    className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
+                  >
+                    <option value="right">يمين الشاشة</option>
+                    <option value="left">يسار الشاشة</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4 border-b border-slate-100 pb-4">
+                <div className="flex flex-col gap-2 flex-1">
+                  <label className="text-xs font-bold text-slate-700">موقع زر البحث السريع:</label>
+                  <select
+                    value={localSearchTabPosition}
+                    onChange={e => setLocalSearchTabPosition(e.target.value)}
                     className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
                   >
                     <option value="right">يمين الشاشة</option>

@@ -28,7 +28,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
   const { id: paramId } = useParams();
   const id = isModal ? modalCaseId : paramId;
   const navigate = useNavigate();
-  const { cases, schema, isAdmin, saveCaseToFirebase, settings, rolls, checkDuplicateCase, deleteCaseFromFirebase, restoreCaseFromFirebase, saveSettingsToFirebase, saveGlobalTask, globalTasks, viewingTasks, currentUser, currentUserPermissions } = useAppContext();
+  const { cases, rawCases, schema, isAdmin, saveCaseToFirebase, settings, rolls, checkDuplicateCase, deleteCaseFromFirebase, restoreCaseFromFirebase, saveSettingsToFirebase, saveGlobalTask, globalTasks, viewingTasks, currentUser, currentUserPermissions } = useAppContext();
 
   const roleOptions = settings?.roles || ['طاعن', 'مطعون ضدنا', 'خصم مدخل'];
   const currentCourtDegree = settings?.courtDegree || 'أول درجة';
@@ -41,8 +41,9 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
   const canDeleteData = isAdmin || currentUserPermissions?.canDeleteData;
   const { toast, showConfirm, openRollViewer, showPrompt } = useUI();
 
-  // In the new architecture, id is the document id, not the array index.
-  const caseData = cases.find(c => c.id === id);
+  // Use rawCases (unfiltered) so the case stays visible even when globalHideNoInterest
+  // is active and the user changes the role to "لا شأن" — avoids the "الملف غير موجود" bug.
+  const caseData = (rawCases || cases).find(c => c.id === id);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(caseData || {});
@@ -1016,7 +1017,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
       {/* Floating Document Button */}
       <button
         onClick={() => setIsPrintModalOpen(true)}
-        className={`${isModal ? 'absolute' : 'fixed'} bottom-40 left-6 md:left-8 w-14 h-14 bg-indigo-500 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-indigo-600 hover:-translate-y-1 transition-all z-40 print:hidden animate-in fade-in zoom-in`}
+        className="fixed bottom-40 left-6 md:left-8 w-14 h-14 bg-indigo-500 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-indigo-600 hover:-translate-y-1 transition-all z-40 print:hidden animate-in fade-in zoom-in"
         title="إنشاء وثائق"
       >
         <FileText className="w-6 h-6" />
@@ -1028,7 +1029,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
           setActiveTab('documents');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        className={`${isModal ? 'absolute' : 'fixed'} bottom-24 left-6 md:left-8 w-14 h-14 bg-amber-500 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-amber-600 hover:-translate-y-1 transition-all z-40 print:hidden animate-in fade-in zoom-in`}
+        className="fixed bottom-24 left-6 md:left-8 w-14 h-14 bg-amber-500 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-amber-600 hover:-translate-y-1 transition-all z-40 print:hidden animate-in fade-in zoom-in"
         title="مجلد المستندات والمرفقات"
       >
         <FolderOpen className="w-6 h-6" />
