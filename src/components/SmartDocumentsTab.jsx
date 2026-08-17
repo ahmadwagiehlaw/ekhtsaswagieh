@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Save, Trash2, Edit3, Copy, FileText, Search, Settings, Variable, ChevronDown, ChevronRight, ChevronLeft, Folder, FolderOpen, List, ListOrdered, Undo, Redo, Eraser } from 'lucide-react';
+import { Plus, Save, Trash2, Edit3, Copy, FileText, Search, Settings, Variable, ChevronDown, ChevronRight, ChevronLeft, Folder, FolderOpen, List, ListOrdered, Undo, Redo, Eraser, Eye, X, Printer } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 
 export default function SmartDocumentsTab() {
-  const { settings, saveSettingsToFirebase, isAdmin } = useAppContext();
+  const { settings, saveSettingsToFirebase, isAdmin, cases } = useAppContext();
   const { toast } = useUI();
+  const [showPreview, setShowPreview] = useState(false);
   
   const [templates, setTemplates] = useState(settings?.printTemplates || [
     {
@@ -163,6 +164,7 @@ export default function SmartDocumentsTab() {
     { label: 'عنوان المدعى عليه', val: '{{عنوان_المدعى_عليه}}' },
     { label: 'المقر المختار', val: '{{المقر_المختار}}' },
     { label: 'تصنيف الدعوى', val: '{{تصنيف_الدعوى}}' },
+    { label: 'موضوع الدعوى', val: '{{موضوع_الدعوى}}' },
     { label: 'مكان الملف', val: '{{مكان_الملف}}' },
     { label: 'نوع الجلسة', val: '{{نوع_الجلسة}}' },
     { label: 'اسم المستشار', val: '{{اسم_المستشار}}' },
@@ -175,11 +177,81 @@ export default function SmartDocumentsTab() {
     { label: 'منطوق الحكم', val: '{{منطوق_الحكم}}' },
     { label: 'تصنيف الحكم', val: '{{تصنيف_الحكم}}' },
     { label: 'الرول', val: '{{الرول}}' },
+    { label: 'المطعون ضده', val: '{{المطعون_ضده}}' },
+    { label: 'طلبات المدعي', val: '{{طلبات_المدعي}}' },
+    { label: 'آخر جلسة', val: '{{آخر_جلسة}}' },
+    { label: 'منطوق حكم أول درجة', val: '{{منطوق_حكم_أول_درجة}}' },
+    { label: 'محكمة أول درجة', val: '{{محكمة_أول_درجة}}' },
   ];
 
+  // ─── Preview Logic ───
+  const previewCase = cases?.[0] || null;
+
+  const getFieldVal = (obj, keys) => {
+    for (const k of keys) {
+      if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k];
+    }
+    return '';
+  };
+
+  const processPreview = (content) => {
+    if (!previewCase) return content;
+    const c = previewCase;
+    const latestSessionDate = c.sessions?.length > 0 ? c.sessions[0].date : getFieldVal(c, ['تاريخ الجلسة']);
+    const legacyAppellee = getFieldVal(c, ['المدعى_عليه', 'المدعى عليه', 'المطعون ضده', 'ضد']);
+    const legacyAddress = getFieldVal(c, ['عنوان المدعى عليه', 'عنوان_المدعى_عليه']);
+    const legacyChosenAddress = getFieldVal(c, ['المقر المختار']);
+    const effectiveDefendants = (c.defendantsList?.length > 0) ? c.defendantsList
+      : ((legacyAppellee || legacyAddress) ? [{ name: legacyAppellee || '', address: legacyAddress || '', chosenAddress: legacyChosenAddress || '' }] : []);
+    const finalDefendantName = effectiveDefendants.map(d => d.name).filter(Boolean).join(' و ') || legacyAppellee || '';
+    const finalDefendantAddress = effectiveDefendants.map(d => d.address).filter(Boolean).join(' و ') || legacyAddress || '';
+    const finalChosenAddress = effectiveDefendants.map(d => d.chosenAddress).filter(Boolean).join(' و ') || legacyChosenAddress || '';
+
+    const vars = {
+      '{{رقم_الدعوى}}': getFieldVal(c, ['رقم الدعوى', 'رقم القضية']) || '',
+      '{{السنة}}': getFieldVal(c, ['السنة', 'سنة']) || '',
+      '{{المدعي}}': getFieldVal(c, ['المدعي', 'الطاعن', 'المدعى']) || '',
+      '{{المدعى_عليه}}': finalDefendantName,
+      '{{المدعي_عليه}}': finalDefendantName,
+      '{{المطعون_ضده}}': finalDefendantName,
+      '{{الجلسة_الحالية}}': latestSessionDate || '',
+      '{{آخر_جلسة}}': latestSessionDate || '',
+      '{{تاريخ_الجلسة}}': latestSessionDate || '',
+      '{{القرار}}': getFieldVal(c, ['القرار', 'قرار الجلسة', 'المنطوق']) || '',
+      '{{نوع_الجلسة}}': getFieldVal(c, ['نوع الجلسة']) || '',
+      '{{اسم_المستشار}}': settings?.consultantName || '',
+      '{{المحكمة}}': getFieldVal(c, ['المحكمة']) || '',
+      '{{الدائرة}}': getFieldVal(c, ['الدائرة']) || '',
+      '{{الصفة}}': getFieldVal(c, ['الصفة', 'صفتنا']) || '',
+      '{{الملاحظات}}': getFieldVal(c, ['الملاحظات', 'ملاحظات']) || '',
+      '{{رقم_الحفظ}}': getFieldVal(c, ['رقم الحفظ']) || '',
+      '{{حكم_تمهيدي}}': getFieldVal(c, ['حكم تمهيدي']) || '',
+      '{{منطوق_الحكم}}': getFieldVal(c, ['منطوق الحكم', 'المنطوق']) || '',
+      '{{تصنيف_الحكم}}': getFieldVal(c, ['تصنيف الحكم', 'نوع الحكم']) || '',
+      '{{الرول}}': getFieldVal(c, ['الرول', 'رول الجلسة']) || '',
+      '{{تصنيف_الدعوى}}': getFieldVal(c, ['تصنيف الدعوى']) || '',
+      '{{موضوع_الدعوى}}': getFieldVal(c, ['موضوع الدعوى', 'ملخص الطعن']) || '',
+      '{{عنوان_المدعي}}': getFieldVal(c, ['عنوان المدعي', 'عنوان الطاعن']) || '',
+      '{{عنوان_المدعى_عليه}}': finalDefendantAddress,
+      '{{عنوان_المدعي_عليه}}': finalDefendantAddress,
+      '{{المقر_المختار}}': finalChosenAddress,
+      '{{مكان_الملف}}': getFieldVal(c, ['مكان الملف']) || '',
+      '{{طلبات_المدعي}}': getFieldVal(c, ['طلبات المدعي', 'طلبات الطاعن']) || '',
+      '{{منطوق_حكم_أول_درجة}}': getFieldVal(c, ['منطوق حكم أول درجة']) || '',
+      '{{حكم_أول_درجة}}': getFieldVal(c, ['حكم محكمة أول درجة']) || '',
+      '{{محكمة_أول_درجة}}': getFieldVal(c, ['محكمة أول درجة']) || '',
+    };
+    let html = content;
+    for (const [key, value] of Object.entries(vars)) {
+      const regex = new RegExp(key.replace(/[{}]/g, '\\$&'), 'g');
+      html = html.replace(regex, `<span style="background:#fef08a;border-radius:3px;padding:0 2px;">${value || `<span style="color:#ef4444;font-size:11px;">[${key}]</span>`}</span>`);
+    }
+    return html;
+  };
+
   return (
+    <>
     <div className="flex flex-col lg:flex-row h-[calc(100vh-140px)] gap-4 w-full">
-      
       {/* Sidebar: Templates List */}
       <div className="w-full lg:w-1/4 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
         <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
@@ -333,6 +405,19 @@ export default function SmartDocumentsTab() {
                     <Save className="w-4 h-4" /> حفظ التعديلات
                   </button>
                 )}
+                <button 
+                  onClick={() => {
+                    if (editorRef.current) {
+                      // Save first then show preview
+                      handleSaveActive();
+                    }
+                    setShowPreview(true);
+                  }}
+                  className="flex items-center gap-1 bg-indigo-100 text-indigo-700 px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-200 transition border border-indigo-200"
+                  title="معاينة القالب مع بيانات حقيقية"
+                >
+                  <Eye className="w-4 h-4" /> معاينة
+                </button>
               </div>
             </div>
 
@@ -403,5 +488,83 @@ export default function SmartDocumentsTab() {
       </div>
 
     </div>
+
+    {/* ─── Preview Modal ─── */}
+    {showPreview && activeTemplate && (
+      <div className="fixed inset-0 z-[999] bg-slate-900/60 backdrop-blur-sm flex flex-col items-center overflow-y-auto">
+        {/* Header */}
+        <div className="w-full bg-slate-900 text-white p-4 flex items-center justify-between sticky top-0 z-10 shadow-xl print:hidden">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+              <Eye className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="font-black text-base">{activeTemplate.name} — معاينة بيانات حقيقية</h2>
+              {previewCase ? (
+                <p className="text-[11px] text-slate-300">
+                  يعرض بيانات: {previewCase['رقم الدعوى'] || previewCase['رقم_الدعوى']} — 
+                  <span className="bg-yellow-400/20 text-yellow-300 px-1 rounded text-[10px]">المتغيرات المعبأة بالأصفر ✓</span>
+                  <span className="text-rose-300 px-1 text-[10px]"> المتغيرات الفارغة بالأحمر ✗</span>
+                </p>
+              ) : (
+                <p className="text-[11px] text-amber-300">⚠️ لا توجد قضايا محملة للمعاينة</p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => window.print()}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-bold transition"
+            >
+              <Printer className="w-4 h-4" /> طباعة
+            </button>
+            <button 
+              onClick={() => setShowPreview(false)}
+              className="bg-slate-700 hover:bg-slate-600 p-2 rounded-lg transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Document Preview */}
+        <div className="w-full max-w-[210mm] mx-auto my-8 print:my-0 shadow-2xl print:shadow-none bg-white">
+          <div className="w-full min-h-[297mm] p-12 print:p-8 bg-white">
+            <div 
+              className="w-full h-full"
+              style={{ fontFamily: 'Cairo, sans-serif' }}
+              dir="rtl"
+              dangerouslySetInnerHTML={{ __html: processPreview(activeTemplate.content || '') }}
+            />
+          </div>
+        </div>
+
+        {/* Variable Legend */}
+        {previewCase && (
+          <div className="w-full max-w-[210mm] mx-auto mb-8 bg-white rounded-xl shadow-lg p-4 print:hidden">
+            <h4 className="font-black text-sm text-slate-700 mb-3 border-b pb-2">📋 تقرير المتغيرات في هذا القالب</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px]">
+              {[...mainVariables, ...moreVariables].filter(v => activeTemplate.content?.includes(v.val)).map(v => {
+                const allVars = { ...mainVariables, ...moreVariables };
+                const previewHtml = processPreview(v.val);
+                const isEmpty = previewHtml.includes('color:#ef4444');
+                return (
+                  <div key={v.val} className={`flex items-center gap-2 p-2 rounded-lg border ${isEmpty ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                    <span className={`text-lg ${isEmpty ? 'text-rose-400' : 'text-emerald-500'}`}>{isEmpty ? '✗' : '✓'}</span>
+                    <div>
+                      <div className="font-black text-slate-700">{v.label}</div>
+                      <div className={`text-[10px] ${isEmpty ? 'text-rose-500' : 'text-emerald-600'}`}>
+                        {isEmpty ? 'فارغ — تحقق من اسم الحقل' : 'يعمل'}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+    </>
   );
 }

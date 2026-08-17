@@ -60,11 +60,11 @@ export default function CaseReport() {
           <div className="grid grid-cols-2 gap-x-12 gap-y-6 mb-12">
             <div>
               <p className="text-xs font-black text-slate-500 mb-1">المدعي / الطاعن</p>
-              <p className="text-lg font-bold text-navy-900">{caseData['المدعي'] || caseData['الطاعن'] || '---'}</p>
+              <p className="text-lg font-bold text-navy-900">{caseData['المدعي'] || caseData['الطاعن'] || caseData['المدعى'] || caseData['مستأنف'] || caseData['المستأنف'] || '---'}</p>
             </div>
             <div>
               <p className="text-xs font-black text-slate-500 mb-1">المدعى عليه / المطعون ضده</p>
-              <p className="text-lg font-bold text-navy-900">{caseData['المطعون ضده'] || caseData['المدعى عليه'] || '---'}</p>
+              <p className="text-lg font-bold text-navy-900">{caseData['المطعون ضده'] || caseData['المدعى عليه'] || caseData['المدعي عليه'] || caseData['مدعى عليه'] || caseData['مدعي عليه'] || caseData['المطعون ضدنا'] || caseData['ضد'] || '---'}</p>
             </div>
             <div>
               <p className="text-xs font-black text-slate-500 mb-1">موضوع الدعوى</p>

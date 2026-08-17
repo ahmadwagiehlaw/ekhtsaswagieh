@@ -1,3 +1,5 @@
+import { formatDateString } from './dateUtils';
+
 export const printViewingTasksList = (tasks, cases, settings = {}) => {
   if (!tasks || tasks.length === 0) {
     return false;
@@ -24,7 +26,7 @@ export const printViewingTasksList = (tasks, cases, settings = {}) => {
     const linkedCase = cases.find(c => c.id === t.linkedCases?.[0]) || {};
     return t.caseContext?.date || linkedCase['تاريخ الجلسة'] || linkedCase['آخر جلسة'] || '';
   }).filter(d => d && d !== '---'))];
-  const commonSessionDate = uniqueSessionDates.length === 1 ? uniqueSessionDates[0] : null;
+  const commonSessionDate = uniqueSessionDates.length === 1 ? formatDateString(uniqueSessionDates[0]) : null;
 
   const printWindow = window.open('', '_blank');
   
@@ -67,12 +69,13 @@ export const printViewingTasksList = (tasks, cases, settings = {}) => {
     const caseYear = linkedCase['السنة'] || linkedCase['سنة'] || linkedCase['year'] ? ` لسنة ${linkedCase['السنة'] || linkedCase['سنة'] || linkedCase['year']}` : '';
     const fullCaseNumber = caseNumber !== '---' ? `${caseNumber}${caseYear}` : (task.caseContext?.roll ? `رول ${task.caseContext.roll}` : '---');
 
-    const appellant = linkedCase['المدعي'] || linkedCase['الطاعن'] || linkedCase['المستأنف'] || '---';
-    const appellee = linkedCase['المدعى عليه'] || linkedCase['المطعون ضده'] || linkedCase['المطعون ضدنا'] || linkedCase['المدعى_عليه'] || '---';
+    const appellant = linkedCase['المدعي'] || linkedCase['الطاعن'] || linkedCase['المستأنف'] || linkedCase['المدعى'] || linkedCase['مستأنف'] || '---';
+    const appellee = linkedCase['المدعى عليه'] || linkedCase['المدعي عليه'] || linkedCase['المطعون ضده'] || linkedCase['المطعون ضدنا'] || linkedCase['المدعى_عليه'] || linkedCase['مدعى عليه'] || linkedCase['مدعي عليه'] || linkedCase['ضد'] || '---';
     const rollStr = task.caseContext?.roll || linkedCase['الرول'] || linkedCase['رول'] || '---';
 
     const docsString = task.title.includes(':') ? task.title.split(':').pop().trim() : task.title;
-    const sessionDate = task.caseContext?.date || linkedCase['تاريخ الجلسة'] || linkedCase['آخر جلسة'] || '---';
+    const rawSessionDate = task.caseContext?.date || linkedCase['تاريخ الجلسة'] || linkedCase['آخر جلسة'];
+    const sessionDate = rawSessionDate ? formatDateString(rawSessionDate) : '---';
     const sessionType = task.caseContext?.type || linkedCase['نوع الجلسة'] || '---';
     const decision = task.caseContext?.decision || linkedCase['القرار'] || linkedCase['قرار الجلسة'] || '---';
     const statusText = task.status === 'completed' ? 'تم الإطلاع' : 'قيد الانتظار';

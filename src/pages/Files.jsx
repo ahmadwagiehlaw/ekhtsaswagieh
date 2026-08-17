@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Filter, FolderClosed, Plus, Clock, FileText, Upload, Download, Loader2, Info, Building2, Gavel, FileBox, X, CalendarDays, Printer, CheckSquare, Square, ClipboardList, AlertTriangle, Sparkles, MapPin, User, Files as FilesIcon, ArrowUpDown, SlidersHorizontal, Edit3, Trash2, Pin, PinOff, Eye, Camera } from 'lucide-react';
+import { Search, Filter, FolderClosed, Plus, Clock, FileText, Upload, Download, Loader2, Info, Building2, Gavel, FileBox, X, CalendarDays, Printer, CheckSquare, Square, ClipboardList, AlertTriangle, Sparkles, MapPin, User, Users, BookOpen, Files as FilesIcon, ArrowUpDown, SlidersHorizontal, Edit3, Trash2, Pin, PinOff, Eye, Camera, LayoutGrid, List, Sidebar } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import ExportPDFModal from '../components/ExportPDFModal';
@@ -11,6 +11,7 @@ import AdvancedSearchModal from '../components/AdvancedSearchModal';
 import GlobalTemplatePrintModal from '../components/GlobalTemplatePrintModal';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 import { printViewingTasksList } from '../utils/printViewingTasks';
+import CaseDetails from './CaseDetails';
 
 import useSessionState from '../hooks/useSessionState';
 
@@ -31,6 +32,7 @@ export default function Files() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const [selectedCaseIds, setSelectedCaseIds] = useState([]);
+  const [isPrintMenuOpen, setIsPrintMenuOpen] = useState(false);
   const [activeShoba, setActiveShoba] = useSessionState('files_activeShoba', 'متداول'); // 'all', 'متداول', 'حفظ'
   const [quickLocationEditId, setQuickLocationEditId] = useState(null);
 
@@ -43,10 +45,12 @@ export default function Files() {
   const [showImportantOnly, setShowImportantOnly] = useSessionState('files_showImportantOnly', false);
   const [showSessionlessOnly, setShowSessionlessOnly] = useSessionState('files_showSessionlessOnly', false);
   const [showPastSessionsOnly, setShowPastSessionsOnly] = useSessionState('files_showPastSessionsOnly', false);
-  const [showRecentlyModifiedOnly, setShowRecentlyModifiedOnly] = useSessionState('files_showRecentlyModifiedOnly', false);
-  const [showRecentlyViewedOnly, setShowRecentlyViewedOnly] = useSessionState('files_showRecentlyViewedOnly', false);
-  const [showRecentlyAddedOnly, setShowRecentlyAddedOnly] = useSessionState('files_showRecentlyAddedOnly', false);
   const [showMissingRoleOnly, setShowMissingRoleOnly] = useSessionState('files_showMissingRoleOnly', false);
+  const [showJudgmentsOnly, setShowJudgmentsOnly] = useSessionState('files_showJudgmentsOnly', false);
+  
+  // New Brainstormed Filters
+  const [locationFilter, setLocationFilter] = useSessionState('files_locationFilter', 'all'); // 'all', 'missing', 'temp', or specific location
+  const [sessionTypeFilter, setSessionTypeFilter] = useSessionState('files_sessionTypeFilter', 'all'); // 'all', 'judgment', 'pleading', 'commissioners', 'review'
   const [quickDateFilter, setQuickDateFilter] = useSessionState('files_quickDateFilter', '');
   const [isDateSearchOpen, setIsDateSearchOpen] = useSessionState('files_isDateSearchOpen', false);
   const [isSelectionReportModalOpen, setIsSelectionReportModalOpen] = useState(false);
@@ -57,6 +61,10 @@ export default function Files() {
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useSessionState('files_isFilterPanelOpen', false);
   const [isSortPanelOpen, setIsSortPanelOpen] = useSessionState('files_isSortPanelOpen', false);
   const [isPinned, setIsPinned] = useState(false);
+
+  // New UX States
+  const [viewMode, setViewMode] = useSessionState('files_viewMode', 'gallery'); // 'gallery' | 'list' | 'compact'
+  const [quickPeekId, setQuickPeekId] = useState(null);
 
   // Ref for the main search input (used by "/" keyboard shortcut)
   const searchInputRef = useRef(null);
@@ -74,10 +82,11 @@ export default function Files() {
         setShowImportantOnly(pinned.showImportantOnly ?? false);
         setShowSessionlessOnly(pinned.showSessionlessOnly ?? false);
         setShowPastSessionsOnly(pinned.showPastSessionsOnly ?? false);
-        setShowRecentlyModifiedOnly(pinned.showRecentlyModifiedOnly ?? false);
-        setShowRecentlyViewedOnly(pinned.showRecentlyViewedOnly ?? false);
-        setShowRecentlyAddedOnly(pinned.showRecentlyAddedOnly ?? false);
+        setShowPastSessionsOnly(pinned.showPastSessionsOnly ?? false);
         setShowMissingRoleOnly(pinned.showMissingRoleOnly ?? false);
+        setShowJudgmentsOnly(pinned.showJudgmentsOnly ?? false);
+        setLocationFilter(pinned.locationFilter ?? 'all');
+        setSessionTypeFilter(pinned.sessionTypeFilter ?? 'all');
         setQuickDateFilter(pinned.quickDateFilter ?? '');
         setSortBy(pinned.sortBy ?? 'none');
       }
@@ -92,7 +101,10 @@ export default function Files() {
       const toSave = {
         roleFilter, showOngoingOnly, showWithAttachmentsOnly,
         showImportantOnly, showSessionlessOnly, showPastSessionsOnly,
-        showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly,
+        showMissingRoleOnly,
+        showJudgmentsOnly,
+        locationFilter,
+        sessionTypeFilter,
         quickDateFilter, sortBy
       };
       localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
@@ -152,6 +164,17 @@ export default function Files() {
     }
   }, [location.search]);
 
+  const uniqueLocations = useMemo(() => {
+    const locs = new Set();
+    cases.forEach(c => {
+      const loc = String(c['مكان الملف'] || '').trim();
+      if (loc && loc !== '-' && loc !== 'مقيدة' && loc !== 'غير موجود' && loc !== 'ملف مؤقت') {
+        locs.add(loc);
+      }
+    });
+    return Array.from(locs).sort();
+  }, [cases]);
+
   const filteredCases = useMemo(() => {
     let result = cases;
 
@@ -206,6 +229,16 @@ export default function Files() {
       });
     }
 
+    if (showJudgmentsOnly) {
+      result = result.filter(c => {
+        const fileLocation = String(c['مكان الملف'] || '').trim();
+        if (fileLocation === 'الأحكام') return true;
+        const decision = String(c['القرار'] || c['قرار الجلسة'] || c['المنطوق'] || '').trim();
+        if (decision.includes('حكم نهائي وبات')) return true;
+        return false;
+      });
+    }
+
     if (showImportantOnly) {
       result = result.filter(c => c.isImportant);
     }
@@ -238,35 +271,31 @@ export default function Files() {
       result = result.filter(c => c.documents && c.documents.length > 0);
     }
 
-    if (showRecentlyViewedOnly) {
+    if (showMissingRoleOnly) {
       result = result.filter(c => {
-        if (!c.lastViewedAt) return false;
-        const diffDays = (new Date() - new Date(c.lastViewedAt)) / (1000 * 60 * 60 * 24);
-        return diffDays <= 7;
+        const appellant = String(c['الطاعن'] || c['المدعي'] || c['المستأنف'] || '').trim();
+        const appellee = String(c['المطعون ضده'] || c['المطعون ضدهم'] || c['المدعى عليه'] || c['المدعى عليهم'] || '').trim();
+        return !appellant || appellant === '-' || !appellee || appellee === '-';
       });
     }
 
-    if (showRecentlyModifiedOnly) {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    if (locationFilter && locationFilter !== 'all') {
       result = result.filter(c => {
-        if (!c.updatedAt) return false;
-        return new Date(c.updatedAt) >= sevenDaysAgo;
+        const loc = String(c['مكان الملف'] || '').trim();
+        if (locationFilter === 'missing') return loc === 'غير موجود' || loc === 'مقيدة' || loc === '';
+        if (locationFilter === 'temp') return loc === 'ملف مؤقت';
+        return loc === locationFilter;
       });
     }
 
-    if (showRecentlyAddedOnly) {
+    if (sessionTypeFilter && sessionTypeFilter !== 'all') {
       result = result.filter(c => {
-        let createdDate = c.createdAt ? new Date(c.createdAt) : null;
-        if (!createdDate) {
-          const timestampStr = c.id?.split('_')[0];
-          if (timestampStr && timestampStr.length >= 13 && !isNaN(timestampStr)) {
-            createdDate = new Date(Number(timestampStr));
-          }
-        }
-        if (!createdDate || isNaN(createdDate.getTime())) return false;
-        const diffDays = (new Date() - createdDate) / (1000 * 60 * 60 * 24);
-        return diffDays <= 7;
+        const decision = String(c['القرار'] || c['قرار الجلسة'] || c['المنطوق'] || '').trim();
+        const sessionType = String(c['نوع الجلسة'] || c['نوع_الجلسة'] || '').trim();
+        
+        if (sessionTypeFilter === 'judgment') return decision.includes('للحكم') || decision.includes('حكم') || sessionType.includes('حكم');
+        
+        return sessionType.includes(sessionTypeFilter) || decision.includes(sessionTypeFilter);
       });
     }
 
@@ -357,11 +386,11 @@ export default function Files() {
     }
 
     return result;
-  }, [cases, debouncedSearchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly, quickDateFilter, activeShoba, settings, globalTasks]);
+  }, [cases, debouncedSearchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showMissingRoleOnly, showJudgmentsOnly, locationFilter, sessionTypeFilter, quickDateFilter, activeShoba, settings, globalTasks]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showRecentlyModifiedOnly, showRecentlyViewedOnly, showRecentlyAddedOnly, quickDateFilter, sortBy, activeShoba]);
+  }, [debouncedSearchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showMissingRoleOnly, showJudgmentsOnly, locationFilter, sessionTypeFilter, quickDateFilter, sortBy, activeShoba]);
 
   const getPrimaryValue = (cObj, possibleKeys) => {
     for (let k of possibleKeys) {
@@ -530,8 +559,58 @@ export default function Files() {
       <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm sticky top-[76px] z-30 no-print flex flex-col gap-3">
 
         <div className="flex flex-col-reverse sm:flex-row gap-3 items-center justify-between w-full">
-          {/* Filters, Sorting & Print on the right (RTL start) */}
+          {/* Filters, Sorting, View Modes & Actions on the right (RTL start) */}
           <div className="flex gap-2 w-full sm:w-auto shrink-0 flex-wrap sm:flex-nowrap justify-start">
+            
+            {/* Select All Toggle */}
+            <button
+              onClick={() => {
+                if (selectedCaseIds.length === filteredCases.length && filteredCases.length > 0) {
+                  setSelectedCaseIds([]);
+                } else {
+                  setSelectedCaseIds(filteredCases.map(c => c.id));
+                }
+              }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border shrink-0 ${
+                selectedCaseIds.length > 0 && selectedCaseIds.length === filteredCases.length
+                  ? 'bg-amber-100 text-amber-700 border-amber-200'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+              title={selectedCaseIds.length === filteredCases.length && filteredCases.length > 0 ? "إلغاء تحديد الكل" : "تحديد الكل (المطابق للبحث)"}
+            >
+              {selectedCaseIds.length === filteredCases.length && filteredCases.length > 0 ? (
+                <CheckSquare className="w-4 h-4" />
+              ) : (
+                <Square className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">تحديد الكل</span>
+            </button>
+
+            {/* View Modes Toggle */}
+            <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200 shadow-sm">
+              <button
+                onClick={() => setViewMode('gallery')}
+                className={`p-1.5 rounded-lg transition-all ${viewMode === 'gallery' ? 'bg-white shadow text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                title="وضع المعرض (البطاقات الكبيرة)"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                title="وضع القائمة (للجرد السريع)"
+              >
+                <List className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('compact')}
+                className={`p-1.5 rounded-lg transition-all ${viewMode === 'compact' ? 'bg-white shadow text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                title="وضع البطاقات المصغرة"
+              >
+                <FileBox className="w-4 h-4" />
+              </button>
+            </div>
+
             {/* Filter Toggle Button */}
             <button
               onClick={() => {
@@ -545,31 +624,11 @@ export default function Files() {
               title="خيارات الفلترة والتصفية"
             >
               <SlidersHorizontal className="w-4 h-4" />
-              <span>الفلترة</span>
+              <span className="hidden sm:inline">الفلترة</span>
               {isPinned && <Pin className="w-3 h-3 text-amber-500" />}
               {!isPinned && (roleFilter !== 'all' || showOngoingOnly || showPastSessionsOnly || showWithAttachmentsOnly || showImportantOnly || showSessionlessOnly) && (
                 <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
               )}
-            </button>
-
-            {/* Hide 'No Interest' Toggle */}
-            <button
-              onClick={() => {
-                const nextState = globalHideNoInterest === 2 ? 0 : globalHideNoInterest + 1;
-                setGlobalHideNoInterest(nextState);
-              }}
-              className={`px-3.5 py-2 rounded-xl text-[10.5px] font-black transition-all flex items-center gap-1.5 shadow-sm border ${
-                globalHideNoInterest === 1 ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
-                globalHideNoInterest === 2 ? 'bg-rose-100 text-rose-700 border-rose-200' :
-                'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                }`}
-              title="إخفاء أو إظهار ملفات (لا شأن) و (خارج الاختصاص)"
-            >
-              {globalHideNoInterest === 0 ? <Eye className="w-3.5 h-3.5 text-indigo-500" /> : <PinOff className="w-3.5 h-3.5" />}
-              <span>
-                {globalHideNoInterest === 0 ? 'إظهار الكل' :
-                 globalHideNoInterest === 1 ? 'إخفاء (لا شأن)' : 'إخفاء (لا شأن والاختصاص)'}
-              </span>
             </button>
 
             {/* Sort Toggle Button */}
@@ -585,36 +644,53 @@ export default function Files() {
               title="ترتيب المعروض"
             >
               <ArrowUpDown className="w-4 h-4" />
-              <span>الترتيب</span>
+              <span className="hidden sm:inline">الترتيب</span>
               {sortBy !== 'none' && (
                 <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
               )}
             </button>
 
-            {/* Print Viewing Tasks */}
-            <button
-              onClick={() => {
-                const casesToPrint = selectedCaseIds.length > 0 ? cases.filter(c => selectedCaseIds.includes(c.id)) : filteredCases;
-                const vTasks = viewingTasks?.filter(t => t.status !== 'completed' && t.linkedCases?.some(id => casesToPrint.find(c => c.id === id)));
-                if(!vTasks || vTasks.length === 0) { toast('لا توجد مهام إطلاع معلقة للملفات المحددة', 'error'); return; }
-                printViewingTasksList(vTasks, cases, settings);
-              }}
-              className="bg-indigo-100 text-indigo-700 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-indigo-200 transition shadow-sm border border-indigo-200"
-              title="طباعة مهام الإطلاع"
-            >
-              <Camera className="w-4 h-4" />
-              <span className="hidden sm:inline">مهام الإطلاع</span>
-            </button>
+            {/* Print & Export Actions (Dropdown) */}
+            <div className="relative">
+              <button
+                onClick={() => setIsPrintMenuOpen(!isPrintMenuOpen)}
+                className="bg-navy-900 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-navy-800 transition shadow-sm border border-navy-950"
+                title="خيارات الطباعة"
+              >
+                <Printer className="w-4 h-4" />
+                <span className="hidden sm:inline">طباعة</span>
+              </button>
+              
+              {isPrintMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsPrintMenuOpen(false)}></div>
+                  <div className="absolute right-0 sm:right-auto sm:left-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-1 animate-in fade-in slide-in-from-top-2">
+                    <button
+                      onClick={() => {
+                        setIsPrintMenuOpen(false);
+                        const casesToPrint = selectedCaseIds.length > 0 ? cases.filter(c => selectedCaseIds.includes(c.id)) : filteredCases;
+                        const vTasks = viewingTasks?.filter(t => t.status !== 'completed' && t.linkedCases?.some(id => casesToPrint.find(c => c.id === id)));
+                        if(!vTasks || vTasks.length === 0) { toast('لا توجد مهام إطلاع معلقة للملفات المحددة', 'error'); return; }
+                        printViewingTasksList(vTasks, cases, settings);
+                      }}
+                      className="w-full text-right px-3 py-2 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-2 transition-colors"
+                    >
+                      <Camera className="w-4 h-4" /> طباعة مهام الإطلاع
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsPrintMenuOpen(false);
+                        setIsExportModalOpen(true);
+                      }}
+                      className="w-full text-right px-3 py-2 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-2 transition-colors"
+                    >
+                      <FileText className="w-4 h-4" /> تصدير القائمة (PDF)
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
 
-            {/* Print Button */}
-            <button
-              onClick={() => setIsExportModalOpen(true)}
-              className="bg-navy-900 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-navy-800 transition shadow-sm border border-navy-950"
-              title="تصدير PDF وطباعة"
-            >
-              <Printer className="w-4 h-4" />
-              <span>طباعة</span>
-            </button>
           </div>
 
           {/* Search on the left (RTL end) */}
@@ -683,138 +759,154 @@ export default function Files() {
           </div>
         </div>
 
-        {/* Collapsible Filter Panel */}
+        {/* Horizontal Scrollable Filter Chips */}
         {isFilterPanelOpen && (
-          <div className="border-t border-slate-100 pt-3 animate-in slide-in-from-top-2 duration-200">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-xs font-black text-slate-500">تصفية القضايا حسب:</h4>
-              <div className="flex items-center gap-2">
-                {/* PIN Button */}
-                <button
-                  onClick={handlePinFilters}
-                  title={isPinned ? 'إلغاء تثبيت الفلاتر الحالية' : 'تثبيت الفلاتر الحالية (تبقى محفوظة)'}
-                  className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg border transition ${isPinned
-                      ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200'
-                      : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-amber-50 hover:text-amber-600'
-                    }`}
-                >
-                  {isPinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
-                  {isPinned ? 'إلغاء التثبيت' : 'تثبيت الفلاتر'}
-                </button>
-                {(roleFilter !== 'all' || showOngoingOnly || showPastSessionsOnly || showWithAttachmentsOnly || showImportantOnly || showSessionlessOnly) && (
-                  <button
-                    onClick={() => {
-                      setRoleFilter('all');
-                      setShowOngoingOnly(false);
-                      setShowPastSessionsOnly(false);
-                      setShowWithAttachmentsOnly(false);
-                      setShowImportantOnly(false);
-                      setShowSessionlessOnly(false);
-                      setShowRecentlyModifiedOnly(false);
-                      setShowRecentlyViewedOnly(false);
-                      setShowRecentlyAddedOnly(false);
-                      setShowMissingRoleOnly(false);
-                      setQuickDateFilter('');
-                      if (isPinned) {
-                        // Update pin to reflect cleared state
-                        const toSave = {
-                          roleFilter: 'all', showOngoingOnly: false, showWithAttachmentsOnly: false,
-                          showImportantOnly: false, showSessionlessOnly: false, showPastSessionsOnly: false,
-                          showRecentlyModifiedOnly: false, showRecentlyViewedOnly: false, showRecentlyAddedOnly: false, showMissingRoleOnly: false,
-                          quickDateFilter: '', sortBy
-                        };
-                        localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
-                      }
-                    }}
-                    className="text-[10px] font-black text-rose-500 hover:text-rose-600 transition"
-                  >
-                    إعادة ضبط الفلاتر
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-hide shrink-0 animate-in slide-in-from-top-2 duration-200">
+            
+            {(roleFilter !== 'all' || showOngoingOnly || showPastSessionsOnly || showWithAttachmentsOnly || showImportantOnly || showSessionlessOnly || showJudgmentsOnly || globalHideNoInterest !== 0 || quickDateFilter || locationFilter !== 'all' || sessionTypeFilter !== 'all') && (
               <button
-                onClick={() => setRoleFilter(prev => prev === 'all' ? 'appellant' : prev === 'appellant' ? 'appellee' : prev === 'appellee' ? 'none' : 'all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${roleFilter === 'all' ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' : roleFilter === 'appellant' ? 'bg-rose-100 text-rose-700 border-rose-200' : roleFilter === 'appellee' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-700 text-slate-100 border-slate-600'}`}
+                onClick={() => {
+                  setRoleFilter('all');
+                  setShowOngoingOnly(false);
+                  setShowPastSessionsOnly(false);
+                  setShowWithAttachmentsOnly(false);
+                  setShowImportantOnly(false);
+                  setShowSessionlessOnly(false);
+                  setShowMissingRoleOnly(false);
+                  setShowJudgmentsOnly(false);
+                  setLocationFilter('all');
+                  setSessionTypeFilter('all');
+                  setQuickDateFilter('');
+                  setGlobalHideNoInterest(0);
+                  if (isPinned) {
+                    const toSave = {
+                      roleFilter: 'all', showOngoingOnly: false, showWithAttachmentsOnly: false,
+                      showImportantOnly: false, showSessionlessOnly: false, showPastSessionsOnly: false,
+                      showMissingRoleOnly: false, showJudgmentsOnly: false, locationFilter: 'all', sessionTypeFilter: 'all',
+                      quickDateFilter: '', sortBy
+                    };
+                    localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
+                  }
+                }}
+                className="px-3 py-1.5 rounded-full text-[10px] font-black text-rose-500 bg-rose-50 border border-rose-100 hover:bg-rose-100 hover:text-rose-600 transition shrink-0"
               >
-                <User className="w-3.5 h-3.5" />
-                <span>الصفة: {roleFilter === 'all' ? 'الكل' : roleFilter === 'appellant' ? (settings?.roles?.[0] || 'الطاعن') : roleFilter === 'appellee' ? (settings?.roles?.[1] || 'المطعون ضدنا') : 'غير محدد'}</span>
+                إلغاء الفلاتر
               </button>
+            )}
 
-              <button
-                onClick={() => setShowOngoingOnly(!showOngoingOnly)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showOngoingOnly ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-              >
-                <Clock className="w-3.5 h-3.5" />
-                <span>المتداول</span>
-              </button>
+            <button
+              onClick={() => {
+                const nextState = globalHideNoInterest === 2 ? 0 : globalHideNoInterest + 1;
+                setGlobalHideNoInterest(nextState);
+              }}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black transition-all flex items-center gap-1.5 shadow-sm border shrink-0 ${
+                globalHideNoInterest === 1 ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
+                globalHideNoInterest === 2 ? 'bg-rose-100 text-rose-700 border-rose-200' :
+                'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                }`}
+              title="إخفاء أو إظهار ملفات (لا شأن) و (خارج الاختصاص)"
+            >
+              {globalHideNoInterest === 0 ? <Eye className="w-3 h-3 text-indigo-500" /> : <PinOff className="w-3 h-3" />}
+              <span>
+                {globalHideNoInterest === 0 ? 'إظهار (لا شأن)' : globalHideNoInterest === 1 ? 'مخفي (لا شأن)' : 'مخفي (لا شأن والاختصاص)'}
+              </span>
+            </button>
 
-              <button
-                onClick={() => setShowPastSessionsOnly(!showPastSessionsOnly)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showPastSessionsOnly ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-              >
-                <CalendarDays className="w-3.5 h-3.5" />
-                <span>جلسات سابقة</span>
-              </button>
+            {/* LOCATION FILTER DROPDOWN */}
+            <select
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black transition-all shadow-sm border shrink-0 outline-none cursor-pointer ${
+                locationFilter !== 'all' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <option value="all">مكان الملف: الكل</option>
+              <option value="missing">مقيدة (غير موجود)</option>
+              <option value="temp">ملف مؤقت</option>
+              {uniqueLocations.map(loc => (
+                <option key={loc} value={loc}>{loc}</option>
+              ))}
+            </select>
+            
+            {/* SESSION TYPE FILTER DROPDOWN */}
+            <select
+              value={sessionTypeFilter}
+              onChange={(e) => setSessionTypeFilter(e.target.value)}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black transition-all shadow-sm border shrink-0 outline-none cursor-pointer ${
+                sessionTypeFilter !== 'all' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <option value="all">نوع الجلسة: الكل</option>
+              <option value="judgment">للحكم</option>
+              {settings?.sessionTypes?.map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
 
-              <button
-                onClick={() => setShowWithAttachmentsOnly(!showWithAttachmentsOnly)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showWithAttachmentsOnly ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-              >
-                <FileBox className="w-3.5 h-3.5" />
-                <span>بها مرفقات</span>
-              </button>
+            {/* OTHER FILTERS */}
+            <button
+              onClick={() => setRoleFilter(prev => prev === 'all' ? 'appellant' : prev === 'appellant' ? 'appellee' : prev === 'appellee' ? 'none' : 'all')}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black transition-all flex items-center gap-1.5 shadow-sm border shrink-0 ${roleFilter === 'all' ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' : roleFilter === 'appellant' ? 'bg-rose-100 text-rose-700 border-rose-200' : roleFilter === 'appellee' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-700 text-slate-100 border-slate-600'}`}
+            >
+              <User className="w-3 h-3" />
+              <span>الصفة: {roleFilter === 'all' ? 'الكل' : roleFilter === 'appellant' ? (settings?.roles?.[0] || 'الطاعن') : roleFilter === 'appellee' ? (settings?.roles?.[1] || 'المطعون ضدنا') : 'غير محدد'}</span>
+            </button>
 
-              <button
-                onClick={() => setShowImportantOnly(!showImportantOnly)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showImportantOnly ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-              >
-                <Sparkles className={`w-3.5 h-3.5 ${showImportantOnly ? 'fill-amber-700' : ''}`} />
-                <span>قضايا هامة</span>
-              </button>
+            <button
+              onClick={() => setShowOngoingOnly(!showOngoingOnly)}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black transition-all flex items-center gap-1.5 shadow-sm border shrink-0 ${showOngoingOnly ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+            >
+              <Clock className="w-3 h-3" />
+              <span>المتداول</span>
+            </button>
 
-              <button
-                onClick={() => setShowMissingRoleOnly(!showMissingRoleOnly)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showMissingRoleOnly ? 'bg-rose-100 text-rose-700 border-rose-200 animate-pulse' : 'bg-slate-50 text-rose-600 border-rose-100 hover:bg-rose-50'}`}
-                title="الملفات التي لم يُسجل لها صفة وتؤثر على الإحصائيات"
-              >
-                <AlertTriangle className="w-3.5 h-3.5" />
-                <span>مجهولة الصفة ⚠️</span>
-              </button>
+            <button
+              onClick={() => setShowJudgmentsOnly(!showJudgmentsOnly)}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black transition-all flex items-center gap-1.5 shadow-sm border shrink-0 ${showJudgmentsOnly ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+            >
+              <Gavel className="w-3 h-3" />
+              <span>سجل الأحكام</span>
+            </button>
 
-              <button
-                onClick={() => setShowRecentlyViewedOnly(!showRecentlyViewedOnly)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showRecentlyViewedOnly ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>استعرضتها مؤخراً</span>
-              </button>
+            <button
+              onClick={() => setShowPastSessionsOnly(!showPastSessionsOnly)}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black transition-all flex items-center gap-1.5 shadow-sm border shrink-0 ${showPastSessionsOnly ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+            >
+              <CalendarDays className="w-3 h-3" />
+              <span>جلسات سابقة</span>
+            </button>
 
-              <button
-                onClick={() => setShowRecentlyModifiedOnly(!showRecentlyModifiedOnly)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showRecentlyModifiedOnly ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-              >
-                <Clock className="w-3.5 h-3.5" />
-                <span>عدلتها مؤخراً</span>
-              </button>
+            <button
+              onClick={() => setShowWithAttachmentsOnly(!showWithAttachmentsOnly)}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black transition-all flex items-center gap-1.5 shadow-sm border shrink-0 ${showWithAttachmentsOnly ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+            >
+              <FileBox className="w-3 h-3" />
+              <span>بمرفقات</span>
+            </button>
 
-              <button
-                onClick={() => setShowRecentlyAddedOnly(!showRecentlyAddedOnly)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showRecentlyAddedOnly ? 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>أُضيفت مؤخراً</span>
-              </button>
+            <button
+              onClick={() => setShowImportantOnly(!showImportantOnly)}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black transition-all flex items-center gap-1.5 shadow-sm border shrink-0 ${showImportantOnly ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+            >
+              <Sparkles className={`w-3 h-3 ${showImportantOnly ? 'fill-amber-700' : ''}`} />
+              <span>هامة</span>
+            </button>
 
-              <button
-                onClick={() => setShowSessionlessOnly(!showSessionlessOnly)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${showSessionlessOnly ? 'bg-slate-700 text-white border-slate-800' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-              >
-                <X className="w-3.5 h-3.5" />
-                <span>بدون جلسة</span>
-              </button>
-            </div>
+            <button
+              onClick={() => setShowSessionlessOnly(!showSessionlessOnly)}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black transition-all flex items-center gap-1.5 shadow-sm border shrink-0 ${showSessionlessOnly ? 'bg-slate-700 text-white border-slate-800' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+            >
+              <X className="w-3 h-3" />
+              <span>بدون جلسة</span>
+            </button>
+
+            <button
+              onClick={() => setShowMissingRoleOnly(!showMissingRoleOnly)}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black transition-all flex items-center gap-1.5 shadow-sm border shrink-0 ${showMissingRoleOnly ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+            >
+              <AlertTriangle className="w-3 h-3" />
+              <span>مجهولة الصفة</span>
+            </button>
           </div>
         )}
 
@@ -873,8 +965,12 @@ export default function Files() {
         )}
       </div>
 
-      {/* Grid of Folder-like Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6 pt-2">
+      {/* List / Grid of Cases */}
+      <div className={`pt-2 ${
+        viewMode === 'gallery' ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6' :
+        viewMode === 'compact' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3' :
+        'flex flex-col gap-2'
+      }`}>
         {currentCases.map(c => {
           const caseNum = getPrimaryValue(c, ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى']);
           const year = getPrimaryValue(c, ['السنة', 'سنة', 'year']);
@@ -980,6 +1076,133 @@ export default function Files() {
           }
 
           const hasViewingTask = viewingTasks?.some(t => t.status !== 'completed' && t.linkedCases?.includes(c.id));
+
+          if (viewMode === 'list') {
+            return (
+              <div
+                key={c.id}
+                onClick={() => navigate(`/case/${c.id}`)}
+                className={`group relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-xl border transition-all cursor-pointer ${bgClass} ${borderClass} ${cardOpacity} ${grayscale}`}
+              >
+                 {/* Left Side: Checkbox, Important badge, Num, Year, Role */}
+                 <div className="flex items-center gap-3 w-full sm:w-1/3">
+                   <div onClick={(e) => toggleSelection(e, c.id)} className="z-30 shrink-0">
+                     {selectedCaseIds.includes(c.id) ? (
+                       <CheckSquare className="w-5 h-5 text-emerald-600 bg-white rounded shadow-sm" />
+                     ) : (
+                       <Square className="w-5 h-5 text-slate-300 bg-white rounded shadow-sm opacity-50 group-hover:opacity-100 transition-opacity" />
+                     )}
+                   </div>
+                   
+                   <div className="flex flex-col gap-1 w-full">
+                     <div className="flex items-center gap-2">
+                       {c.isImportant && <Sparkles className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />}
+                       <span className="font-black text-navy-900 text-sm sm:text-base">{caseNum || 'بدون رقم'}</span>
+                       {year && <span className="text-xs font-bold text-slate-400">لسنة {year}</span>}
+                     </div>
+                     <span className={`text-[10px] font-black w-fit px-1.5 py-0.5 rounded ${badgeBgClass}`}>
+                       {role || 'ملف دعوى'}
+                     </span>
+                   </div>
+                 </div>
+
+                 {/* Middle: Opponents */}
+                 <div className="flex flex-col text-[10px] sm:text-xs w-full sm:w-1/3 border-r sm:border-r-0 sm:border-x border-slate-200 px-3 py-1">
+                   <div className="flex gap-1"><span className="text-emerald-600 font-bold shrink-0">الطاعن:</span><span className="font-black truncate">{appellant || '---'}</span></div>
+                   <div className="flex gap-1"><span className="text-rose-500 font-bold shrink-0">ضد:</span><span className="font-bold truncate">{appellee || '---'}</span></div>
+                 </div>
+
+                 {/* Right: Date & Decision & Actions */}
+                 <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-1/3">
+                    <div className="flex flex-col gap-1 items-start sm:items-end w-full">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                        <CalendarDays className="w-3.5 h-3.5" />
+                        <span dir="ltr">{formattedLastSession || 'لم تحدد'}</span>
+                        {sessionRoll && <span className="text-[10px] bg-slate-100 px-1 rounded border">رول {sessionRoll}</span>}
+                      </div>
+                      {decision && (
+                        <div className={`text-[10px] font-black px-2 py-0.5 rounded border max-w-full truncate ${isJudgment ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-700 border-slate-200'}`}>
+                          {decision}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quick Peek Button */}
+                    <button
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         setQuickPeekId(c.id);
+                       }}
+                       className="p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors shrink-0 z-30"
+                       title="نظرة سريعة"
+                    >
+                       <Eye className="w-4 h-4" />
+                    </button>
+                 </div>
+                 
+                 {/* Urgent Alert absolute */}
+                 {hasUrgentAlert && <div className="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full animate-pulse m-2"></div>}
+                 
+                 {/* Has Viewing Task absolute */}
+                 {hasViewingTask && <div className="absolute top-0 right-3 w-2 h-2 bg-indigo-500 rounded-full m-2" title="مهمة إطلاع معلقة"></div>}
+              </div>
+            )
+          }
+
+          if (viewMode === 'compact') {
+            return (
+              <div
+                key={c.id}
+                onClick={() => navigate(`/case/${c.id}`)}
+                className={`group relative flex flex-col p-4 rounded-2xl border transition-all cursor-pointer ${bgClass} ${borderClass} ${cardOpacity} ${grayscale}`}
+              >
+                 {/* Checkbox */}
+                 <div className="absolute top-3 left-3 z-30" onClick={(e) => toggleSelection(e, c.id)}>
+                   {selectedCaseIds.includes(c.id) ? (
+                     <CheckSquare className="w-5 h-5 text-emerald-600 bg-white rounded shadow-sm" />
+                   ) : (
+                     <Square className="w-5 h-5 text-slate-300 bg-white rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                   )}
+                 </div>
+                 
+                 {hasUrgentAlert && <div className="absolute top-3 right-3 w-2 h-2 bg-rose-500 rounded-full animate-pulse"></div>}
+
+                 {/* Header */}
+                 <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="font-black text-base text-navy-900 flex items-center gap-1.5">
+                        {c.isImportant && <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />}
+                        {caseNum || 'بدون رقم'}
+                        {year && <span className="text-[10px] text-slate-400">لسنة {year}</span>}
+                      </h3>
+                      <span className={`inline-block mt-1 text-[9px] font-black px-1.5 py-0.5 rounded ${badgeBgClass}`}>{role || 'ملف دعوى'}</span>
+                    </div>
+                    <button
+                       onClick={(e) => { e.stopPropagation(); setQuickLocationEditId(c.id); }}
+                       className={`w-6 h-6 flex items-center justify-center rounded bg-slate-100 text-slate-500 hover:bg-slate-200 transition mt-1 mr-4`}
+                       title={`مكان الملف: ${fileLocation || 'لم يحدد'} (انقر للتغيير)`}
+                     >
+                       <MapPin className="w-3 h-3" />
+                     </button>
+                 </div>
+
+                 {/* Opponents */}
+                 <div className="flex flex-col gap-1 text-[10px] bg-slate-50 p-2 rounded-lg border border-slate-100 mb-3">
+                   <div className="flex gap-1"><span className="text-emerald-600 font-bold shrink-0">الطاعن:</span><span className="font-black truncate">{appellant || '---'}</span></div>
+                   <div className="flex gap-1"><span className="text-rose-500 font-bold shrink-0">ضد:</span><span className="font-bold truncate">{appellee || '---'}</span></div>
+                 </div>
+
+                 {/* Footer */}
+                 <div className="mt-auto pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                    <div className="flex items-center gap-1 font-bold text-slate-600">
+                       <CalendarDays className="w-3 h-3" />
+                       <span dir="ltr">{formattedLastSession || 'لم تحدد'}</span>
+                    </div>
+                    {decision && <span className={`truncate max-w-[120px] font-black ${isJudgment ? 'text-rose-600' : 'text-slate-600'}`}>{decision}</span>}
+                 </div>
+              </div>
+            )
+          }
 
           return (
             <div
@@ -1351,6 +1574,41 @@ export default function Files() {
           onClose={() => setIsPrintViewOpen(false)}
         />
       )}
+
+      {/* Quick Peek Side Panel */}
+      {quickPeekId && (
+        <>
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-navy-900/40 backdrop-blur-sm z-[60]"
+            onClick={() => setQuickPeekId(null)}
+          ></div>
+          
+          {/* Side Panel */}
+          <div className="fixed top-0 bottom-0 left-0 w-full sm:w-[500px] lg:w-[650px] bg-slate-50 shadow-2xl z-[70] transform transition-transform duration-300 translate-x-0 flex flex-col animate-in slide-in-from-left">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white shrink-0">
+              <h2 className="font-black text-lg text-navy-900 flex items-center gap-2">
+                <Eye className="w-5 h-5 text-indigo-600" />
+                نظرة سريعة على تفاصيل الدعوى
+              </h2>
+              <button
+                onClick={() => setQuickPeekId(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-rose-100 hover:text-rose-600 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content (CaseDetails Modal) */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden relative p-0 custom-scrollbar bg-slate-50">
+               <CaseDetails isModal={true} modalCaseId={quickPeekId} onCloseModal={() => setQuickPeekId(null)} />
+            </div>
+          </div>
+        </>
+      )}
+
     </div>
   );
 }

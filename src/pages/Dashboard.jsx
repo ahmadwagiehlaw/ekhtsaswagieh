@@ -1052,7 +1052,7 @@ export default function Dashboard() {
             <h3 className="font-black text-xs text-slate-600">توزيع الأحكام الكلي</h3>
           </div>
           {donutSegments.length > 0 ? (
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between gap-8 sm:gap-12">
               <div className="relative shrink-0">
                 <DonutChart segments={donutSegments} size={130} thickness={22} />
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -1060,7 +1060,7 @@ export default function Dashboard() {
                   <span className="text-[9px] font-bold text-slate-400">حكم</span>
                 </div>
               </div>
-              <div className="flex-1 space-y-1.5 overflow-hidden">
+              <div className="flex-1 space-y-1.5 min-w-0 py-1">
                 {donutSegments.slice(0, 7).map(seg => {
                   const isCritical = (seg.name.includes('وقف') && stats.criticalSuspended.length > 0) || (seg.name.includes('اعتبار') && stats.criticalConsidered.length > 0);
                   return (
