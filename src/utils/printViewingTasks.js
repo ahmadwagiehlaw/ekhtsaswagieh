@@ -60,8 +60,29 @@ export const printViewingTasksList = (tasks, cases, settings = {}) => {
     }
   }).join('');
 
+  // Sort tasks by roll number
+  const sortedTasks = [...tasks].sort((a, b) => {
+    const caseA = cases.find(c => c.id === a.linkedCases?.[0]) || {};
+    const caseB = cases.find(c => c.id === b.linkedCases?.[0]) || {};
+    
+    const rollAStr = a.caseContext?.roll || caseA['الرول'] || caseA['رول'] || '';
+    const rollBStr = b.caseContext?.roll || caseB['الرول'] || caseB['رول'] || '';
+    
+    const numA = parseInt(rollAStr, 10);
+    const numB = parseInt(rollBStr, 10);
+    
+    if (!isNaN(numA) && !isNaN(numB)) {
+      if (numA === numB) {
+         // if same roll number, keep original order
+         return 0;
+      }
+      return numA - numB;
+    }
+    return String(rollAStr).localeCompare(String(rollBStr), 'ar');
+  });
+
   // Build rows
-  const tableRows = tasks.map((task, index) => {
+  const tableRows = sortedTasks.map((task, index) => {
     const linkedCaseId = task.linkedCases && task.linkedCases[0];
     const linkedCase = cases.find(c => c.id === linkedCaseId) || {};
     
