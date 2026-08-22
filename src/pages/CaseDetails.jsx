@@ -26,6 +26,8 @@ import SessionsTab from '../components/CaseDetailsTabs/SessionsTab';
 import NotesTab from '../components/CaseDetailsTabs/NotesTab';
 
 
+import * as CASE_FIELDS from '../constants/caseFields';
+
 export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
   const { id: paramId } = useParams();
   const id = isModal ? modalCaseId : paramId;
@@ -262,8 +264,8 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
     return '';
   };
 
-  const caseNo = getFieldValue(caseData, ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى']);
-  const year = getFieldValue(caseData, ['السنة', 'سنة', 'year']);
+  const caseNo = getFieldValue(caseData, CASE_FIELDS.CASE_NO_KEYS);
+  const year = getFieldValue(caseData, CASE_FIELDS.YEAR_KEYS);
 
   const appellant = getFieldValue(caseData, ['المدعي', 'الطاعن', 'المستأنف']);
   
@@ -353,8 +355,8 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
     if (!canEditData) return;
 
     // Check for duplicate Case No + Year
-    const newCaseNo = getFieldValue(editData, ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى']);
-    const newYear = getFieldValue(editData, ['السنة', 'سنة', 'year']);
+    const newCaseNo = getFieldValue(editData, CASE_FIELDS.CASE_NO_KEYS);
+    const newYear = getFieldValue(editData, CASE_FIELDS.YEAR_KEYS);
 
     if (checkDuplicateCase(newCaseNo, newYear, caseData.id)) {
       toast("هذه الدعوى مسجلة بالفعل (رقم الدعوى والسنة مكرران)", "error");

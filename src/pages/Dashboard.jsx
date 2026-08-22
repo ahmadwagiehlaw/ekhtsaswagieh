@@ -6,7 +6,9 @@ import {
   Printer, Settings2, Eye, EyeOff, BarChart3, FileText, Clock, Gavel,
   ChevronRight, Calendar, LogOut, X, Star, Filter
 } from 'lucide-react';
-import { useAppContext } from '../context/AppState';
+import { useCasesContext } from '../context/CasesContext';
+import { useSettingsContext } from '../context/SettingsContext';
+import { useTasksContext } from '../context/TasksContext';
 import { calculateDashboardStats, computeMonthStats } from '../utils/statsUtils';
 import useDashboardStats from '../hooks/useDashboardStats';
 import { useUI } from '../context/UIContext';
@@ -32,92 +34,8 @@ const getJColor = (name) => {
 // ─────────────────────────────────────────────────────────────
 // SVG Donut Chart
 // ─────────────────────────────────────────────────────────────
-const DonutChart = ({ segments, size = 130, thickness = 22 }) => {
-  const radius = (size - thickness) / 2;
-  const circum = 2 * Math.PI * radius;
-  const total = segments.reduce((s, d) => s + (d.value || 0), 0);
-  const cx = size / 2, cy = size / 2;
-  if (total === 0) return null;
-  let cum = 0;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
-      <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#f1f5f9" strokeWidth={thickness} />
-      {segments.filter(s => s.value > 0).map((seg, i) => {
-        const pct = seg.value / total, dash = pct * circum, offset = -(cum * circum);
-        cum += pct;
-        return (
-          <circle key={i} cx={cx} cy={cy} r={radius} fill="none" stroke={seg.color}
-            strokeWidth={thickness} strokeDasharray={`${dash} ${circum}`} strokeDashoffset={offset}
-            style={{ transition: 'stroke-dasharray 0.8s ease' }} />
-        );
-      })}
-    </svg>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────
-// SVG Area trend line
-// ─────────────────────────────────────────────────────────────
-const TrendLine = ({ data, color = '#f59e0b' }) => {
-  if (!data || data.length < 2) return null;
-  const max = Math.max(...data.map(d => d.count), 1);
-  const W = 300, H = 72, P = 10;
-  const gradId = `tg${color.replace('#', '')}`;
-  const pts = data.map((d, i) => ({
-    x: P + (i / (data.length - 1)) * (W - 2 * P),
-    y: H - P - ((d.count / max) * (H - 2 * P))
-  }));
-  const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-  const area = `${line} L ${pts.at(-1).x.toFixed(1)} ${H} L ${pts[0].x.toFixed(1)} ${H} Z`;
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#${gradId})`} />
-      <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="white" stroke={color} strokeWidth="2" />)}
-    </svg>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────
-// Trend comparison badge
-// ─────────────────────────────────────────────────────────────
-const TrendBadge = ({ current, prev, positiveIsGood = true, className = "mt-0.5" }) => {
-  if (prev === undefined || prev === null) return null;
-  const diff = current - prev;
-  if (diff === 0) return <span className={`text-[10px] text-slate-400 font-bold ${className}`}>—</span>;
-  const isUp = diff > 0;
-  const isGood = positiveIsGood ? isUp : !isUp;
-  return (
-    <span className={`text-[10px] font-black ${className} ${isGood ? 'text-emerald-400' : 'text-rose-400'}`}>
-      {isUp ? '▲' : '▼'} {Math.abs(diff)}
-    </span>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────
-// KPI Card component (gradient, icon, value)
-// ─────────────────────────────────────────────────────────────
-const KPICard = ({ icon: Icon, label, sublabel, value, accentColor, bgFrom, bgTo, iconBg, border, onClick, extra }) => (
-  <button onClick={onClick}
-    className={`group relative overflow-hidden bg-gradient-to-br ${bgFrom} ${bgTo} rounded-2xl p-4 border ${border} shadow-sm
-      flex flex-col gap-1 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200 text-right w-full`}>
-    <div className="absolute -left-5 -top-5 w-20 h-20 rounded-full opacity-10" style={{ backgroundColor: accentColor }} />
-    <div className={`${iconBg} w-10 h-10 rounded-xl flex items-center justify-center shadow-sm mb-1 self-start`}>
-      <Icon className="w-5 h-5" style={{ color: accentColor }} />
-    </div>
-    <p className="text-3xl font-black leading-none" style={{ color: accentColor }}>{value}</p>
-    <p className="text-xs font-black text-slate-700 leading-tight">{label}</p>
-    <p className="text-[10px] font-bold text-slate-400">{sublabel}</p>
-    {extra && <div className="mt-1">{extra}</div>}
-    <div className="absolute bottom-0 left-0 w-full h-0.5 opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: accentColor }} />
-  </button>
-);
+import { DonutChart, TrendLine, TrendBadge } from '../components/ui/Charts';
+import KPICard from '../components/ui/KPICard';
 
 // ─────────────────────────────────────────────────────────────
 // Print Report Modal
@@ -361,7 +279,9 @@ const JudicialAgendaReportModal = ({ title, casesList, onClose }) => {
 // Main Dashboard
 // ─────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { cases, isEmployee, currentUser, currentUserName, logoutAdmin, saveCaseToFirebase, settings, globalTasks, saveGlobalTask, completeGlobalTask } = useAppContext();
+  const { cases, saveCaseToFirebase } = useCasesContext();
+  const { settings, isEmployee, currentUser, currentUserName, logoutAdmin } = useSettingsContext();
+  const { globalTasks, saveGlobalTask, completeGlobalTask } = useTasksContext();
   const navigate = useNavigate();
   const { showPrompt, toast } = useUI();
 

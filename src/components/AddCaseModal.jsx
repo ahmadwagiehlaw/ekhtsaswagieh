@@ -1,14 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import { X, Save, Plus, Check, Trash2, MapPin, Settings2 } from 'lucide-react';
-import { useAppContext } from '../context/AppState';
+import { useCasesContext } from '../context/CasesContext';
+import { useSettingsContext } from '../context/SettingsContext';
 import { useUI } from '../context/UIContext';
 import { useNavigate } from 'react-router-dom';
 import SmartAutocomplete from './SmartAutocomplete';
 import FieldOptionsManager from './FieldOptionsManager';
 import StrictSelectField from './StrictSelectField';
+import * as CASE_FIELDS from '../constants/caseFields';
 
 export default function AddCaseModal({ isOpen, onClose }) {
-  const { schema, createNewCase, settings, cases, saveCaseToFirebase } = useAppContext();
+  const { schema, createNewCase, cases, saveCaseToFirebase } = useCasesContext();
+  const { settings } = useSettingsContext();
   const { toast } = useUI();
   const [formData, setFormData] = useState({
     joinedCasesList: [],
@@ -161,22 +164,22 @@ export default function AddCaseModal({ isOpen, onClose }) {
                   {
                     title: '📌 بيانات أساسية',
                     colorClass: 'text-blue-700 bg-blue-50/50 border-blue-100',
-                    keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'دعاوى منضمة', 'المحكمة', 'الدائرة', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'مطعون ضدهم آخرين', 'الصفة', 'صفة']
+                    keys: [...CASE_FIELDS.CASE_NO_KEYS, ...CASE_FIELDS.YEAR_KEYS, 'دعاوى منضمة', 'المحكمة', 'الدائرة', ...CASE_FIELDS.APPELLANT_KEYS, ...CASE_FIELDS.APPELLEE_KEYS, 'الخصوم', 'مطعون ضدهم آخرين', ...CASE_FIELDS.ROLE_KEYS]
                   },
                   {
                     title: '⚖️ الجلسة والقرار',
                     colorClass: 'text-amber-700 bg-amber-50/50 border-amber-100',
-                    keys: ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'الرول', 'نوع الجلسة', 'القرار', 'قرار الجلسة', 'مكان الملف', 'ملاحظات']
+                    keys: [...CASE_FIELDS.SESSION_DATE_KEYS, ...CASE_FIELDS.ROLL_KEYS, ...CASE_FIELDS.SESSION_TYPE_KEYS, ...CASE_FIELDS.DECISION_KEYS, ...CASE_FIELDS.LOCATION_KEYS, 'ملاحظات']
                   },
                   {
                     title: '📑 بيانات فنية',
                     colorClass: 'text-indigo-700 bg-indigo-50/50 border-indigo-100',
-                    keys: ['تصنيف الدعوى', 'موضوع الدعوى', 'طلبات المدعي']
+                    keys: [...CASE_FIELDS.CLASSIFICATION_KEYS, ...CASE_FIELDS.SUBJECT_KEYS, 'طلبات المدعي']
                   },
                   {
                     title: '🏛️ بيانات الحكم وأخرى',
                     colorClass: 'text-rose-700 bg-rose-50/50 border-rose-100',
-                    keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي']
+                    keys: [...CASE_FIELDS.COURT_FIRST_NAME_KEYS, 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', ...CASE_FIELDS.JUDGMENT_KEYS, 'تصنيف الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي']
                   }
                 ].map((group) => (
                   <button
@@ -200,27 +203,27 @@ export default function AddCaseModal({ isOpen, onClose }) {
                   {
                     title: '📌 بيانات أساسية',
                     colorClass: 'text-blue-700 bg-blue-50/50 border-blue-100',
-                    keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'دعاوى منضمة', 'المحكمة', 'الدائرة', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'مطعون ضدهم آخرين', 'الصفة', 'صفة']
+                    keys: [...CASE_FIELDS.CASE_NO_KEYS, ...CASE_FIELDS.YEAR_KEYS, 'دعاوى منضمة', 'المحكمة', 'الدائرة', ...CASE_FIELDS.APPELLANT_KEYS, ...CASE_FIELDS.APPELLEE_KEYS, 'الخصوم', 'مطعون ضدهم آخرين', ...CASE_FIELDS.ROLE_KEYS]
                   },
                   {
                     title: '⚖️ الجلسة والقرار',
                     colorClass: 'text-amber-700 bg-amber-50/50 border-amber-100',
-                    keys: ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'الرول', 'نوع الجلسة', 'القرار', 'قرار الجلسة', 'مكان الملف', 'ملاحظات']
+                    keys: [...CASE_FIELDS.SESSION_DATE_KEYS, ...CASE_FIELDS.ROLL_KEYS, ...CASE_FIELDS.SESSION_TYPE_KEYS, ...CASE_FIELDS.DECISION_KEYS, ...CASE_FIELDS.LOCATION_KEYS, 'ملاحظات']
                   },
                   {
                     title: '📑 بيانات فنية',
                     colorClass: 'text-indigo-700 bg-indigo-50/50 border-indigo-100',
-                    keys: ['تصنيف الدعوى', 'موضوع الدعوى', 'طلبات المدعي']
+                    keys: [...CASE_FIELDS.CLASSIFICATION_KEYS, ...CASE_FIELDS.SUBJECT_KEYS, 'طلبات المدعي']
                   },
                   {
                     title: '🏛️ بيانات الحكم وأخرى',
                     colorClass: 'text-rose-700 bg-rose-50/50 border-rose-100',
-                    keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي']
+                    keys: [...CASE_FIELDS.COURT_FIRST_NAME_KEYS, 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', ...CASE_FIELDS.JUDGMENT_KEYS, 'تصنيف الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي']
                   }
                 ].map((group, idx, arr) => {
                   if (group.title !== activeTab) return null;
 
-                  const excludedFields = ['الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي'];
+                  const excludedFields = [...CASE_FIELDS.JUDGMENT_KEYS, 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', ...CASE_FIELDS.ROLL_KEYS, 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي'];
                   let groupFields = schema.filter(f => f.visible && group.keys.includes(f.id));
                   
                   if (idx === arr.length - 1) {
@@ -246,11 +249,11 @@ export default function AddCaseModal({ isOpen, onClose }) {
                             if (field.id === 'عنوان المدعي' && !isDefendantRole) return null;
                             if (['السنة', 'سنة', 'year', 'دعاوى منضمة', 'مطعون ضدهم آخرين', 'المدعى_عليه', 'المدعى عليه', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي', 'المدعي', 'الصفة', 'صفة'].includes(field.id)) return null;
                             
-                            const isFullWidthField = field.type === 'textarea' || ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى'].includes(field.id);
+                            const isFullWidthField = field.type === 'textarea' || CASE_FIELDS.CASE_NO_KEYS.includes(field.id);
                             
                             return (
                               <div key={field.id} className={`${isFullWidthField ? 'md:col-span-2' : ''}`}>
-                                {!['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'القرار', 'الصفة', 'مكان الملف', 'نوع الجلسة', 'تصنيف الحكم', 'نوع الحكم'].includes(field.id) && (
+                                {!['القرار', 'الصفة', 'مكان الملف', 'نوع الجلسة', 'تصنيف الحكم', 'نوع الحكم', ...CASE_FIELDS.CASE_NO_KEYS].includes(field.id) && (
                                   <div className="flex items-center gap-2 mb-1.5">
                                     <label className="text-[11px] font-black text-slate-500 block">{field.label}</label>
                                   </div>
@@ -291,7 +294,7 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                    </div>
                                 ) : (
                                   <div>
-                                    {['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى'].includes(field.id) ? (
+                                    {CASE_FIELDS.CASE_NO_KEYS.includes(field.id) ? (
                                         <div className="w-full pt-5">
                                           <div className="grid grid-cols-12 gap-2 w-full">
                                             <div className="col-span-4 sm:col-span-3 relative">

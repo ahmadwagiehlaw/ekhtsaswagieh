@@ -5,6 +5,9 @@ import { useAuth } from './AuthContext';
 import { getSafeDateObj } from '../utils/dateUtils';
 import { getCaseRole, getAppellantName, getAppelleeName, syncSessionRootFields } from '../utils/caseUtils';
 import { isNoInterestRole, isOutOfJurisdictionRole } from '../constants/roleHelpers';
+import { CasesContext } from './CasesContext';
+import { SettingsContext } from './SettingsContext';
+import { TasksContext } from './TasksContext';
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
@@ -717,6 +720,24 @@ export const AppProvider = ({ children }) => {
     }
   }
 
+  const settingsValue = useMemo(() => ({
+    settings, isAdmin, isEmployee, currentUser: userEmail, currentUserName, currentUserPermissions,
+    loading, saveSettingsToFirebase, logoutAdmin: logout
+  }), [settings, isAdmin, isEmployee, userEmail, currentUserName, currentUserPermissions, loading, logout]);
+
+  const tasksValue = useMemo(() => ({
+    globalTasks, saveGlobalTask, deleteGlobalTask, completeGlobalTask, PREDEFINED_TASKS,
+    viewingTasks, saveViewingTask, deleteViewingTask, completeViewingTask
+  }), [globalTasks, viewingTasks]);
+
+  const casesValue = useMemo(() => ({
+    cases, rawCases, deletedCases, plaintiffsList, defendantsList, rolls, schema,
+    globalHideNoInterest, setGlobalHideNoInterest,
+    saveCaseToFirebase, createNewCase, checkDuplicateCase, saveBatchCasesToFirebase,
+    saveSchemaToFirebase, deleteAllCases, deleteCaseFromFirebase, restoreCaseFromFirebase,
+    saveRollToFirebase, deleteRollFromFirebase
+  }), [cases, rawCases, deletedCases, plaintiffsList, defendantsList, rolls, schema, globalHideNoInterest]);
+
   const contextValue = useMemo(() => ({
       cases,
       rawCases,
@@ -759,14 +780,20 @@ export const AppProvider = ({ children }) => {
       completeViewingTask,
   }), [
     cases, rawCases, deletedCases, plaintiffsList, defendantsList, rolls, schema, settings, isAdmin, isEmployee, 
-    currentUser, currentUserName, currentUserPermissions, loading, globalHideNoInterest,
-    globalTasks, viewingTasks
+    userEmail, currentUserName, currentUserPermissions, loading, globalHideNoInterest,
+    globalTasks, viewingTasks, logout
   ]);
 
   return (
-    <AppContext.Provider value={contextValue}>
-      {children}
-    </AppContext.Provider>
+    <SettingsContext.Provider value={settingsValue}>
+      <TasksContext.Provider value={tasksValue}>
+        <CasesContext.Provider value={casesValue}>
+          <AppContext.Provider value={contextValue}>
+            {children}
+          </AppContext.Provider>
+        </CasesContext.Provider>
+      </TasksContext.Provider>
+    </SettingsContext.Provider>
   );
 };
 
