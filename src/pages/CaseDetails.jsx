@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2, Bell, AlertTriangle, FileText, ExternalLink, BookOpen, Files, Hash, Paperclip, Scale, Loader2, Plus, Star, MessageSquare, Printer, FolderOpen, History, MapPin, Camera } from 'lucide-react';
+import { ArrowRight, Save, Edit3, X, Gavel, Trash2, CalendarPlus, ClipboardList, CheckCircle2, Bell, AlertTriangle, FileText, ExternalLink, BookOpen, Files, Hash, Paperclip, Scale, Loader2, Plus, Star, MessageSquare, Printer, FolderOpen, History, MapPin, Camera, StickyNote, Pin } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import AddSessionModal from '../components/AddSessionModal';
@@ -22,6 +22,7 @@ import { useRef } from 'react';
 import SmartAutocomplete from '../components/SmartAutocomplete';
 import CaseInfoTab from '../components/CaseDetailsTabs/CaseInfoTab';
 import SessionsTab from '../components/CaseDetailsTabs/SessionsTab';
+import NotesTab from '../components/CaseDetailsTabs/NotesTab';
 
 
 export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
@@ -636,6 +637,8 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
             </h1>
           </div>
 
+
+
           {/* Action Buttons Centered Below */}
           <div className="flex items-center justify-center gap-3 mt-2">
             {/* Star Button */}
@@ -653,6 +656,20 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
               title={caseData.isImportant ? "إزالة الأهمية" : "تمييز كدعوى هامة"}
             >
               <Star className={`w-5 h-5 ${caseData.isImportant ? 'fill-amber-500' : ''}`} />
+            </button>
+
+            {/* Notes Button */}
+            <button
+              onClick={() => setActiveTab('notes')}
+              className={`relative p-2 rounded-xl transition ${caseData.notes && caseData.notes.length > 0 ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-indigo-600'}`}
+              title="ملاحظات الدعوى"
+            >
+              <StickyNote className={`w-5 h-5 ${caseData.notes && caseData.notes.length > 0 ? 'fill-amber-100' : ''}`} />
+              {caseData.notes && caseData.notes.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-rose-500 text-white text-[10px] font-black rounded-full border-2 border-white px-1">
+                  {caseData.notes.length}
+                </span>
+              )}
             </button>
 
             {/* Viewing Task Button */}
@@ -721,6 +738,26 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
             </span>
           </div>
 
+          {/* Pinned Notes Banners */}
+          {caseData.notes && caseData.notes.filter(n => n.isPinned).length > 0 && (
+            <div className="flex flex-col gap-2 mt-3 items-center justify-center max-w-2xl mx-auto w-full px-4">
+              {caseData.notes.filter(n => n.isPinned).map(note => (
+                <div key={note.id} className="w-full flex flex-col items-start gap-1 bg-amber-50 text-amber-900 border border-amber-200 p-3 rounded-xl shadow-sm text-right">
+                  {note.title && (
+                    <div className="flex items-center gap-2 font-black text-amber-800">
+                      <Pin className="w-4 h-4 text-amber-500 shrink-0" />
+                      {note.title}
+                    </div>
+                  )}
+                  <div className={`text-sm font-bold whitespace-pre-wrap flex-1 ${!note.title ? 'flex items-start gap-2' : 'pr-6'}`}>
+                    {!note.title && <Pin className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />}
+                    {note.content}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {(decision || lastSession) && (
             <div className={`mt-3 p-3 rounded-xl border flex flex-row items-center justify-center gap-3 flex-wrap ${isJudgment ? 'bg-rose-50 border-rose-100 text-rose-800' : 'bg-amber-50/50 border-amber-100 text-amber-800'}`}>
               {caseRoll && (
@@ -777,6 +814,15 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
             className={`flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-lg whitespace-nowrap transition-all flex items-center justify-center gap-1.5 ${activeTab === 'sessions' ? 'bg-navy-900 text-amber-300 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
           >
             <CalendarPlus className="w-4 h-4" /> الجلسات
+          </button>
+          <button
+            onClick={() => setActiveTab('notes')}
+            className={`flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-lg whitespace-nowrap transition-all flex items-center justify-center gap-1.5 ${activeTab === 'notes' ? 'bg-navy-900 text-amber-300 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+          >
+            <StickyNote className="w-4 h-4" /> ملاحظات
+            {caseData.notes && caseData.notes.length > 0 && (
+              <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-md leading-none">{caseData.notes.length}</span>
+            )}
           </button>
         </div>
       </div>
@@ -844,6 +890,17 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
       {/* Tab Content: Documents */}
       {activeTab === 'documents' && (
         <CaseDocuments caseId={caseData.id} pastedFile={pastedFile} setPastedFile={setPastedFile} />
+      )}
+
+      {/* Tab Content: Notes */}
+      {activeTab === 'notes' && (
+        <NotesTab 
+          caseData={caseData} 
+          saveCaseToFirebase={saveCaseToFirebase} 
+          showConfirm={showConfirm} 
+          showPrompt={showPrompt} 
+          toast={toast} 
+        />
       )}
 
       {/* Add Session Modal */}
