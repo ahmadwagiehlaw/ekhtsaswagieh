@@ -203,6 +203,25 @@ export default function Files() {
   });
 
   const totalPages = Math.ceil(sortedCases.length / itemsPerPage);
+  
+  // Prevent empty pages when filters reduce results
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    debouncedSearchQuery, advancedParams, activeShoba, roleFilter,
+    showSessionlessOnly, showJudgmentsOnly, showImportantOnly,
+    showPastSessionsOnly, showOngoingOnly, showWithAttachmentsOnly,
+    showMissingRoleOnly, locationFilter, sessionTypeFilter,
+    decisionFilter, quickDateFilter, setCurrentPage
+  ]);
+  
+  // Prevent out of bounds if cases are deleted
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage, setCurrentPage]);
+
   const currentCases = sortedCases.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleAdvancedSearch = (params) => {

@@ -280,10 +280,14 @@ export const AppProvider = ({ children }) => {
   };
 
   const cleanUndefined = (obj) => {
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) {
+      return obj.map(cleanUndefined).filter(v => v !== undefined);
+    }
     const newObj = {};
     for (let key in obj) {
       if (obj[key] !== undefined) {
-        newObj[key] = obj[key];
+        newObj[key] = cleanUndefined(obj[key]);
       }
     }
     return newObj;
@@ -297,22 +301,20 @@ export const AppProvider = ({ children }) => {
       
       // Get the existing case data to check transitions correctly if needed
       const existingCase = cases.find(c => c.id === caseId) || {};
-      let payload = { ...caseData };
+      let payload = { ...existingCase, ...caseData };
 
       // Apply Court Degree State Machine Logic
       const currentCourtDegree = settings?.courtDegree || 'أول درجة';
       const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
       
-      const newSessionType = payload['نوع الجلسة'] || existingCase['نوع الجلسة'];
-      const newDecision = payload['القرار'] || existingCase['القرار'];
-      const hasJudgmentData = (payload['الحكم'] || existingCase['الحكم']) || (payload['منطوق الحكم'] || existingCase['منطوق الحكم']) || (payload['تصنيف الحكم'] || existingCase['تصنيف الحكم']);
-
+      const newSessionType = payload['نوع الجلسة'];
+      const newDecision = payload['القرار'];
+      
       if (isSupreme) {
         // Supreme Court Transitions
         if (newSessionType === 'فحص' && newDecision === 'إحالة للموضوع') {
           payload['نوع الجلسة'] = 'موضوع';
         }
-        // Removed aggressive 'حكم' override to allow manual corrections and preliminary judgments
       }
 
       // Sync root fields with sessions

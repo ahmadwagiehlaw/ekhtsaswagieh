@@ -91,6 +91,13 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
     }
   }, [caseData?.id]);
 
+  // Sync editData when caseData updates from server (e.g. from modals)
+  React.useEffect(() => {
+    if (!isEditing && caseData) {
+      setEditData(caseData);
+    }
+  }, [caseData, isEditing]);
+
   // Auto-migration for legacy sessions
   React.useEffect(() => {
     if (caseData?.id && (!caseData.sessions || caseData.sessions.length === 0)) {

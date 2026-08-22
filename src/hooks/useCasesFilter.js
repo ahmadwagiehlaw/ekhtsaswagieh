@@ -262,7 +262,11 @@ export default function useCasesFilter({
     } else if (debouncedSearchQuery) {
       const q = debouncedSearchQuery.toLowerCase();
       result = result.filter(c => {
-        const srchStr = `${c['رقم الدعوى'] || ''} ${c['السنة'] || ''} ${c['المدعي'] || ''} ${c['الطاعن'] || ''} ${c['المدعى عليه'] || ''} ${c['المطعون ضده'] || ''} ${c.id || ''}`.toLowerCase();
+        const caseNo = c['رقم الدعوى'] || c['رقم القضية'] || c['رقم_الدعوى'] || '';
+        const year = c['السنة'] || c['سنة'] || c['year'] || '';
+        const appName = c['المدعي'] || c['الطاعن'] || c['المستأنف'] || '';
+        const applee = c['المدعى عليه'] || c['المطعون ضده'] || c['المدعى_عليه'] || '';
+        const srchStr = `${caseNo} ${year} ${appName} ${applee} ${c.id || ''}`.toLowerCase();
         return srchStr.includes(q);
       });
     }
