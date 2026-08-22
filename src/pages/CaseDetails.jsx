@@ -761,8 +761,8 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
           {(decision || lastSession) && (
             <div className={`mt-3 p-3 rounded-xl border flex flex-row items-center justify-center gap-3 flex-wrap ${isJudgment ? 'bg-rose-50 border-rose-100 text-rose-800' : 'bg-amber-50/50 border-amber-100 text-amber-800'}`}>
               {caseRoll && (
-                <div className="text-sm font-black flex items-center gap-1 shrink-0">
-                  <Hash className="w-4 h-4 text-slate-500" />
+                <div className="text-sm font-black flex items-center gap-1 shrink-0" title="الرول">
+                  <Hash className="w-4 h-4 opacity-60" />
                   <span dir="ltr">{caseRoll}</span>
                 </div>
               )}
@@ -773,19 +773,22 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
                   className="text-sm font-black flex items-center gap-1.5 shrink-0 hover:text-indigo-600 transition"
                   title="عرض رول الجلسة"
                 >
-                  📅 جلسة: <span dir="ltr">{lastSession}</span>
+                  <CalendarPlus className="w-4 h-4 text-indigo-500" />
+                  <span dir="ltr">{lastSession}</span>
                   <BookOpen className="w-4 h-4 text-indigo-500" />
                 </button>
               )}
               {lastSession && decision && <div className="w-px h-4 bg-current opacity-20"></div>}
               {decision && (
-                <span className="text-sm font-black text-center">
+                <span className="text-sm font-black flex items-center gap-1 text-center" title="القرار / المنطوق">
+                  <Gavel className="w-4 h-4 opacity-60" />
                   {decision}
                 </span>
               )}
               {((lastSession || decision) && sessionType) && <div className="w-px h-4 bg-current opacity-20"></div>}
               {sessionType && (
-                <span className="text-sm font-black text-center">
+                <span className="text-sm font-black flex items-center gap-1 text-center" title="نوع الجلسة">
+                  <FileText className="w-4 h-4 opacity-60" />
                   {sessionType}
                 </span>
               )}

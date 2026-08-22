@@ -10,7 +10,6 @@ import { useAppContext } from '../context/AppState';
 import { calculateDashboardStats, computeMonthStats } from '../utils/statsUtils';
 import { useUI } from '../context/UIContext';
 import { getSafeDateObj } from '../utils/dateUtils';
-import AdvancedSearchModal from '../components/AdvancedSearchModal';
 import BulkAssignTaskModal from '../components/BulkAssignTaskModal';
 
 // ─────────────────────────────────────────────────────────────
@@ -1402,10 +1401,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Modals */}
-      {isAdvancedSearchOpen && (
-        <AdvancedSearchModal isOpen={isAdvancedSearchOpen} onClose={() => setIsAdvancedSearchOpen(false)} onSearch={handleAdvancedSearch} />
-      )}
+
       <BulkAssignTaskModal isOpen={isGlobalTaskModalOpen} onClose={() => setIsGlobalTaskModalOpen(false)} selectedCases={[]} onClearSelection={() => { }} />
       {agendaModal.isOpen && (
         <JudicialAgendaReportModal
