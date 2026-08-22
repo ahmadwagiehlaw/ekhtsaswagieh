@@ -9,10 +9,13 @@ import BulkViewingTaskModal from '../components/BulkViewingTaskModal';
 import BulkEditCasesModal from '../components/BulkEditCasesModal';
 import GlobalTemplatePrintModal from '../components/GlobalTemplatePrintModal';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
+import useCasesFilter from '../hooks/useCasesFilter';
+import useCasesSort from '../hooks/useCasesSort';
 import { printViewingTasksList } from '../utils/printViewingTasks';
 import CaseDetails from './CaseDetails';
 
 import useSessionState from '../hooks/useSessionState';
+import useDebounce from '../hooks/useDebounce';
 
 export default function Files() {
   const { cases, schema, settings, deleteCaseFromFirebase, saveCaseToFirebase, globalHideNoInterest, setGlobalHideNoInterest, globalTasks, viewingTasks } = useAppContext();
@@ -21,7 +24,7 @@ export default function Files() {
   const location = useLocation();
 
   const [searchQuery, setSearchQuery] = useSessionState('files_searchQuery', '');
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
+  const debouncedSearchQuery = useDebounce(searchQuery, 400);
   const [roleFilter, setRoleFilter] = useSessionState('files_roleFilter', 'all');
   const [currentPage, setCurrentPage] = useSessionState('files_currentPage', 1);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -113,12 +116,6 @@ export default function Files() {
     }
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
 
   // "/" keyboard shortcut — focus & select-all on the search input
   useEffect(() => {
@@ -165,256 +162,26 @@ export default function Files() {
     }
   }, [location.search]);
 
-  const uniqueLocations = useMemo(() => {
-    const locs = new Set();
-    cases.forEach(c => {
-      const loc = String(c['مكان الملف'] || '').trim();
-      if (loc && loc !== '-' && loc !== 'مقيدة' && loc !== 'غير موجود' && loc !== 'ملف مؤقت') {
-        locs.add(loc);
-      }
-    });
-    return Array.from(locs).sort();
-  }, [cases]);
-
-  const uniqueDates = useMemo(() => {
-    const dates = new Set();
-    cases.forEach(c => {
-      const dStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'];
-      if (dStr) {
-        const d = getSafeDateObj(dStr);
-        if (d) {
-          const pad = n => n.toString().padStart(2, '0');
-          dates.add(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-        }
-      }
-    });
-    return Array.from(dates).sort((a, b) => new Date(b) - new Date(a));
-  }, [cases]);
-
-  const filteredCases = useMemo(() => {
-    let result = cases;
-
-    // 1. Shoba Filter
-    const archiveLocations = settings?.archiveLocations || ['شعبة الحفظ', 'الحفظ', 'حفظ'];
-
-    const isSpecialLocation = (loc) => {
-      if (!loc) return false;
-      if (archiveLocations.includes(loc)) return false;
-      return loc === 'شعبة تحت التحديد' || loc === 'تحت التحديد';
-    };
-
-    if (activeShoba === 'متداول') {
-      result = result.filter(c => {
-        const loc = String(c['مكان الملف'] || '').trim();
-        return !archiveLocations.includes(loc) && !isSpecialLocation(loc);
-      });
-    } else if (activeShoba === 'تحت_التحديد') {
-      result = result.filter(c => {
-        const loc = String(c['مكان الملف'] || '').trim();
-        return isSpecialLocation(loc);
-      });
-    } else if (activeShoba === 'حفظ') {
-      result = result.filter(c => {
-        const loc = String(c['مكان الملف'] || '').trim();
-        return archiveLocations.includes(loc);
-      });
-    }
-
-    if (roleFilter !== 'all') {
-      result = result.filter(c => {
-        const role = String(c['الصفة'] || c['صفة'] || '').trim();
-        const appRole = settings?.roles?.[0] || 'طاعن';
-        const apeRole = settings?.roles?.[1] || 'مطعون ضدنا';
-        if (roleFilter === 'appellant') {
-          return role.includes(appRole) || role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
-        } else if (roleFilter === 'appellee') {
-          return role.includes(apeRole) || role.includes('مطعون') || role.includes('مستأنف ضده') || role.includes('مدعى عليه') || role.includes('مدعى علينا');
-        } else if (roleFilter === 'none') {
-          return !role || role === '-' || role === '---' || role === 'غير محدد';
-        }
-        return true;
-      });
-    }
-
-    if (showSessionlessOnly) {
-      result = result.filter(c => {
-        const dateStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'];
-        if (!dateStr) return true;
-        const d = getSafeDateObj(dateStr);
-        return !d;
-      });
-    }
-
-    if (showJudgmentsOnly) {
-      result = result.filter(c => {
-        const fileLocation = String(c['مكان الملف'] || '').trim();
-        if (fileLocation === 'الأحكام') return true;
-        const decision = String(c['القرار'] || c['قرار الجلسة'] || c['المنطوق'] || '').trim();
-        if (decision.includes('حكم نهائي وبات')) return true;
-        return false;
-      });
-    }
-
-    if (showImportantOnly) {
-      result = result.filter(c => c.isImportant);
-    }
-
-    if (showPastSessionsOnly) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      result = result.filter(c => {
-        const dateStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'];
-        if (!dateStr) return false;
-        const d = getSafeDateObj(dateStr);
-        if (!d) return false;
-        return d < today;
-      });
-    }
-
-    if (showOngoingOnly) {
-      const today = new Date();
-      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      result = result.filter(c => {
-        const dateStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'];
-        if (!dateStr) return false;
-        const d = getSafeDateObj(dateStr);
-        if (!d) return false;
-        return d >= firstDayOfMonth;
-      });
-    }
-
-    if (showWithAttachmentsOnly) {
-      result = result.filter(c => c.documents && c.documents.length > 0);
-    }
-
-    if (showMissingRoleOnly) {
-      result = result.filter(c => {
-        const appellant = String(c['الطاعن'] || c['المدعي'] || c['المستأنف'] || '').trim();
-        const appellee = String(c['المطعون ضده'] || c['المطعون ضدهم'] || c['المدعى عليه'] || c['المدعى عليهم'] || '').trim();
-        return !appellant || appellant === '-' || !appellee || appellee === '-';
-      });
-    }
-
-    if (locationFilter && locationFilter !== 'all') {
-      result = result.filter(c => {
-        const loc = String(c['مكان الملف'] || '').trim();
-        if (locationFilter === 'missing') return loc === 'غير موجود' || loc === 'مقيدة' || loc === '';
-        if (locationFilter === 'temp') return loc === 'ملف مؤقت';
-        return loc === locationFilter;
-      });
-    }
-
-    if (sessionTypeFilter && sessionTypeFilter !== 'all') {
-      result = result.filter(c => {
-        const decision = String(c['القرار'] || c['قرار الجلسة'] || c['المنطوق'] || '').trim();
-        const sessionType = String(c['نوع الجلسة'] || c['نوع_الجلسة'] || '').trim();
-        
-        if (sessionTypeFilter === 'judgment') return decision.includes('للحكم') || decision.includes('حكم') || sessionType.includes('حكم');
-        
-        return sessionType.includes(sessionTypeFilter) || decision.includes(sessionTypeFilter);
-      });
-    }
-
-    if (decisionFilter) {
-      const q = decisionFilter.toLowerCase();
-      result = result.filter(c => {
-        const decision = String(c['القرار'] || c['قرار الجلسة'] || c['المنطوق'] || '').toLowerCase();
-        return decision.includes(q);
-      });
-    }
-
-    if (quickDateFilter) {
-      result = result.filter(c => {
-        const dStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'];
-        if (!dStr) return false;
-        const d = getSafeDateObj(dStr);
-        if (!d) return false;
-        const pad = n => n.toString().padStart(2, '0');
-        const dISO = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-        return dISO === quickDateFilter;
-      });
-    }
-
-    if (advancedParams) {
-      const { caseNo, year, opponentName, opponentRole, decision, sessionDateStart, sessionDateEnd, court, location, requiredTask, requiredTaskType } = advancedParams;
-
-      result = result.filter(c => {
-        // 1. Case No
-        if (caseNo && !(c['رقم الدعوى'] || c['رقم القضية'] || c.id)?.toString().includes(caseNo)) return false;
-
-        // 2. Year
-        if (year && !(c['السنة'] || c['سنة'])?.toString().includes(year)) return false;
-
-        // 3. Opponent
-        if (opponentName) {
-          const name = opponentName.toLowerCase();
-          const appellant = (c['الطاعن'] || c['المدعي'] || c['المستأنف'] || '').toLowerCase();
-          const appellee = (c['المطعون ضده'] || c['المدعى عليه'] || '').toLowerCase();
-
-          if (opponentRole === 'appellant') {
-            if (!appellant.includes(name)) return false;
-          } else if (opponentRole === 'appellee') {
-            if (!appellee.includes(name)) return false;
-          } else {
-            if (!appellant.includes(name) && !appellee.includes(name)) return false;
-          }
-        }
-
-        // 4. Decision
-        if (decision) {
-          const caseDecision = (c['القرار'] || c['قرار الجلسة'] || c['المنطوق'] || '');
-          if (decision === 'حكم') {
-            if (!caseDecision.includes('حكم') && !caseDecision.includes('للحكم')) return false;
-          } else if (decision === 'للحكم') {
-            if (caseDecision !== 'للحكم' && caseDecision !== 'محجوز للحكم') return false;
-          } else {
-            if (!caseDecision.includes(decision)) return false;
-          }
-        }
-
-        // Required Task
-        if (requiredTask) {
-          const hasRequiredTask = globalTasks.some(t => t.status === 'pending' && t.title === requiredTask && t.linkedCases?.includes(c.id));
-          if (!hasRequiredTask) return false;
-        }
-        if (requiredTaskType) {
-          const hasRequiredTaskType = globalTasks.some(t => t.status === 'pending' && t.type === requiredTaskType && t.linkedCases?.includes(c.id));
-          if (!hasRequiredTaskType) return false;
-        }
-
-        // 5. Session Date
-        if (sessionDateStart || sessionDateEnd) {
-          const caseDateStr = c['آخر جلسة'] || c['تاريخ الجلسة'];
-          if (!caseDateStr) return false;
-          const caseDate = getSafeDateObj(caseDateStr);
-          if (!caseDate) return false;
-
-          if (sessionDateStart && caseDate < new Date(sessionDateStart)) return false;
-          if (sessionDateEnd && caseDate > new Date(sessionDateEnd)) return false;
-        }
-
-        // 6. Court
-        if (court && c['المحكمة'] !== court) return false;
-
-        // 7. Location
-        if (location && c['مكان الملف'] !== location) return false;
-
-        return true;
-      });
-    } else if (debouncedSearchQuery) {
-      const q = debouncedSearchQuery.toLowerCase();
-      result = result.filter(c => {
-        const srchStr = `${c['رقم الدعوى'] || ''} ${c['السنة'] || ''} ${c['المدعي'] || ''} ${c['الطاعن'] || ''} ${c['المدعى عليه'] || ''} ${c['المطعون ضده'] || ''} ${c.id || ''}`.toLowerCase();
-        return srchStr.includes(q);
-      });
-    }
-
-    return result;
-  }, [cases, debouncedSearchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showMissingRoleOnly, showJudgmentsOnly, locationFilter, sessionTypeFilter, decisionFilter, quickDateFilter, activeShoba, settings, globalTasks]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearchQuery, roleFilter, advancedParams, showOngoingOnly, showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly, showMissingRoleOnly, showJudgmentsOnly, locationFilter, sessionTypeFilter, decisionFilter, quickDateFilter, sortBy, activeShoba]);
+  const { uniqueLocations, uniqueDates, filteredCases } = useCasesFilter({
+    cases,
+    settings,
+    globalTasks,
+    activeShoba,
+    roleFilter,
+    showSessionlessOnly,
+    showJudgmentsOnly,
+    showImportantOnly,
+    showPastSessionsOnly,
+    showOngoingOnly,
+    showWithAttachmentsOnly,
+    showMissingRoleOnly,
+    locationFilter,
+    sessionTypeFilter,
+    decisionFilter,
+    quickDateFilter,
+    advancedParams,
+    debouncedSearchQuery
+  });
 
   const getPrimaryValue = (cObj, possibleKeys) => {
     for (let k of possibleKeys) {
@@ -423,96 +190,11 @@ export default function Files() {
     return '';
   };
 
-  const sortedCases = useMemo(() => {
-    let result = [...filteredCases];
-
-    const getSessionRoll = (c) => {
-      const rollStr = c['الرول'] || c['رول الجلسة'] || c['رقم الرول'] || '';
-      const parsed = parseInt(String(rollStr).replace(/[^\d]/g, ''), 10);
-      return isNaN(parsed) ? 999999 : parsed;
-    };
-
-    if (quickDateFilter) {
-      result.sort((a, b) => getSessionRoll(a) - getSessionRoll(b));
-    }
-
-    if (sortBy === 'none') return result;
-
-    const getCaseNumber = (c) => {
-      const numStr = c['رقم الدعوى'] || c['رقم القضية'] || c['رقم_الدعوى'] || c.id || '';
-      const parsed = parseInt(String(numStr).replace(/[^\d]/g, ''), 10);
-      return isNaN(parsed) ? 0 : parsed;
-    };
-
-    const getCaseYear = (c) => {
-      const yrStr = c['السنة'] || c['سنة'] || '';
-      const parsed = parseInt(String(yrStr).replace(/[^\d]/g, ''), 10);
-      return isNaN(parsed) ? 0 : parsed;
-    };
-
-    const getSessionDate = (c) => {
-      const dStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'] || '';
-      if (!dStr) return null;
-      return getSafeDateObj(dStr);
-    };
-
-    result.sort((a, b) => {
-      if (sortBy === 'appellant_asc') {
-        const valA = getPrimaryValue(a, ['الطاعن', 'المدعي', 'المستأنف']);
-        const valB = getPrimaryValue(b, ['الطاعن', 'المدعي', 'المستأنف']);
-        return valA.localeCompare(valB, 'ar');
-      }
-      if (sortBy === 'appellant_desc') {
-        const valA = getPrimaryValue(a, ['الطاعن', 'المدعي', 'المستأنف']);
-        const valB = getPrimaryValue(b, ['الطاعن', 'المدعي', 'المستأنف']);
-        return valB.localeCompare(valA, 'ar');
-      }
-      if (sortBy === 'number_asc') {
-        const numA = getCaseNumber(a);
-        const numB = getCaseNumber(b);
-        return numA - numB;
-      }
-      if (sortBy === 'number_desc') {
-        const numA = getCaseNumber(a);
-        const numB = getCaseNumber(b);
-        return numB - numA;
-      }
-      if (sortBy === 'year_desc') {
-        const yrA = getCaseYear(a);
-        const yrB = getCaseYear(b);
-        return yrB - yrA;
-      }
-      if (sortBy === 'year_asc') {
-        const yrA = getCaseYear(a);
-        const yrB = getCaseYear(b);
-        return yrA - yrB;
-      }
-      if (sortBy === 'date_desc') {
-        const dA = getSessionDate(a);
-        const dB = getSessionDate(b);
-        if (!dA && !dB) return 0;
-        if (!dA) return 1;
-        if (!dB) return -1;
-        const diff = dB.getTime() - dA.getTime();
-        if (diff === 0) return getSessionRoll(a) - getSessionRoll(b);
-        return diff;
-      }
-      if (sortBy === 'date_asc') {
-        const dA = getSessionDate(a);
-        const dB = getSessionDate(b);
-        if (!dA && !dB) return 0;
-        if (!dA) return 1;
-        if (!dB) return -1;
-        const diff = dA.getTime() - dB.getTime();
-        if (diff === 0) return getSessionRoll(a) - getSessionRoll(b);
-        return diff;
-      }
-
-      return 0;
-    });
-
-    return result;
-  }, [filteredCases, sortBy, quickDateFilter]);
+  const { sortedCases } = useCasesSort({
+    filteredCases,
+    sortBy,
+    quickDateFilter
+  });
 
   const totalPages = Math.ceil(sortedCases.length / itemsPerPage);
   const currentCases = sortedCases.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);

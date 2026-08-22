@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { calculateDashboardStats, computeMonthStats } from '../utils/statsUtils';
+import useDashboardStats from '../hooks/useDashboardStats';
 import { useUI } from '../context/UIContext';
 import { getSafeDateObj } from '../utils/dateUtils';
 import BulkAssignTaskModal from '../components/BulkAssignTaskModal';
@@ -381,7 +382,8 @@ export default function Dashboard() {
   // Month selector state
   const [viewMonth, setViewMonth] = useState({ month: today.getMonth(), year: today.getFullYear() });
 
-  const stats = useMemo(() => calculateDashboardStats(cases, settings, globalTasks), [cases, settings, globalTasks]);
+  // Add the import at the top (manually added via another block later if needed, but I can replace the import here too)
+  const { stats } = useDashboardStats({ cases, settings, globalTasks });
 
   const selectedMonthStats = useMemo(() => computeMonthStats(cases, settings, viewMonth.month, viewMonth.year), [cases, settings, viewMonth]);
   const prevViewMonth = useMemo(() => ({ month: viewMonth.month === 0 ? 11 : viewMonth.month - 1, year: viewMonth.month === 0 ? viewMonth.year - 1 : viewMonth.year }), [viewMonth]);
