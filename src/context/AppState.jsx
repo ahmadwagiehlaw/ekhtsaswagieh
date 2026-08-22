@@ -84,20 +84,22 @@ export const AppProvider = ({ children }) => {
   const isAdmin = userData?.role === 'super_admin' || userData?.role === 'consultant';
   const isEmployee = userData?.role === 'employee';
   
-  let empPermissions = null;
-  if (isEmployee && settings?.employees) {
-    const emp = settings.employees.find(e => `${e.username}@${tenantId}.ekhtsas.local` === userData?.email);
-    if (emp && emp.permissions) {
-      empPermissions = emp.permissions;
+  const currentUserPermissions = useMemo(() => {
+    let empPermissions = null;
+    if (isEmployee && settings?.employees) {
+      const emp = settings.employees.find(e => `${e.username}@${tenantId}.ekhtsas.local` === userData?.email);
+      if (emp && emp.permissions) {
+        empPermissions = emp.permissions;
+      }
     }
-  }
 
-  const currentUserPermissions = {
-    canEditData: isAdmin || (isEmployee && empPermissions?.canEditData),
-    canDeleteData: isAdmin || (isEmployee && empPermissions?.canDeleteData),
-    canManageRolls: isAdmin || (isEmployee && empPermissions?.canManageRolls),
-    canManageTasks: isAdmin || (isEmployee && empPermissions?.canManageTasks)
-  };
+    return {
+      canEditData: isAdmin || (isEmployee && empPermissions?.canEditData),
+      canDeleteData: isAdmin || (isEmployee && empPermissions?.canDeleteData),
+      canManageRolls: isAdmin || (isEmployee && empPermissions?.canManageRolls),
+      canManageTasks: isAdmin || (isEmployee && empPermissions?.canManageTasks)
+    };
+  }, [isAdmin, isEmployee, settings?.employees, tenantId, userData?.email]);
 
   useEffect(() => {
     if (!tenantId) {

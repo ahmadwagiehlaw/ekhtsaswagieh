@@ -7,7 +7,7 @@ import { useUI } from '../context/UIContext';
 
 export default function SuperAdmin() {
   const { userData } = useAuth();
-  const { toast } = useUI();
+  const { toast, showConfirm } = useUI();
   const [migrationStatus, setMigrationStatus] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [copied, setCopied] = useState(false);
@@ -82,7 +82,8 @@ export default function SuperAdmin() {
 
   const handleToggleBan = async (consultantId, currentStatus) => {
     const action = currentStatus ? 'إلغاء حظر' : 'حظر';
-    if (!window.confirm(`هل أنت متأكد من ${action} هذا المستشار؟`)) return;
+    const confirmed = await showConfirm('تأكيد العملية', `هل أنت متأكد من ${action} هذا المستشار؟`);
+    if (!confirmed) return;
     try {
       await updateDoc(doc(USERS_DIRECTORY_REF, consultantId), {
         banned: !currentStatus
@@ -96,7 +97,8 @@ export default function SuperAdmin() {
   };
 
   const handleMigration = async () => {
-    if (!window.confirm('هل أنت متأكد من بدء عملية الترحيل؟')) return;
+    const confirmed = await showConfirm('تأكيد الترحيل', 'هل أنت متأكد من بدء عملية الترحيل؟');
+    if (!confirmed) return;
     
     setIsMigrating(true);
     setMigrationStatus('جاري قراءة البيانات القديمة...');

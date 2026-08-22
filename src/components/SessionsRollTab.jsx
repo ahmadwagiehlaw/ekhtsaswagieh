@@ -65,7 +65,7 @@ const getRowBg = (fileLocation, isSelected) => {
 
 export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   const { cases, saveCaseToFirebase, settings, deleteCaseFromFirebase, globalTasks, viewingTasks } = useAppContext();
-  const { showPrompt, toast } = useUI();
+  const { showPrompt, toast, showConfirm } = useUI();
   const navigate = useNavigate();
 
   // Day cases derived from the date
@@ -589,7 +589,8 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
             </button>
             <button
               onClick={async () => {
-                if (!window.confirm(`هل أنت متأكد من حذف ${selectedIds.size} دعوى/دعاوى؟\nتحذير: لا يمكن التراجع عن هذا!`)) return;
+                const confirmed = await showConfirm('تأكيد الحذف', `هل أنت متأكد من حذف ${selectedIds.size} دعوى/دعاوى؟\nتحذير: لا يمكن التراجع عن هذا!`);
+                if (!confirmed) return;
                 let count = 0;
                 for (const id of selectedIds) {
                   const ok = await deleteCaseFromFirebase(id);

@@ -12,7 +12,7 @@ export default function JudgmentRulesSection({
   localSessionTypes,
   localDecisions
 }) {
-  const { showPrompt } = useUI();
+  const { showPrompt, showConfirm } = useUI();
   const [activeFolder, setActiveFolder] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedRules, setExpandedRules] = useState([]);
@@ -59,8 +59,8 @@ export default function JudgmentRulesSection({
 
   const allFolders = [...new Set(localJudgmentDefaults.map(r => r.folder || 'قواعد عامة'))];
 
-  const handleGenerateDefaults = () => {
-    const confirmLoad = window.confirm('هل أنت متأكد من تحميل القواعد الافتراضية الذكية؟ سيتم إضافتها في مجلدات مخصصة.');
+  const handleGenerateDefaults = async () => {
+    const confirmLoad = await showConfirm('تأكيد التوليد', 'هل أنت متأكد من تحميل القواعد الافتراضية الذكية؟ سيتم إضافتها في مجلدات مخصصة.');
     if (confirmLoad) {
       const defaults = [
         { name: 'استنتاج ذكي: قبول/إلغاء للطاعن', folder: 'قواعد: قبول', conditions: { role: 'طاعن', type: 'قبول' }, actions: { classification: 'صالح' } },
@@ -131,8 +131,8 @@ export default function JudgmentRulesSection({
     setLocalJudgmentDefaults(newRules);
   };
 
-  const handleDeleteFolder = (folderName) => {
-    const confirm = window.confirm(`هل أنت متأكد من حذف المجلد "${folderName}" وجميع القواعد بداخله؟`);
+  const handleDeleteFolder = async (folderName) => {
+    const confirm = await showConfirm('تأكيد الحذف', `هل أنت متأكد من حذف المجلد "${folderName}" وجميع القواعد بداخله؟`);
     if (!confirm) return;
     const newRules = localJudgmentDefaults.filter(r => (r.folder || 'قواعد عامة') !== folderName);
     setLocalJudgmentDefaults(newRules);
@@ -237,9 +237,9 @@ export default function JudgmentRulesSection({
                       </div>
                       <div className="flex items-center gap-4 shrink-0 mr-4">
                         <button
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            const confirm = window.confirm('هل أنت متأكد من الحذف؟');
+                            const confirm = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من الحذف؟');
                             if (confirm) setLocalJudgmentDefaults(localJudgmentDefaults.filter((_, i) => i !== idx));
                           }}
                           className="text-slate-400 hover:text-rose-500 transition"

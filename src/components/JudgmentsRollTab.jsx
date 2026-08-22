@@ -178,7 +178,7 @@ function ImagePasteZone({ caseId, sessionDate, caseData, onImageSaved }) {
 
 export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
   const { cases, saveCaseToFirebase, settings, deleteCaseFromFirebase } = useAppContext();
-  const { showPrompt, toast } = useUI();
+  const { showPrompt, toast, showConfirm } = useUI();
   const navigate = useNavigate();
 
   // Judgment cases for this date
@@ -600,7 +600,8 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
             </button>
             <button
               onClick={async () => {
-                if (!window.confirm(`هل أنت متأكد من حذف ${selectedIds.size} دعوى/دعاوى؟ لا يمكن التراجع عن هذا!`)) return;
+                const confirmed = await showConfirm('تأكيد الحذف', `هل أنت متأكد من حذف ${selectedIds.size} دعوى/دعاوى؟ لا يمكن التراجع عن هذا!`);
+                if (!confirmed) return;
                 let count = 0;
                 for (const id of selectedIds) {
                   const ok = await deleteCaseFromFirebase(id);

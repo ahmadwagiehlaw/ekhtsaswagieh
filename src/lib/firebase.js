@@ -3,12 +3,12 @@ import { doc, collection, initializeFirestore, persistentLocalCache, persistentM
 import { getAuth } from "firebase/auth";
 
 export const firebaseConfig = {
-  apiKey: "AIzaSyDpil-ZG7qzutPNK9A04Hrmv4DOXF2RgnA",
-  authDomain: "ekhtsasi-light.firebaseapp.com",
-  projectId: "ekhtsasi-light",
-  storageBucket: "ekhtsasi-light.firebasestorage.app",
-  messagingSenderId: "713907672870",
-  appId: "1:713907672870:web:9204f3330ff9085aa713e7"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);

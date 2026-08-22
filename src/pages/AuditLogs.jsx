@@ -8,10 +8,12 @@ import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { parseISO, isBefore, subMonths } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
+import { useUI } from '../context/UIContext';
 
 export default function AuditLogs() {
   const { isAdmin } = useAppContext();
   const { userData } = useAuth();
+  const { showConfirm, toast } = useUI();
   const tenantId = userData?.tenantId;
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -67,7 +69,8 @@ export default function AuditLogs() {
 
   const handleCleanOldLogs = async () => {
     if (!tenantId) return;
-    if (!window.confirm("هل أنت متأكد من حذف جميع السجلات الأقدم من 3 شهور؟ لا يمكن التراجع عن هذه الخطوة.")) return;
+    const confirmed = await showConfirm("تأكيد الحذف", "هل أنت متأكد من حذف جميع السجلات الأقدم من 3 شهور؟ لا يمكن التراجع عن هذه الخطوة.");
+    if (!confirmed) return;
     
     try {
       setLoading(true);
@@ -87,13 +90,13 @@ export default function AuditLogs() {
       
       if (deletedCount > 0) {
         await batch.commit();
-        alert(`تم حذف ${deletedCount} سجل قديم بنجاح.`);
+        toast(`تم حذف ${deletedCount} سجل قديم بنجاح.`, 'success');
       } else {
-        alert("لا توجد سجلات أقدم من 3 شهور لحذفها.");
+        toast("لا توجد سجلات أقدم من 3 شهور لحذفها.", 'info');
       }
     } catch (e) {
       console.error(e);
-      alert("حدث خطأ أثناء محاولة حذف السجلات.");
+      toast("حدث خطأ أثناء محاولة حذف السجلات.", 'error');
     } finally {
       setLoading(false);
     }

@@ -130,15 +130,43 @@ export default function Files() {
       if (isEditable) return;
       e.preventDefault();
       if (searchInputRef.current) {
-        setSearchQuery('');
         setTimeout(() => {
           searchInputRef.current?.focus();
+          searchInputRef.current?.select();
         }, 10);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  const clearAllFilters = () => {
+    setRoleFilter('all');
+    setShowOngoingOnly(false);
+    setShowPastSessionsOnly(false);
+    setShowWithAttachmentsOnly(false);
+    setShowImportantOnly(false);
+    setShowSessionlessOnly(false);
+    setShowMissingRoleOnly(false);
+    setShowJudgmentsOnly(false);
+    setLocationFilter('all');
+    setSessionTypeFilter('all');
+    setDecisionFilter('');
+    setQuickDateFilter('');
+    setGlobalHideNoInterest(0);
+    setSearchQuery('');
+    setAdvancedParams(null);
+    navigate('/files');
+    if (isPinned) {
+      const toSave = {
+        roleFilter: 'all', showOngoingOnly: false, showWithAttachmentsOnly: false,
+        showImportantOnly: false, showSessionlessOnly: false, showPastSessionsOnly: false,
+        showMissingRoleOnly: false, showJudgmentsOnly: false, locationFilter: 'all', sessionTypeFilter: 'all', decisionFilter: '',
+        quickDateFilter: '', sortBy
+      };
+      localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
+    }
+  };
 
   const itemsPerPage = 20;
 
@@ -472,35 +500,12 @@ export default function Files() {
               <h3 className="text-sm font-black text-navy-900 flex items-center gap-2">
                 <Filter className="w-4 h-4 text-indigo-500" /> الفلاتر المتقدمة
               </h3>
-              {(roleFilter !== 'all' || showOngoingOnly || showPastSessionsOnly || showWithAttachmentsOnly || showImportantOnly || showSessionlessOnly || showJudgmentsOnly || globalHideNoInterest !== 0 || quickDateFilter || locationFilter !== 'all' || sessionTypeFilter !== 'all' || decisionFilter) && (
+              {(roleFilter !== 'all' || showOngoingOnly || showPastSessionsOnly || showWithAttachmentsOnly || showImportantOnly || showSessionlessOnly || showMissingRoleOnly || showJudgmentsOnly || globalHideNoInterest !== 0 || quickDateFilter || locationFilter !== 'all' || sessionTypeFilter !== 'all' || decisionFilter || searchQuery) && (
                 <button
-                  onClick={() => {
-                    setRoleFilter('all');
-                    setShowOngoingOnly(false);
-                    setShowPastSessionsOnly(false);
-                    setShowWithAttachmentsOnly(false);
-                    setShowImportantOnly(false);
-                    setShowSessionlessOnly(false);
-                    setShowMissingRoleOnly(false);
-                    setShowJudgmentsOnly(false);
-                    setLocationFilter('all');
-                    setSessionTypeFilter('all');
-                    setDecisionFilter('');
-                    setQuickDateFilter('');
-                    setGlobalHideNoInterest(0);
-                    if (isPinned) {
-                      const toSave = {
-                        roleFilter: 'all', showOngoingOnly: false, showWithAttachmentsOnly: false,
-                        showImportantOnly: false, showSessionlessOnly: false, showPastSessionsOnly: false,
-                        showMissingRoleOnly: false, showJudgmentsOnly: false, locationFilter: 'all', sessionTypeFilter: 'all', decisionFilter: '',
-                        quickDateFilter: '', sortBy
-                      };
-                      localStorage.setItem('pinnedFilters', JSON.stringify(toSave));
-                    }
-                  }}
-                  className="px-3 py-1.5 rounded-lg text-xs font-black text-rose-500 bg-rose-50 hover:bg-rose-100 border border-rose-100 transition"
+                  onClick={clearAllFilters}
+                  className="px-3 py-1.5 rounded-lg text-xs font-black text-rose-500 bg-rose-50 hover:bg-rose-100 border border-rose-100 transition flex items-center gap-1"
                 >
-                  مسح الفلاتر
+                  <Trash2 className="w-4 h-4" /> مسح الفلاتر
                 </button>
               )}
             </div>

@@ -30,7 +30,8 @@ export const AuthProvider = ({ children }) => {
             setUserData({ ...data, uid: user.uid });
           } else {
             // Fallback: If no directory entry, but email matches Super Admin
-            if (user.email === 'ahmad.wagieh@gmail.com') {
+            const superAdminEmail = import.meta.env.VITE_SUPER_ADMIN_EMAIL;
+            if (superAdminEmail && user.email === superAdminEmail) {
               const defaultSuperAdminData = { role: 'super_admin', tenantId: 'tenant_main', email: user.email };
               await setDoc(userDocRef, defaultSuperAdminData);
               setUserData(defaultSuperAdminData);

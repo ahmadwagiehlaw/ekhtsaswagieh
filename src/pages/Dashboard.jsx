@@ -283,7 +283,7 @@ export default function Dashboard() {
   const { settings, isEmployee, currentUser, currentUserName, logoutAdmin } = useSettingsContext();
   const { globalTasks, saveGlobalTask, completeGlobalTask } = useTasksContext();
   const navigate = useNavigate();
-  const { showPrompt, toast } = useUI();
+  const { showPrompt, toast, showConfirm } = useUI();
 
   const today = new Date();
   const [searchQuery, setSearchQuery] = useState('');
@@ -476,7 +476,8 @@ export default function Dashboard() {
   };
 
   const handleDeleteTaskAdmin = async (taskType, caseId, taskId) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذه المهمة؟')) return;
+    const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذه المهمة؟');
+    if (!confirmed) return;
     const c = cases.find(c => c.id === caseId);
     if (!c) return;
     await saveCaseToFirebase(caseId, { tasks: c.tasks.filter(t => t.id !== taskId) });

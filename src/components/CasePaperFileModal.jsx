@@ -13,7 +13,7 @@ const DEFAULT_CHECKLIST = [
 
 export default function CasePaperFileModal({ isOpen, onClose, caseData }) {
   const { saveCaseToFirebase, settings, saveSettingsToFirebase, viewingTasks, saveViewingTask, completeViewingTask, deleteViewingTask, currentUser } = useAppContext();
-  const { toast } = useUI();
+  const { toast, showConfirm } = useUI();
 
   const [activeUploadTask, setActiveUploadTask] = useState(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -46,7 +46,8 @@ export default function CasePaperFileModal({ isOpen, onClose, caseData }) {
   };
 
   const handleDeleteTask = async (taskId) => {
-    if(window.confirm('هل أنت متأكد من حذف هذه المهمة؟')) {
+    const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذه المهمة؟');
+    if (confirmed) {
       await deleteViewingTask(taskId);
       toast('تم حذف المهمة', 'success');
     }

@@ -5,7 +5,7 @@ import { useUI } from '../context/UIContext';
 
 export default function SmartDocumentsTab() {
   const { settings, saveSettingsToFirebase, isAdmin, cases } = useAppContext();
-  const { toast } = useUI();
+  const { toast, showConfirm } = useUI();
   const [showPreview, setShowPreview] = useState(false);
   
   const [templates, setTemplates] = useState(settings?.printTemplates || [
@@ -107,8 +107,8 @@ export default function SmartDocumentsTab() {
     setActiveTemplate(prev => ({ ...prev, content: newContent }));
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('هل أنت متأكد من حذف هذا القالب؟')) {
+  const handleDelete = async (id) => {
+    if (await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذا القالب؟')) {
       const updated = templates.filter(t => t.id !== id);
       saveTemplates(updated);
       if (activeTemplate?.id === id) setActiveTemplate(updated[0] || null);
