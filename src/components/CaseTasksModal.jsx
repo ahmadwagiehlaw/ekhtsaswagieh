@@ -161,7 +161,7 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0 bg-navy-900/60 backdrop-blur-sm" onClick={onClose}></div>
-      <div className="relative w-full h-full sm:h-auto sm:max-h-[90vh] max-w-4xl bg-slate-50 sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="relative w-full h-full sm:h-auto sm:max-h-[90vh] max-w-6xl bg-slate-50 sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
         
         {/* Modal Header */}
         <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 shrink-0">
@@ -170,7 +170,7 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
               <ClipboardList className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-black text-navy-900">مهام الدعوى</h2>
+              <h2 className="text-xl font-black text-navy-900">سجل الإجراءات والمهام</h2>
               <p className="text-xs font-bold text-slate-500">رقم {caseData['رقم الدعوى']} لسنة {caseData['السنة']}</p>
             </div>
           </div>
@@ -183,203 +183,205 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 hide-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 hide-scrollbar flex flex-col lg:flex-row gap-6">
           
+          {/* Right Column: Add/Edit Form */}
           {canManageTasks && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-              <button 
-                onClick={() => setIsAdding(!isAdding)}
-                className="w-full bg-indigo-50/50 hover:bg-indigo-50 p-4 flex items-center justify-between transition-colors border-b border-slate-100"
-              >
-                <div className="flex items-center gap-2">
-                  <Plus className="w-5 h-5 text-indigo-600" />
-                  <h3 className="font-black text-indigo-700">{editingTaskId ? 'تعديل المهمة' : 'إضافة مهمة جديدة'}</h3>
-                </div>
-              </button>
+            <div className="w-full lg:w-1/3 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden h-fit">
+              <div className="bg-indigo-50/50 p-4 border-b border-slate-100 flex items-center gap-2">
+                {editingTaskId ? <Edit3 className="w-5 h-5 text-indigo-600" /> : <Plus className="w-5 h-5 text-indigo-600" />}
+                <h3 className="font-black text-indigo-700">{editingTaskId ? 'تعديل المهمة' : 'إضافة مهمة جديدة'}</h3>
+              </div>
               
-              {isAdding && (
-                <div className="p-4 sm:p-5 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <span className="text-xs font-bold text-slate-500 py-1.5 shrink-0">مهام سريعة:</span>
-                    {quickTemplates.map((t, i) => (
+              <div className="p-4 sm:p-5">
+                {!editingTaskId && (
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    <span className="text-xs font-bold text-slate-500 py-1.5 shrink-0 w-full mb-1">مهام سريعة:</span>
+                    {quickTemplates.filter(t => t.label !== 'إطلاع' && t.label !== 'تصوير مستندات').map((t, i) => (
                       <button 
                         key={i}
                         type="button"
-                        onClick={() => setNewTask({...newTask, title: t.value, type: t.label === 'إطلاع' ? 'viewing' : 'general'})}
-                        className={`flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1.5 rounded-lg border border-transparent hover:border-slate-200 transition ${t.color}`}
+                        onClick={() => setNewTask({...newTask, title: t.value, type: 'general'})}
+                        className={`flex-1 min-w-[100px] flex items-center justify-center gap-1.5 text-xs font-black px-2.5 py-2 rounded-xl border border-transparent hover:border-slate-200 transition ${t.color}`}
                       >
                         <t.icon className="w-3.5 h-3.5" />
                         {t.label}
                       </button>
                     ))}
                   </div>
+                )}
 
-                  <form onSubmit={handleAddTask} className="space-y-4">
+                <form onSubmit={handleAddTask} className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 block mb-1.5">عنوان المهمة *</label>
+                    <input 
+                      type="text"
+                      placeholder="مثال: استخراج شهادة..."
+                      value={newTask.title}
+                      onChange={e => setNewTask({...newTask, title: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 block mb-1.5">التفاصيل (اختياري)</label>
+                    <textarea
+                      placeholder="اكتب أي تفاصيل إضافية هنا..."
+                      value={newTask.description}
+                      onChange={e => setNewTask({...newTask, description: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[80px]"
+                      rows={3}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <input 
-                        type="text"
-                        placeholder="عنوان المهمة (مثال: استخراج شهادة)..."
-                        value={newTask.title}
-                        onChange={e => setNewTask({...newTask, title: e.target.value})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <div>
-                      <textarea
-                        placeholder="وصف أو تفاصيل المهمة (اختياري)..."
-                        value={newTask.description}
-                        onChange={e => setNewTask({...newTask, description: e.target.value})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[60px]"
-                        rows={2}
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1">المُكلّف</label>
                       <select 
                         value={newTask.assignee}
                         onChange={e => setNewTask({...newTask, assignee: e.target.value})}
-                        className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
                         <option value="">إسناد إلى...</option>
                         {settings?.employees?.map(emp => (
                           <option key={emp.name} value={emp.name}>{emp.name}</option>
                         ))}
                       </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1">تاريخ التنفيذ</label>
                       <input 
                         type="date"
                         value={newTask.dueDate}
                         onChange={e => setNewTask({...newTask, dueDate: e.target.value})}
-                        className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <select 
-                        value={newTask.priority}
-                        onChange={e => setNewTask({...newTask, priority: e.target.value})}
-                        className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="normal">أولوية عادية</option>
-                        <option value="important">أولوية هامة</option>
-                        <option value="urgent">أولوية عاجلة</option>
-                      </select>
-                    </div>
-                    <div>
-                      <input 
-                        type="text"
-                        placeholder="ملاحظات تفصيلية (اختياري)..."
-                        value={newTask.notes}
-                        onChange={e => setNewTask({...newTask, notes: e.target.value})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
-                    <div className="flex justify-end gap-2 pt-2">
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block mb-1">الأولوية</label>
+                    <select 
+                      value={newTask.priority}
+                      onChange={e => setNewTask({...newTask, priority: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="normal">عادية ⚪</option>
+                      <option value="important">هامة 🟡</option>
+                      <option value="urgent">عاجلة 🔴</option>
+                    </select>
+                  </div>
+                  
+                  <div className="pt-4 flex gap-2">
+                    {editingTaskId && (
                       <button 
                         type="button"
                         onClick={() => {
-                          setIsAdding(false);
                           setEditingTaskId(null);
                           setNewTask({ title: '', notes: '', assignee: '', dueDate: '', priority: 'normal' });
                         }}
-                        className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition"
+                        className="flex-1 bg-white border border-slate-200 text-slate-600 py-3 rounded-xl text-xs font-bold transition hover:bg-slate-50"
                       >
                         إلغاء
                       </button>
-                      <button 
-                        type="submit"
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl text-xs font-black shadow-sm transition"
-                      >
-                        حفظ المهمة
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
+                    )}
+                    <button 
+                      type="submit"
+                      className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-sm font-black shadow-sm transition"
+                    >
+                      {editingTaskId ? 'حفظ التعديلات' : 'إضافة المهمة'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
 
-          <div className="bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-200 min-h-[40vh]">
-            <div className="flex bg-slate-100 rounded-xl p-1 mb-6">
+          {/* Left Column: Tasks List */}
+          <div className="flex-1 bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-200 min-h-[50vh] flex flex-col">
+            <div className="flex bg-slate-100 rounded-xl p-1.5 mb-6">
               <button 
                 onClick={() => setActiveTab('pending')}
-                className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition ${activeTab === 'pending' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`flex-1 py-2.5 text-sm font-black rounded-lg transition-all ${activeTab === 'pending' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 قيد التنفيذ ({pendingTasks.length})
               </button>
               <button 
                 onClick={() => setActiveTab('completed')}
-                className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition ${activeTab === 'completed' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`flex-1 py-2.5 text-sm font-black rounded-lg transition-all ${activeTab === 'completed' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 مكتملة ({completedTasks.length})
               </button>
             </div>
 
             {selectedTaskIds.length > 0 && (
-                <div className="bg-indigo-50 border border-indigo-200 p-3 rounded-xl flex items-center justify-between mb-3 animate-in fade-in">
-                  <span className="text-sm font-black text-indigo-700">تم تحديد {selectedTaskIds.length} مهام</span>
-                  <button 
-                    onClick={handleBulkDelete}
-                    className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    حذف المحدد
-                  </button>
-                </div>
-              )}
+              <div className="bg-indigo-50 border border-indigo-200 p-3 rounded-xl flex items-center justify-between mb-4 animate-in fade-in shrink-0">
+                <span className="text-sm font-black text-indigo-700">تم تحديد {selectedTaskIds.length} مهام</span>
+                <button 
+                  onClick={handleBulkDelete}
+                  className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  حذف المحدد
+                </button>
+              </div>
+            )}
 
-            <div className="space-y-3">
+            <div className="space-y-3 flex-1 overflow-y-auto pr-1">
               {displayTasks.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <CheckCircle2 className="w-8 h-8 text-slate-300" />
+                <div className="text-center py-16 flex flex-col items-center justify-center h-full">
+                  <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                    <CheckCircle2 className="w-10 h-10 text-slate-300" />
                   </div>
-                  <p className="text-sm font-bold text-slate-400">لا توجد مهام في هذه القائمة</p>
+                  <h3 className="text-lg font-black text-slate-400">لا توجد مهام في هذه القائمة</h3>
+                  <p className="text-sm font-bold text-slate-400 mt-2">قم بإضافة مهام جديدة لمتابعة إجراءات الدعوى</p>
                 </div>
               ) : (
                 displayTasks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(task => (
-                  <div key={task.id} className={`p-4 rounded-2xl border transition-all ${task.status === 'completed' ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-200 hover:border-indigo-300 shadow-sm hover:shadow-md'} ${selectedTaskIds.includes(task.id) ? 'ring-2 ring-indigo-400' : ''}`}>
+                  <div key={task.id} className={`p-4 sm:p-5 rounded-2xl border transition-all ${task.status === 'completed' ? 'bg-slate-50 border-slate-100 opacity-70 hover:opacity-100' : 'bg-white border-slate-200 hover:border-indigo-300 shadow-sm hover:shadow-md'} ${selectedTaskIds.includes(task.id) ? 'ring-2 ring-indigo-400' : ''}`}>
                     <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3 flex-1">
+                      <div className="flex items-start gap-4 flex-1">
                         {canManageTasks && (
-                          <input 
-                            type="checkbox"
-                            checked={selectedTaskIds.includes(task.id)}
-                            onChange={() => toggleTaskSelection(task.id)}
-                            className="mt-1.5 w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
-                          />
+                          <div className="mt-1 flex-shrink-0">
+                            <input 
+                              type="checkbox"
+                              checked={selectedTaskIds.includes(task.id)}
+                              onChange={() => toggleTaskSelection(task.id)}
+                              className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                            />
+                          </div>
                         )}
                         <button 
                           onClick={() => canManageTasks ? handleToggleStatus(task) : null}
                           disabled={!canManageTasks}
-                          className={`mt-1 shrink-0 ${!canManageTasks ? 'cursor-not-allowed opacity-50' : 'hover:scale-110 transition-transform'} ${task.status === 'completed' ? 'text-emerald-500' : 'text-slate-300 hover:text-indigo-500'}`}
+                          className={`mt-0.5 shrink-0 transition-all ${!canManageTasks ? 'cursor-not-allowed opacity-50' : 'hover:scale-110'} ${task.status === 'completed' ? 'text-emerald-500' : 'text-slate-300 hover:text-indigo-500'}`}
                         >
                           <CheckCircle2 className="w-6 h-6" />
                         </button>
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <span className="text-[10px] font-black px-2 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-200">
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded border bg-white text-slate-600 border-slate-200">
                               المكلف: {task.assignee || 'غير محدد'}
                             </span>
                             <span className={`text-[10px] font-black px-2 py-0.5 rounded border ${getPriorityColors(task.priority)}`}>
                               {getPriorityLabel(task.priority)}
                             </span>
                             {task.dueDate && (
-                              <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+                              <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
                                 <Calendar className="w-3 h-3" /> {formatDateString(task.dueDate)}
                               </span>
                             )}
                           </div>
-                          <h4 className={`font-black text-sm ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-navy-900'} leading-relaxed`}>
+                          <h4 className={`font-black text-sm sm:text-base ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-navy-900'} leading-relaxed`}>
                             {task.title}
                           </h4>
                           {task.description && (
-                            <p className="text-xs font-bold text-slate-500 mt-1 whitespace-pre-wrap">
+                            <p className="text-xs font-bold text-slate-500 mt-2 whitespace-pre-wrap leading-relaxed">
                               {task.description}
-                            </p>
-                          )}
-                          {task.notes && (
-                            <p className="text-xs font-bold text-slate-500 mt-1 bg-slate-50 p-2 rounded border border-slate-100 inline-block">
-                              {task.notes}
                             </p>
                           )}
                         </div>
                       </div>
+                      
                       {canManageTasks && (
                         <div className="flex flex-col gap-2 shrink-0">
                           <button 
@@ -387,12 +389,11 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
                               setEditingTaskId(task.id);
                               setNewTask({
                                 title: task.title,
-                                notes: task.notes || '',
+                                description: task.description || '',
                                 assignee: task.assignee || '',
                                 dueDate: task.dueDate || '',
                                 priority: task.priority || 'normal'
                               });
-                              setIsAdding(true);
                             }}
                             className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
                             title="تعديل المهمة"

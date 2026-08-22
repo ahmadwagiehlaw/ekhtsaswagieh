@@ -50,7 +50,16 @@ export const formatDateString = (value, formatStr) => {
     }
 
     if (isValid(dateObj)) {
-      return format(dateObj, activeFormat, { locale: ar });
+      let finalFormat = activeFormat;
+      const currentYear = new Date().getFullYear();
+      const dateYear = dateObj.getFullYear();
+      
+      // If the date is not in the current year AND the format doesn't show the year
+      if (dateYear !== currentYear && !finalFormat.includes('y')) {
+        finalFormat = 'dd/MM/yyyy';
+      }
+      
+      return format(dateObj, finalFormat, { locale: ar });
     }
   } catch (e) {
     console.warn('Failed to format date:', value);

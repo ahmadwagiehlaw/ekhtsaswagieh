@@ -130,20 +130,32 @@ export default function CasePaperFileModal({ isOpen, onClose, caseData }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {checklist.map(item => {
                 const isChecked = paperFileContents.includes(item);
+                const hasAttachment = caseData.documents?.some(doc => doc.type === item || doc.title === item);
+                const isManualCheck = isChecked && !hasAttachment;
+
+                let btnClass = 'bg-slate-50/50 border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-600 hover:border-solid hover:bg-indigo-50/50 shadow-sm';
+                let iconBoxClass = 'bg-white border-slate-300 border-dashed';
+                let Icon = null;
+                
+                if (isChecked && hasAttachment) {
+                  btnClass = 'bg-emerald-50 border-emerald-200 text-emerald-800 border-solid';
+                  iconBoxClass = 'bg-emerald-500 border-emerald-500 text-white border-solid';
+                  Icon = CheckCircle2;
+                } else if (isManualCheck) {
+                  btnClass = 'bg-amber-50 border-amber-200 text-amber-800 border-solid bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.4)_50%,transparent_75%,transparent_100%)] bg-[length:20px_20px]';
+                  iconBoxClass = 'bg-amber-400 border-amber-400 text-white border-solid';
+                  Icon = FileText; // Distinguishing icon for manual check
+                }
+
                 return (
                   <button
                     key={item}
                     onClick={() => toggleChecklistItem(item)}
-                    className={`flex items-center gap-3 p-3 rounded-xl border text-right transition-all ${
-                      isChecked 
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50/50'
-                    }`}
+                    className={`flex items-center gap-3 p-3 rounded-xl border text-right transition-all relative ${btnClass}`}
+                    title={isManualCheck ? "تم التأشير يدوياً (بدون مرفق)" : isChecked ? "مرفق موجود" : "غير موجود"}
                   >
-                    <div className={`w-5 h-5 rounded-md flex items-center justify-center border shrink-0 transition-colors ${
-                      isChecked ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-300'
-                    }`}>
-                      {isChecked && <CheckCircle2 className="w-3.5 h-3.5" />}
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center border shrink-0 transition-colors ${iconBoxClass}`}>
+                      {Icon && <Icon className="w-3.5 h-3.5" />}
                     </div>
                     <span className="text-sm font-bold flex-1 truncate">{item}</span>
                   </button>

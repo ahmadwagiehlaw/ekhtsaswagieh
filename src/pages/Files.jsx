@@ -126,8 +126,10 @@ export default function Files() {
       if (isEditable) return;
       e.preventDefault();
       if (searchInputRef.current) {
-        searchInputRef.current.focus();
-        searchInputRef.current.select();
+        setSearchQuery('');
+        setTimeout(() => {
+          searchInputRef.current?.focus();
+        }, 10);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -411,19 +413,20 @@ export default function Files() {
                 placeholder="بحث في القضايا... (اضغط / للبحث)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2 pl-28 pr-10 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2 pl-36 pr-10 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
               />
 
               <button
                 type="button"
                 onClick={() => setIsAdvancedSearchOpen(!isAdvancedSearchOpen)}
-                className={`absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded transition ${isAdvancedSearchOpen || (roleFilter !== 'all' || locationFilter !== 'all' || sessionTypeFilter !== 'all' || decisionFilter || quickDateFilter || showOngoingOnly || showImportantOnly || showJudgmentsOnly || showWithAttachmentsOnly || showSessionlessOnly || showMissingRoleOnly || showPastSessionsOnly) ? 'bg-indigo-500 text-white shadow-sm' : 'bg-indigo-50 text-indigo-500 hover:bg-indigo-100'}`}
+                className={`absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 h-7 rounded transition ${isAdvancedSearchOpen || (roleFilter !== 'all' || locationFilter !== 'all' || sessionTypeFilter !== 'all' || decisionFilter || quickDateFilter || showOngoingOnly || showImportantOnly || showJudgmentsOnly || showWithAttachmentsOnly || showSessionlessOnly || showMissingRoleOnly || showPastSessionsOnly) ? 'bg-indigo-500 text-white shadow-sm' : 'bg-indigo-50 text-indigo-500 hover:bg-indigo-100'}`}
                 title="البحث المتقدم"
               >
                 <Sparkles className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-bold whitespace-nowrap hidden sm:inline">بحث متقدم</span>
               </button>
 
-              <span className="absolute left-9 top-1/2 -translate-y-1/2 bg-indigo-100/80 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded font-black border border-indigo-200 pointer-events-none select-none">
+              <span className="absolute left-9 sm:left-24 top-1/2 -translate-y-1/2 bg-indigo-100/80 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded font-black border border-indigo-200 pointer-events-none select-none hidden sm:block">
                 {filteredCases.length} ملف
               </span>
 
@@ -737,6 +740,13 @@ export default function Files() {
             badgeBgClass = `bg-slate-100 text-slate-500 border-slate-300`;
             cardOpacity = 'opacity-60 hover:opacity-100';
             grayscale = 'grayscale';
+          }
+
+          const hasNoPaperDetails = (!c.documents || c.documents.length === 0) && (!c.paperFileContents || c.paperFileContents.length === 0);
+          
+          if (hasNoPaperDetails && !isNoInterest) {
+            borderClass = `border-dashed border-[2px] border-slate-300 hover:border-slate-400`;
+            bgClass = `bg-slate-50/50 hover:bg-slate-100/50`;
           }
 
           const activeAlerts = (c.alerts || []).filter(a => !a.isDone);
