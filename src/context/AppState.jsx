@@ -3,7 +3,8 @@ import { onSnapshot, setDoc, doc, writeBatch, getDocs, deleteDoc, addDoc } from 
 import { db, getSettingsRef, getSchemaRef, getCasesRef, getRollsRef, getTasksRef, getViewingTasksRef, getActivityLogsRef } from '../lib/firebase';
 import { useAuth } from './AuthContext';
 import { getSafeDateObj } from '../utils/dateUtils';
-
+import { getCaseRole, getAppellantName, getAppelleeName, syncSessionRootFields } from '../utils/caseUtils';
+import { isNoInterestRole, isOutOfJurisdictionRole } from '../constants/roleHelpers';
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
@@ -45,14 +46,14 @@ export const AppProvider = ({ children }) => {
   const cases = useMemo(() => {
     if (globalHideNoInterest === 1) {
       return rawCases.filter(c => {
-         const role = String(c['الصفة'] || c['صفة'] || '').trim();
-         return role !== 'لا شأن' && role !== 'لاشأن';
+         const role = getCaseRole(c);
+         return !isNoInterestRole(role);
       });
     }
     if (globalHideNoInterest === 2) {
       return rawCases.filter(c => {
-         const role = String(c['الصفة'] || c['صفة'] || '').trim();
-         return role !== 'لا شأن' && role !== 'لاشأن' && role !== 'خارج الاختصاص';
+         const role = getCaseRole(c);
+         return !isNoInterestRole(role) && !isOutOfJurisdictionRole(role);
       });
     }
     return rawCases;
@@ -61,7 +62,8 @@ export const AppProvider = ({ children }) => {
   const plaintiffsList = useMemo(() => {
     const set = new Set();
     rawCases.forEach(c => {
-      if (c['المدعي']) set.add(c['المدعي']);
+      const p = getAppellantName(c);
+      if (p) set.add(p);
     });
     return Array.from(set);
   }, [rawCases]);
@@ -69,7 +71,7 @@ export const AppProvider = ({ children }) => {
   const defendantsList = useMemo(() => {
     const set = new Set();
     rawCases.forEach(c => {
-      const def = c['المدعى_عليه'] || c['المدعى عليه'] || c['المطعون ضده'] || c['المطعون ضدها'];
+      const def = getAppelleeName(c);
       if (def) set.add(def);
     });
     return Array.from(set);
@@ -309,6 +311,9 @@ export const AppProvider = ({ children }) => {
         }
         // Removed aggressive 'حكم' override to allow manual corrections and preliminary judgments
       }
+
+      // Sync root fields with sessions
+      payload = syncSessionRootFields(payload);
 
       const isNew = !cases.some(c => c.id === caseId);
       const dataToSave = cleanUndefined({ ...payload, updatedAt: new Date().toISOString() });

@@ -6,7 +6,7 @@ import { uploadToR2 } from '../lib/r2';
 import imageCompression from 'browser-image-compression';
 
 export default function UploadDocumentModal({ isOpen, onClose, caseData, onSuccess, initialDocType = '' }) {
-  const { saveCaseToFirebase, currentUser } = useAppContext();
+  const { saveCaseToFirebase, currentUser, settings } = useAppContext();
   const { toast } = useUI();
   
   const [selectedFile, setSelectedFile] = useState(null);
@@ -102,7 +102,25 @@ export default function UploadDocumentModal({ isOpen, onClose, caseData, onSucce
 
       const documents = caseData.documents || [];
       const updatedDocs = [...documents, newDoc];
-      await saveCaseToFirebase(caseData.id, { documents: updatedDocs });
+      
+      const updatePayload = { documents: updatedDocs };
+      
+      const DEFAULT_CHECKLIST = [
+        'صحيفة الطعن', 'تقرير مفوضين', 'مذكرة دفاع', 'مذكرة ختامية', 
+        'تقرير الخبراء', 'تعجيل من الوقف', 'مذكرة تكميلية', 'مذكرة رأي',
+        'حافظة مستندات', 'مسودة حكم', 'فتح باب مرافعة', 'محضر الجلسة',
+        'مستندات الخصم', 'مذكرات الخصم'
+      ];
+      const checklist = settings?.paperFileChecklist || DEFAULT_CHECKLIST;
+      
+      if (checklist.includes(docType)) {
+        const currentPaperFiles = caseData.paperFileContents || [];
+        if (!currentPaperFiles.includes(docType)) {
+          updatePayload.paperFileContents = [...currentPaperFiles, docType];
+        }
+      }
+
+      await saveCaseToFirebase(caseData.id, updatePayload);
 
       toast('تم رفع المستند بنجاح!', 'success');
       if (onSuccess) onSuccess(newDoc);

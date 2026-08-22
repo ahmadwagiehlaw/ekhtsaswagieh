@@ -1,0 +1,16 @@
+export const SESSION_DATE_KEYS = ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة'];
+export const DECISION_KEYS     = ['القرار', 'قرار الجلسة', 'المنطوق'];
+export const CASE_NO_KEYS      = ['رقم الدعوى', 'رقم القضية'];
+export const YEAR_KEYS         = ['السنة', 'سنة', 'year'];
+export const ROLE_KEYS         = ['الصفة', 'صفة'];
+export const APPELLANT_KEYS    = ['الطاعن', 'المدعي', 'المستأنف'];
+export const APPELLEE_KEYS     = ['المطعون ضده', 'المطعون ضدهم', 'المدعى عليه', 'المدعى عليهم', 'المطعون ضدنا', 'مدعى علينا', 'مدعى علي'];
+export const SESSION_TYPE_KEYS = ['نوع الجلسة', 'نوع_الجلسة'];
+export const ROLL_KEYS         = ['الرول'];
+export const LOCATION_KEYS     = ['مكان الملف', 'مكان_الملف'];
+export const IS_FINAL_KEYS     = ['نهائي', 'بات', 'حكم نهائي'];
+export const JUDGMENT_KEYS     = ['الحكم', 'منطوق الحكم', 'حكم'];
+export const CLASSIFICATION_KEYS = ['تصنيف الدعوى'];
+export const SUBJECT_KEYS      = ['موضوع الدعوى'];
+export const COURT_FIRST_NO_KEYS = ['حكم محكمة أول درجة'];
+export const COURT_FIRST_NAME_KEYS = ['محكمة أول درجة'];

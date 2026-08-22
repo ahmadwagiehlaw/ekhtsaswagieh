@@ -7,6 +7,7 @@ import AddSessionModal from '../components/AddSessionModal';
 import CaseDocuments from '../components/CaseDocuments';
 import AlertsModal from '../components/AlertsModal';
 import CaseTasksModal from '../components/CaseTasksModal';
+import CasePaperFileModal from '../components/CasePaperFileModal';
 import BulkViewingTaskModal from '../components/BulkViewingTaskModal';
 import GlobalTemplatePrintModal from '../components/GlobalTemplatePrintModal';
 import ProceduresModal from '../components/ProceduresModal';
@@ -53,7 +54,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
   const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [isCaseTasksModalOpen, setIsCaseTasksModalOpen] = useState(false);
-  const [isViewingTaskModalOpen, setIsViewingTaskModalOpen] = useState(false);
+  const [isPaperFileModalOpen, setIsPaperFileModalOpen] = useState(false);
   const [isProceduresModalOpen, setIsProceduresModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'documents' | 'sessions' | 'tasks'
   const [isChangeRoleModalOpen, setIsChangeRoleModalOpen] = useState(false);
@@ -672,19 +673,11 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
               )}
             </button>
 
-            {/* Viewing Task Button */}
+            {/* Paper File Contents & Viewing Tasks Button */}
             <button
-              onClick={() => {
-                const hasViewingTask = viewingTasks?.some(t => t.status !== 'completed' && t.linkedCases?.includes(caseData.id));
-                if (hasViewingTask) {
-                  toast('تم العثور على مهمة إطلاع حالية، جاري فتح سجل المهام...', 'success');
-                  setIsCaseTasksModalOpen(true);
-                } else {
-                  setIsViewingTaskModalOpen(true);
-                }
-              }}
+              onClick={() => setIsPaperFileModalOpen(true)}
               className="relative p-2 rounded-xl transition bg-indigo-50 text-indigo-500 hover:bg-indigo-100 hover:text-indigo-700"
-              title="إنشاء مهمة إطلاع جديدة"
+              title="محتويات الملف الورقي ومهام الإطلاع"
             >
               <Camera className="w-5 h-5" />
             </button>
@@ -926,15 +919,12 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
         caseData={caseData}
       />
 
-      {/* Viewing Task Modal */}
-      {isViewingTaskModalOpen && (
-        <BulkViewingTaskModal
-          isOpen={isViewingTaskModalOpen}
-          onClose={() => setIsViewingTaskModalOpen(false)}
-          selectedCaseIds={new Set([caseData.id])}
-          cases={cases}
-        />
-      )}
+      {/* Case Paper File Modal */}
+      <CasePaperFileModal
+        isOpen={isPaperFileModalOpen}
+        onClose={() => setIsPaperFileModalOpen(false)}
+        caseData={caseData}
+      />
 
       {/* Case Tasks Modal */}
       <CaseTasksModal

@@ -31,8 +31,7 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
 
   // مهام القضية: مهام عادية (globalTasks) + مهام إطلاع (viewingTasks) — فصل تام
   const caseRegularTasks = globalTasks.filter(t => t.linkedCases?.includes(caseData.id));
-  const caseViewingTasks = viewingTasks.filter(t => t.linkedCases?.includes(caseData.id));
-  const caseTasks = [...caseRegularTasks, ...caseViewingTasks];
+  const caseTasks = [...caseRegularTasks];
   const pendingTasks = caseTasks.filter(t => t.status === 'pending');
   const completedTasks = caseTasks.filter(t => t.status === 'completed');
 
@@ -378,17 +377,6 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
                             <p className="text-xs font-bold text-slate-500 mt-1 bg-slate-50 p-2 rounded border border-slate-100 inline-block">
                               {task.notes}
                             </p>
-                          )}
-                          {task.type === 'viewing' && task.status === 'pending' && canManageTasks && (
-                            <button
-                              onClick={() => {
-                                setActiveUploadTask(task);
-                                setIsUploadModalOpen(true);
-                              }}
-                              className="mt-2 flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold transition border border-indigo-200"
-                            >
-                              <Camera className="w-3.5 h-3.5" /> إتمام وإرفاق المستندات
-                            </button>
                           )}
                         </div>
                       </div>

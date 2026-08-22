@@ -1,6 +1,6 @@
 import { getSafeDateObj } from './dateUtils';
-
-
+import { getSessionDate, getCaseRole, getCaseDecision } from './caseUtils';
+import { isAppellantRole, isAppelleeRole, isNoInterestRole, isOutOfJurisdictionRole } from '../constants/roleHelpers';
 
 function addToJudgments(target, computeAs, c = null) {
   target.total++;
@@ -24,8 +24,6 @@ const emptyJudgments = () =>
 // Used by Dashboard for the interactive month-selector
 // ─────────────────────────────────────────────────────────────
 export function computeMonthStats(cases, settings, targetMonth, targetYear) {
-  const appRole = settings?.roles?.[0] || 'طاعن';
-  const apeRole = settings?.roles?.[1] || 'مطعون ضدنا';
   let sessions   = 0;
   let memos      = 0;
   let casesAdded = 0;
@@ -34,14 +32,12 @@ export function computeMonthStats(cases, settings, targetMonth, targetYear) {
   const memoCalcMode = settings?.memoCalculationMode || 'session_date';
 
   cases.forEach(c => {
-    const role = String(c['الصفة'] || c['صفة'] || '').trim();
-    if (role === 'لا شأن' || role === 'خارج الاختصاص') return;
+    const role = getCaseRole(c);
+    
+    if (isNoInterestRole(role) || isOutOfJurisdictionRole(role)) return;
 
-    if (role.includes('لا شأن') || role.includes('خارج الاختصاص')) return;
-
-    // Flexible role check (طاعن / مدعي / مستأنف) vs (مطعون ضدنا / مدعى عليه / مستأنف ضده)
-    const isAppellant = role.includes('طاعن') || role.includes('مدعي') || role.includes('مستأنف') || role.includes(appRole);
-    const isAppellee  = role.includes('مطعون ضد') || role.includes('مدعى علي') || role.includes(apeRole);
+    const isAppellant = isAppellantRole(role, settings);
+    const isAppellee  = isAppelleeRole(role, settings);
 
     const createdAtDate = getSafeDateObj(c.createdAt || c.timestamp || '');
     if (createdAtDate && createdAtDate.getMonth() === targetMonth && createdAtDate.getFullYear() === targetYear) {
@@ -103,9 +99,6 @@ export function computeMonthStats(cases, settings, targetMonth, targetYear) {
 // calculateDashboardStats: full dashboard aggregation
 // ─────────────────────────────────────────────────────────────
 export function calculateDashboardStats(cases, settings, globalTasks = []) {
-  const appRole = settings?.roles?.[0] || 'طاعن';
-  const apeRole = settings?.roles?.[1] || 'مطعون ضدنا';
-
   let activeCasesCount    = 0;
   let ongoingCount        = 0;
   let reservedCount       = 0;
@@ -144,18 +137,15 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
   }
 
   cases.forEach(c => {
-    const role = String(c['الصفة'] || c['صفة'] || '').trim();
+    const role = getCaseRole(c);
 
-    if (role === 'لا شأن' || role === 'خارج الاختصاص') return;
+    if (isNoInterestRole(role) || isOutOfJurisdictionRole(role)) return;
 
-    if (role.includes('لا شأن') || role.includes('خارج الاختصاص')) return;
-
-    // Flexible role check (طاعن / مدعي / مستأنف) vs (مطعون ضدنا / مدعى عليه / مستأنف ضده)
-    const isAppellant = role.includes('طاعن') || role.includes('مدعي') || role.includes('مستأنف') || role.includes(appRole);
-    const isAppellee  = role.includes('مطعون ضد') || role.includes('مدعى علي') || role.includes(apeRole);
+    const isAppellant = isAppellantRole(role, settings);
+    const isAppellee  = isAppelleeRole(role, settings);
 
     // "آخر جلسة" field = next scheduled / most-recent session date
-    const lastSessionStr  = c['آخر جلسة'] || c['تاريخ الجلسة'] || c['أخر جلسة'] || '';
+    const lastSessionStr  = getSessionDate(c);
     const lastSessionDate = getSafeDateObj(lastSessionStr);
 
     const year = c['السنة'] || c['سنة'] || c['year'] || 'غير محدد';

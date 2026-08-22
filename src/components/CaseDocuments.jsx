@@ -126,8 +126,25 @@ export default function CaseDocuments({ caseId, pastedFile, setPastedFile }) {
       };
 
       const updatedDocs = [...documents, newDoc];
-      await saveCaseToFirebase(caseId, { documents: updatedDocs });
+      
+      const updatePayload = { documents: updatedDocs };
+      
+      const DEFAULT_CHECKLIST = [
+        'صحيفة الطعن', 'تقرير مفوضين', 'مذكرة دفاع', 'مذكرة ختامية', 
+        'تقرير الخبراء', 'تعجيل من الوقف', 'مذكرة تكميلية', 'مذكرة رأي',
+        'حافظة مستندات', 'مسودة حكم', 'فتح باب مرافعة', 'محضر الجلسة',
+        'مستندات الخصم', 'مذكرات الخصم'
+      ];
+      const checklist = settings?.paperFileChecklist || DEFAULT_CHECKLIST;
+      
+      if (checklist.includes(docType)) {
+        const currentPaperFiles = caseData.paperFileContents || [];
+        if (!currentPaperFiles.includes(docType)) {
+          updatePayload.paperFileContents = [...currentPaperFiles, docType];
+        }
+      }
 
+      await saveCaseToFirebase(caseId, updatePayload);
       toast('تم إضافة الملف بنجاح', 'success');
       setDocTitle('');
       setDocType('ملف الدعوى');
