@@ -340,17 +340,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
 
     const updateData = { sessions: newSessions };
 
-    const sessionKey = Object.keys(caseData).find(k => k === 'آخر جلسة' || k === 'تاريخ الجلسة' || k === 'أخر جلسة') || 'آخر جلسة';
-    const decisionKey = Object.keys(caseData).find(k => k === 'القرار' || k === 'قرار الجلسة' || k === 'المنطوق') || 'القرار';
-    const rollKey = Object.keys(caseData).find(k => k === 'الرول') || 'الرول';
-    const typeKey = Object.keys(caseData).find(k => k === 'نوع الجلسة' || k === 'نوع_الجلسة') || 'نوع الجلسة';
-
-    if (newSessions.length > 0) {
-      updateData[sessionKey] = newSessions[0].date;
-      updateData[decisionKey] = newSessions[0].decision || '';
-      updateData[rollKey] = newSessions[0].roll || '';
-      updateData[typeKey] = newSessions[0].type || '';
-    }
+    Object.assign(updateData, syncLatestSessionToCaseData(caseData, newSessions));
 
     await saveCaseToFirebase(caseData.id, updateData);
     setEditingSessionIdx(null);

@@ -145,3 +145,30 @@ export const calculateLitigationStage = (caseData, settings = {}) => {
   // Default Fallback Rule 8: Ongoing
   return 'متداول';
 };
+
+
+export const syncLatestSessionToCaseData = (caseData, sessionsList) => {
+  if (!sessionsList || sessionsList.length === 0) return {};
+  
+  // Sort descending by date
+  const sortedSessions = [...sessionsList].sort((a, b) => {
+    const dA = new Date(a.date).getTime();
+    const dB = new Date(b.date).getTime();
+    return dB - dA; // descending
+  });
+
+  const latest = sortedSessions[0];
+  const updateData = {};
+  
+  const sessionKey = Object.keys(caseData).find(k => k === 'آخر جلسة' || k === 'تاريخ الجلسة' || k === 'أخر جلسة') || 'آخر جلسة';
+  const decisionKey = Object.keys(caseData).find(k => k === 'القرار' || k === 'قرار الجلسة' || k === 'المنطوق') || 'القرار';
+  const rollKey = Object.keys(caseData).find(k => k === 'الرول') || 'الرول';
+  const typeKey = Object.keys(caseData).find(k => k === 'نوع الجلسة' || k === 'نوع_الجلسة') || 'نوع الجلسة';
+
+  updateData[sessionKey] = latest.date || '';
+  updateData[decisionKey] = latest.decision || '';
+  updateData[rollKey] = latest.roll || '';
+  updateData[typeKey] = latest.type || '';
+
+  return updateData;
+};

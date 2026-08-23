@@ -3,6 +3,8 @@ import { X, Save, CalendarPlus, Paperclip, Loader2, CheckCircle2, Plus } from 'l
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { uploadToR2 } from '../lib/r2';
+import { syncLatestSessionToCaseData } from '../utils/caseUtils';
+
 import imageCompression from 'browser-image-compression';
 
 export default function AddSessionModal({ isOpen, onClose, caseData }) {
