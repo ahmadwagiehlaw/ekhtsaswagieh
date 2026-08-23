@@ -324,7 +324,14 @@ export default function SessionsTab({
                         const tempType = changedField === 'type' ? newValue : currentType;
                         const tempTrigger = changedField === 'trigger' ? newValue : currentTrigger;
 
-                        for (const rule of settings.judgmentDefaults) {
+                        // Sort rules by specificity (number of defined conditions) descending
+                        const sortedRules = [...settings.judgmentDefaults].sort((a, b) => {
+                          const countA = Object.values(a.conditions || {}).filter(v => v && String(v).trim() !== '').length;
+                          const countB = Object.values(b.conditions || {}).filter(v => v && String(v).trim() !== '').length;
+                          return countB - countA;
+                        });
+
+                        for (const rule of sortedRules) {
                           const conds = rule.conditions || {};
                           
                           const roleMatch = !conds.role || currentRole.includes(conds.role) || conds.role === currentRole;

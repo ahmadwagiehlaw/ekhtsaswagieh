@@ -43,11 +43,12 @@ export default function JudgmentRulesSection({
       rule.conditions.classification || '',
       rule.conditions.type || '',
       rule.conditions.sessionType || '',
-      rule.conditions.decision || ''
+      rule.conditions.decision || '',
+      rule.conditions.keyword || ''
     ].join('||');
     
     // Ignore empty rules
-    if (key === '||||||||||') return;
+    if (key === '||||||||||||') return;
 
     if (seen.has(key)) {
       duplicates.add(idx);
