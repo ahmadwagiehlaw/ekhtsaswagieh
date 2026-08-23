@@ -9,6 +9,7 @@ import {
 import { useAppContext } from '../context/AppState';
 import { calculateDashboardStats, computeMonthStats } from '../utils/statsUtils';
 import { getActiveMapping, resolveColor } from '../utils/statsMapping';
+import { autoDetermineRole } from '../utils/caseUtils';
 import useDashboardStats from '../hooks/useDashboardStats';
 import { useUI } from '../context/UIContext';
 import { getSafeDateObj } from '../utils/dateUtils';
@@ -38,11 +39,37 @@ import JudicialAgendaReportModal from '../components/JudicialAgendaReportModal';
 // Main Dashboard
 // ─────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { cases, saveCaseToFirebase, settings, isEmployee, currentUser, currentUserName, logoutAdmin, globalTasks, saveGlobalTask, completeGlobalTask } = useAppContext();
+  const { cases, saveCaseToFirebase, saveBatchCasesToFirebase, settings, isEmployee, currentUser, currentUserName, logoutAdmin, globalTasks, saveGlobalTask, completeGlobalTask } = useAppContext();
   const navigate = useNavigate();
   const { showPrompt, toast, showConfirm } = useUI();
 
   const today = new Date();
+
+  // One-time auto-migration for missing 'الصفة'
+  const [hasMigratedRoles, setHasMigratedRoles] = useState(false);
+  useEffect(() => {
+    if (cases && cases.length > 0 && !hasMigratedRoles && saveBatchCasesToFirebase) {
+      setHasMigratedRoles(true); // Ensure it only runs once per app load
+      const updates = cases.map(c => {
+        if (!c['الصفة'] || String(c['الصفة']).trim() === '') {
+           const auto = autoDetermineRole(c);
+           if (auto !== 'لا شأن') {
+              return { id: c.id, 'الصفة': auto };
+           }
+        }
+        return null;
+      }).filter(Boolean);
+      
+      if (updates.length > 0) {
+        saveBatchCasesToFirebase(updates).then(() => {
+          toast(`تم استكمال حقل "الصفة" تلقائياً لـ ${updates.length} قضية قديمة لتفعيل القواعد.`, 'success');
+        }).catch(err => {
+          console.error("Failed to migrate roles:", err);
+        });
+      }
+    }
+  }, [cases, hasMigratedRoles, saveBatchCasesToFirebase, toast]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const [isGlobalTaskModalOpen, setIsGlobalTaskModalOpen] = useState(false);

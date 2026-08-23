@@ -7,6 +7,8 @@ import SmartAutocomplete from './SmartAutocomplete';
 import FieldOptionsManager from './FieldOptionsManager';
 import StrictSelectField from './StrictSelectField';
 import * as CASE_FIELDS from '../constants/caseFields';
+import { autoDetermineRole } from '../utils/caseUtils';
+import { useEffect } from 'react';
 
 export default function AddCaseModal({ isOpen, onClose }) {
   const { schema, createNewCase, cases, saveCaseToFirebase, settings } = useAppContext();
@@ -27,6 +29,18 @@ export default function AddCaseModal({ isOpen, onClose }) {
   const [newJoinedYear, setNewJoinedYear] = useState('');
   const [managingField, setManagingField] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const pNames = (formData.plaintiffsList || []).map(p => p.name).filter(Boolean);
+    const dNames = (formData.defendantsList || []).map(p => p.name).filter(Boolean);
+    const pCombined = pNames.length > 1 ? `${pNames[0]} وآخرين` : pNames[0] || '';
+    const dCombined = dNames.length > 1 ? `${dNames[0]} وآخرين` : dNames[0] || '';
+    
+    const autoRole = autoDetermineRole({ 'المدعي': pCombined, 'المطعون ضده': dCombined });
+    if (autoRole !== 'لا شأن' && !formData['الصفة']) {
+      setFormData(prev => ({ ...prev, 'الصفة': autoRole }));
+    }
+  }, [formData.plaintiffsList, formData.defendantsList]);
 
   const currentCourtDegree = settings?.courtDegree || 'أول درجة';
   const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا';

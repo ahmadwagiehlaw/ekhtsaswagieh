@@ -172,3 +172,22 @@ export const syncLatestSessionToCaseData = (caseData, sessionsList) => {
 
   return updateData;
 };
+
+
+export const GOV_OFFICIAL_KEYWORDS = ['وزير', 'رئيس حي', 'محافظ', 'رئيس الوحدة المحلية', 'رئيس مجلس الوزراء', 'رئيس الجمهورية', 'رئيس الوزراء', 'وكيل وزارة', 'وزارة', 'رئيس مصلحة'];
+
+export function isGovernmentOfficialText(text) {
+  if (!text) return false;
+  const t = String(text);
+  if (t.includes('هيئة')) return false; // الهيئات مستبعدة دايماً، حتى لو فيها كلمة تانية من القايمة
+  return GOV_OFFICIAL_KEYWORDS.some(kw => t.includes(kw));
+}
+
+export function autoDetermineRole(caseData) {
+  if (!caseData) return 'لا شأن';
+  const appellantText = caseData['الطاعن'] || caseData['المدعي'] || '';
+  const defendantText = caseData['المطعون ضده'] || caseData['المدعى عليه'] || '';
+  if (isGovernmentOfficialText(appellantText)) return 'طاعن';
+  if (isGovernmentOfficialText(defendantText)) return 'مطعون ضدنا';
+  return 'لا شأن';
+}

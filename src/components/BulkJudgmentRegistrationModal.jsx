@@ -3,6 +3,7 @@ import { X, Save, Scale } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
+import { autoDetermineRole } from '../utils/caseUtils';
 
 export default function BulkJudgmentRegistrationModal({ isOpen, onClose, sessionDate, selectedCaseIds }) {
   const { cases, settings, saveBatchCasesToFirebase } = useAppContext();
@@ -20,16 +21,22 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
 
   useEffect(() => {
     if (isOpen) {
+      let defaultRole = '';
+      if (selectedCaseIds && selectedCaseIds.size > 0 && cases) {
+        const firstId = Array.from(selectedCaseIds)[0];
+        const firstCase = cases.find(c => c.id === firstId);
+        defaultRole = autoDetermineRole(firstCase);
+      }
       setFormData({
         _category: '',
         _result: '',
         _type: '',
         _verdict: '',
         _isFinal: false,
-        _role: ''
+        _role: defaultRole
       });
     }
-  }, [isOpen]);
+  }, [isOpen, selectedCaseIds, cases]);
 
   if (!isOpen) return null;
 

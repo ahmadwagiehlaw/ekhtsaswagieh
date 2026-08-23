@@ -15,7 +15,7 @@ import FieldOptionsManager from '../components/FieldOptionsManager';
 import StrictSelectField from '../components/StrictSelectField';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 import { localizeNumber } from '../utils/numberUtils';
-import { calculateLitigationStage } from '../utils/caseUtils';
+import { calculateLitigationStage, autoDetermineRole } from '../utils/caseUtils';
 import { calculateCaseAlerts } from '../utils/statsUtils';
 import { uploadToR2 } from '../lib/r2';
 import imageCompression from 'browser-image-compression';
@@ -377,6 +377,13 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
         const combined = names.length > 1 ? `${names[0]} وآخرين` : names[0] || '';
         dataToSave['المدعى عليه'] = combined;
         dataToSave['المطعون ضده'] = combined;
+      }
+
+      if (!dataToSave['الصفة'] || String(dataToSave['الصفة']).trim() === '') {
+        const autoRole = autoDetermineRole(dataToSave);
+        if (autoRole !== 'لا شأن') {
+          dataToSave['الصفة'] = autoRole;
+        }
       }
 
       const previousData = { ...caseData };
@@ -1132,4 +1139,4 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
   }
 
   return content;
-}
+}
