@@ -253,43 +253,44 @@ export default function Dashboard() {
     toast('تم الحذف بنجاح', 'success');
   };
 
-  if (isEmployee) {
-    const userEmail = currentUser || '';
-    const usernameOnly = userEmail.split('@')[0];
+  const userEmail = currentUser || '';
+  const usernameOnly = userEmail.split('@')[0];
 
-    const { pendingTasks, completedTasks } = useMemo(() => {
-      const isAssignedToMe = (assignee) => {
-        if (!assignee) return false;
-        const ass = assignee.toLowerCase().trim();
-        return ass === userEmail.toLowerCase().trim() ||
-               ass === usernameOnly.toLowerCase().trim() ||
-               ass === (currentUserName || '').toLowerCase().trim();
-      };
+  const { pendingTasks, completedTasks } = useMemo(() => {
+    if (!isEmployee) return { pendingTasks: [], completedTasks: [] };
+    const isAssignedToMe = (assignee) => {
+      if (!assignee) return false;
+      const ass = assignee.toLowerCase().trim();
+      return ass === userEmail.toLowerCase().trim() ||
+             ass === usernameOnly.toLowerCase().trim() ||
+             ass === (currentUserName || '').toLowerCase().trim();
+    };
 
-      const myTasks = [];
-      cases.forEach(c => {
-        if (c.tasks) c.tasks.forEach(t => {
-          if (isAssignedToMe(t.assignee))
-            myTasks.push({ ...t, caseId: c.id, caseNum: c['رقم الدعوى'] || c.id, year: c['السنة'], type: 'case', caseCover: c.coverImage });
-        });
+    const myTasks = [];
+    cases.forEach(c => {
+      if (c.tasks) c.tasks.forEach(t => {
+        if (isAssignedToMe(t.assignee))
+          myTasks.push({ ...t, caseId: c.id, caseNum: c['رقم الدعوى'] || c.id, year: c['السنة'], type: 'case', caseCover: c.coverImage });
       });
-      globalTasks.forEach(t => {
-        if (isAssignedToMe(t.assignee)) {
-          let caseNum = 'مهمة عامة', caseCover = null;
-          if (t.linkedCases?.length > 0) {
-            const fc = cases.find(c => c.id === t.linkedCases[0]);
-            if (fc) { caseNum = t.linkedCases.length > 1 ? `مرتبطة بـ ${t.linkedCases.length} ملفات` : (fc['رقم الدعوى'] || 'ملف'); caseCover = fc.coverImage; }
-          }
-          myTasks.push({ ...t, type: 'global', caseNum, caseCover });
+    });
+    globalTasks.forEach(t => {
+      if (isAssignedToMe(t.assignee)) {
+        let caseNum = 'مهمة عامة', caseCover = null;
+        if (t.linkedCases?.length > 0) {
+          const fc = cases.find(c => c.id === t.linkedCases[0]);
+          if (fc) { caseNum = t.linkedCases.length > 1 ? `مرتبطة بـ ${t.linkedCases.length} ملفات` : (fc['رقم الدعوى'] || 'ملف'); caseCover = fc.coverImage; }
         }
-      });
-      
-      const pTasks = myTasks.filter(t => t.status !== 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      const cTasks = myTasks.filter(t => t.status === 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      
-      return { pendingTasks: pTasks, completedTasks: cTasks };
-    }, [cases, globalTasks, currentUser, currentUserName, userEmail, usernameOnly]);
+        myTasks.push({ ...t, type: 'global', caseNum, caseCover });
+      }
+    });
+    
+    const pTasks = myTasks.filter(t => t.status !== 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const cTasks = myTasks.filter(t => t.status === 'completed').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    return { pendingTasks: pTasks, completedTasks: cTasks };
+  }, [cases, globalTasks, currentUser, currentUserName, userEmail, usernameOnly, isEmployee]);
 
+  if (isEmployee) {
     return (
       <div className="space-y-6 animate-fade-in pb-10">
         <div className="bg-emerald-600 rounded-3xl p-6 relative overflow-hidden shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">

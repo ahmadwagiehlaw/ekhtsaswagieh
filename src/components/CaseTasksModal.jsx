@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { X, ClipboardList, CheckCircle2, Plus, Calendar, Trash2, FileText, Search, Eye, Bell, Camera, Edit3 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
+import { useGeneralTasks } from '../hooks/useGeneralTasks';
 import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
 import UploadDocumentModal from './UploadDocumentModal';
 
 export default function CaseTasksModal({ isOpen, onClose, caseData }) {
+  const { completeTask, uncompleteTask, saveTask, deleteTask } = useGeneralTasks();
   const { globalTasks, saveGlobalTask, deleteGlobalTask, completeGlobalTask, currentUser, settings, isAdmin, currentUserPermissions,
     viewingTasks, saveViewingTask, deleteViewingTask, completeViewingTask } = useAppContext();
   const { toast, showConfirm } = useUI();
@@ -70,7 +72,7 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
     if (isViewingType) {
       success = await saveViewingTask(taskObj);
     } else {
-      success = await saveGlobalTask(taskObj);
+      success = await saveTask(taskObj);
     }
 
     if (success) {
@@ -92,7 +94,7 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
       if (task?.type === 'viewing') {
         success = await deleteViewingTask(taskId);
       } else {
-        success = await deleteGlobalTask(taskId);
+        success = await deleteTask(taskId, true);
       }
       if (success) toast("تم حذف المهمة بنجاح", "success");
     }
@@ -117,7 +119,7 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
         if (task?.type === 'viewing') {
           success = await deleteViewingTask(id);
         } else {
-          success = await deleteGlobalTask(id);
+          success = await deleteTask(id, true);
         }
         if (success) count++;
       }
@@ -428,7 +430,7 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
             if (activeUploadTask.type === 'viewing') {
               await completeViewingTask(activeUploadTask.id, true);
             } else {
-              await completeGlobalTask(activeUploadTask.id, true);
+              await completeTask(activeUploadTask.id, '');
             }
             toast("تم الإرفاق وإنجاز المهمة بنجاح", "success");
           }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, ClipboardList, CheckCircle2, Plus, Trash2, Calendar, Search, Files, Printer, Camera, Edit, FolderOpen, Folder, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
+import { useGeneralTasks } from '../hooks/useGeneralTasks';
 import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
 import { useLocation } from 'react-router-dom';
@@ -61,7 +62,8 @@ const EgyptianDateInput = ({ value, onChange, className }) => {
 };
 
 export default function TasksManagerModal({ isOpen, onClose }) {
-  const { globalTasks, saveGlobalTask, completeGlobalTask, PREDEFINED_TASKS, deleteGlobalTask, settings, isAdmin, currentUser, currentUserName, cases, currentUserPermissions,
+  const { completeTask, uncompleteTask, saveTask, deleteTask } = useGeneralTasks();
+  const { globalTasks, PREDEFINED_TASKS, deleteGlobalTask, settings, isAdmin, currentUser, currentUserName, cases, currentUserPermissions,
     viewingTasks, saveViewingTask, deleteViewingTask, completeViewingTask } = useAppContext();
 
   const canManageTasks = isAdmin || currentUserPermissions?.canManageTasks;
@@ -165,10 +167,10 @@ export default function TasksManagerModal({ isOpen, onClose }) {
         const taskToSave = { ...newTask, type: 'general' };
         if (editingTaskId) {
           const existingTask = globalTasks.find(t => t.id === editingTaskId);
-          await saveGlobalTask({ ...existingTask, ...taskToSave, updatedAt: new Date().toISOString() }, editingTaskId);
+          await saveTask(taskToSave, editingTaskId);
           toast('تم تعديل المهمة بنجاح', 'success');
         } else {
-          await saveGlobalTask({ ...taskToSave, status: 'pending', createdAt: new Date().toISOString(), createdBy: currentUser || 'مجهول' });
+          await saveTask(taskToSave);
           toast('تمت إضافة المهمة بنجاح', 'success');
         }
       }
@@ -186,9 +188,9 @@ export default function TasksManagerModal({ isOpen, onClose }) {
         await completeViewingTask(task.id, task.status !== 'completed');
       } else {
         if (task.status !== 'completed') {
-          await completeGlobalTask(task.id, task.notes);
+          await completeTask(task.id, task.notes);
         } else {
-          await saveGlobalTask({ ...task, status: 'pending', completedAt: null }, task.id);
+          await uncompleteTask(task.id);
         }
       }
     } catch (e) {
@@ -203,7 +205,7 @@ export default function TasksManagerModal({ isOpen, onClose }) {
       if (activeMainTab === 'viewing') {
         success = await deleteViewingTask(id);
       } else {
-        success = await deleteGlobalTask(id);
+        success = await deleteTask(id, true);
       }
       if (success) toast('تم حذف المهمة بنجاح', 'success');
     }
@@ -237,7 +239,7 @@ export default function TasksManagerModal({ isOpen, onClose }) {
         if (activeMainTab === 'viewing') {
           success = await deleteViewingTask(id);
         } else {
-          success = await deleteGlobalTask(id);
+          success = await deleteTask(id, true);
         }
         if (success) count++;
       }
@@ -257,7 +259,7 @@ export default function TasksManagerModal({ isOpen, onClose }) {
           if (t && t.status !== 'completed') { await completeViewingTask(id, true); count++; }
         } else {
           const t = globalTasks.find(task => task.id === id);
-          if (t && t.status !== 'completed') { await completeGlobalTask(id, t.notes); count++; }
+          if (t && t.status !== 'completed') { await completeTask(id, t.notes); count++; }
         }
       }
       setSelectedTaskIds([]);
@@ -1007,7 +1009,7 @@ export default function TasksManagerModal({ isOpen, onClose }) {
         initialDocType="تصوير مستندات"
         onSuccess={async () => {
           if (activeUploadTask) {
-            await completeGlobalTask(activeUploadTask.id, true);
+            await completeTask(activeUploadTask.id, '');
             toast("تم الإرفاق وإنجاز المهمة بنجاح", "success");
           }
         }}

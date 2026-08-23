@@ -89,19 +89,7 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
     }
 
     // Also update main fields to reflect the latest session for stats and list view
-    // Find the schema keys used for lastSession and decision
-    const sessionKey = Object.keys(caseData).find(k => k === 'آخر جلسة' || k === 'تاريخ الجلسة' || k === 'أخر جلسة') || 'آخر جلسة';
-    const decisionKey = Object.keys(caseData).find(k => k === 'القرار' || k === 'قرار الجلسة' || k === 'المنطوق') || 'القرار';
-    const rollKey = Object.keys(caseData).find(k => k === 'الرول') || 'الرول';
-    const typeKey = Object.keys(caseData).find(k => k === 'نوع الجلسة' || k === 'نوع_الجلسة') || 'نوع الجلسة';
-
-    if (updatedSessions.length > 0) {
-      const latestSession = updatedSessions[0];
-      updateData[sessionKey] = latestSession.date;
-      updateData[decisionKey] = latestSession.decision || '';
-      updateData[rollKey] = latestSession.roll || '';
-      updateData[typeKey] = latestSession.type || '';
-    }
+    Object.assign(updateData, syncLatestSessionToCaseData(caseData, updatedSessions));
 
     if (createViewingTask && saveViewingTask) {
       const caseNumber = caseData['رقم الدعوى'] || caseData['رقم القضية'] || '';

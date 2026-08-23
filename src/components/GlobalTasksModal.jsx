@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { X, ClipboardList, CheckCircle2, Plus, Trash2, Calendar } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
+import { useGeneralTasks } from '../hooks/useGeneralTasks';
 import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
 
 export default function GlobalTasksModal({ isOpen, onClose }) {
-  const { globalTasks, saveGlobalTask, completeGlobalTask, PREDEFINED_TASKS, deleteGlobalTask, settings, isAdmin, currentUser, currentUserPermissions } = useAppContext();
+  const { completeTask, uncompleteTask, saveTask, deleteTask } = useGeneralTasks();
+  const { globalTasks, PREDEFINED_TASKS, settings, isAdmin, currentUser, currentUserPermissions } = useAppContext();
   const canManageTasks = isAdmin || currentUserPermissions?.canManageTasks;
   const { toast, showConfirm } = useUI();
   const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'completed'
@@ -62,7 +64,7 @@ export default function GlobalTasksModal({ isOpen, onClose }) {
   const handleDelete = async (id) => {
     const confirmed = await showConfirm('حذف المهمة', 'هل أنت متأكد من حذف هذه المهمة؟', 'delete_task');
     if (confirmed) {
-      const success = await deleteGlobalTask(id);
+      const success = await deleteTask(id, true);
       if (success) toast('تم الحذف بنجاح', 'success');
     }
   };
