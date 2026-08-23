@@ -318,63 +318,38 @@ export default function SessionsTab({
                       const applyRules = (changedField, newValue, currentCat, currentRes, currentType, currentTrigger) => {
                         if (!settings?.judgmentDefaults?.length) return;
                         
-                        const currentRole = String(caseData['الصفة'] || caseData['صفة'] || '').trim();
-                        const tempCat = changedField === 'category' ? newValue : currentCat;
-                        const tempRes = changedField === 'classification' ? newValue : currentRes;
-                        const tempType = changedField === 'type' ? newValue : currentType;
-                        const tempTrigger = changedField === 'trigger' ? newValue : currentTrigger;
-
-                        // Sort rules by specificity (number of defined conditions) descending
-                        const sortedRules = [...settings.judgmentDefaults].sort((a, b) => {
-                          const countA = Object.values(a.conditions || {}).filter(v => v && String(v).trim() !== '').length;
-                          const countB = Object.values(b.conditions || {}).filter(v => v && String(v).trim() !== '').length;
-                          return countB - countA;
-                        });
-
-                        for (const rule of sortedRules) {
-                          const conds = rule.conditions || {};
-                          
-                          const roleMatch = !conds.role || currentRole.includes(conds.role) || conds.role === currentRole;
-                          const catMatch = !conds.category || tempCat === conds.category;
-                          const classMatch = !conds.classification || tempRes === conds.classification;
-                          
-                          // Fix: type matches type, keyword matches trigger
-                          const typeMatch = !conds.type || tempType === conds.type;
-                          const keywordMatch = !conds.keyword || (tempTrigger && tempTrigger.includes(conds.keyword));
-                          
-                          const sessionTypeMatch = !conds.sessionType || session.type === conds.sessionType;
-                          const decisionMatch = !conds.decision || session.decision === conds.decision;
-
-                          const hasConditions = conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision || conds.keyword;
-
-                          if (hasConditions && roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch && keywordMatch) {
-                            const acts = rule.actions || {};
-                            
-                            let newCat = tempCat;
-                            if (acts.category) {
-                              setCat(acts.category);
-                              newCat = acts.category;
-                            }
-                            if (acts.classification) {
-                              setRes(acts.classification);
-                              if (!acts.category) {
-                                const autoCat = calculateCategory(acts.classification);
-                                if (autoCat) setCat(autoCat);
-                              }
-                            }
-                            if (acts.type) setType(acts.type);
-                            
-                            if (acts.text) {
-                              setVerd(prev => {
-                                if (!prev || prev === lastAutoFilledText) {
-                                  setLastAutoFilledText(acts.text);
-                                  return acts.text;
-                                }
-                                return prev;
-                              });
-                            }
-                            break;
-                          }
+                        const engineInput = {
+                           role: String(caseData['الصفة'] || caseData['صفة'] || '').trim(),
+                           category: changedField === 'category' ? newValue : currentCat,
+                           classification: changedField === 'classification' ? newValue : currentRes,
+                           type: changedField === 'type' ? newValue : currentType,
+                           sessionType: session.type,
+                           decision: session.decision || currentTrigger // SessionsTab used to pass trigger
+                           // the engine in SessionTable.jsx checks engineInput.decision
+                        };
+                        
+                        const engineOutput = applyJudgmentDefaultRules(engineInput, settings.judgmentDefaults);
+                        
+                        let newCat = engineOutput.category;
+                        if (newCat && newCat !== engineInput.category) {
+                           setCat(newCat);
+                        }
+                        
+                        let newRes = engineOutput.classification;
+                        if (newRes && newRes !== engineInput.classification) {
+                           setRes(newRes);
+                           if (!newCat) {
+                             const fallbackCat = getFallbackCategory(newRes);
+                             if (fallbackCat) setCat(fallbackCat);
+                           }
+                        }
+                        
+                        if (engineOutput.type && engineOutput.type !== engineInput.type) {
+                           setType(engineOutput.type);
+                        }
+                        
+                        if (engineOutput.text && engineOutput.text !== engineInput.text) {
+                           setVerd(engineOutput.text);
                         }
                       };
 

@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
 import { autoDetermineRole } from '../utils/caseUtils';
+import { applyJudgmentDefaultRules } from '../utils/judgmentRulesEngine';
 
 export default function BulkJudgmentRegistrationModal({ isOpen, onClose, sessionDate, selectedCaseIds }) {
   const { cases, settings, saveBatchCasesToFirebase } = useAppContext();
@@ -42,27 +43,26 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
 
   const applyDefaultRules = (field, value, currentData) => {
     if (!settings?.judgmentDefaults?.length) return currentData;
-    const newData = { ...currentData };
     
-    for (const rule of settings.judgmentDefaults) {
-      const conds = rule.conditions || {};
-      const roleMatch = !conds.role || (currentData._role && currentData._role.includes(conds.role)) || conds.role === currentData._role;
-      const catMatch = !conds.category || newData._category === conds.category;
-      const classMatch = !conds.classification || newData._result === conds.classification;
-      const typeMatch = !conds.type || newData._type === conds.type;
-      const sessionTypeMatch = !conds.sessionType || newData._sessionType === conds.sessionType;
-      const decisionMatch = !conds.decision || newData._decision === conds.decision;
-      
-      if (roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch && (conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision)) {
-        const acts = rule.actions || {};
-        if (acts.category && !newData._category) newData._category = acts.category;
-        if (acts.classification && !newData._result) newData._result = acts.classification;
-        if (acts.type && !newData._type) newData._type = acts.type;
-        if (acts.text && !newData._verdict) newData._verdict = acts.text;
-        break; // apply only the first fully matching rule
-      }
-    }
-    return newData;
+    const engineInput = {
+      role: currentData._role,
+      category: currentData._category,
+      classification: currentData._result,
+      type: currentData._type,
+      sessionType: currentData._sessionType,
+      decision: currentData._decision,
+      text: currentData._verdict
+    };
+    
+    const engineOutput = applyJudgmentDefaultRules(engineInput, settings.judgmentDefaults);
+    
+    return {
+      ...currentData,
+      _category: engineOutput.category || currentData._category,
+      _result: engineOutput.classification || currentData._result,
+      _type: engineOutput.type || currentData._type,
+      _verdict: engineOutput.text || currentData._verdict
+    };
   };
 
   const handleFieldChange = (field, value) => {

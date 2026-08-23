@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { applyJudgmentDefaultRules } from '../utils/judgmentRulesEngine';
 import { useNavigate } from 'react-router-dom';
 import { Check, X, Upload, Edit3, Gavel, Settings2, Copy, Maximize2, CheckSquare, Square, Save, CopyPlus, RefreshCcw, Search, Settings, Plus, Trash2, FileText, Camera } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
@@ -287,25 +288,22 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
     
     // Apply Dynamic Rules if missing result or type
     if (hasJudgmentData && settings?.judgmentDefaults?.length > 0) {
-       for (const rule of settings.judgmentDefaults) {
-         const conds = rule.conditions || {};
-         const currentRole = getFieldValueLocal(cObj, ['الصفة', 'صفة']) || '';
-         const roleMatch = !conds.role || currentRole.includes(conds.role) || conds.role === currentRole;
-         const catMatch = !conds.category || newData['_judgmentCategory'] === conds.category;
-         const classMatch = !conds.classification || newData['_judgmentResult'] === conds.classification;
-         const typeMatch = !conds.type || newData['_judgmentType'] === conds.type;
-         const sessionTypeMatch = !conds.sessionType || newData['نوع الجلسة'] === conds.sessionType;
-         const decisionMatch = !conds.decision || newData['القرار'] === conds.decision;
-         
-         if (roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch && (conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision)) {
-           const acts = rule.actions || {};
-           if (acts.category && !newData['_judgmentCategory']) newData['_judgmentCategory'] = acts.category;
-           if (acts.classification && !newData['_judgmentResult']) newData['_judgmentResult'] = acts.classification;
-           if (acts.type && !newData['_judgmentType']) newData['_judgmentType'] = acts.type;
-           if (acts.text && !newData['منطوق الحكم']) newData['منطوق الحكم'] = acts.text;
-           break;
-         }
-       }
+       const currentRole = getFieldValueLocal(cObj, ['الصفة', 'صفة']) || '';
+       const engineInput = {
+         role: currentRole,
+         category: newData['_judgmentCategory'],
+         classification: newData['_judgmentResult'],
+         type: newData['_judgmentType'],
+         sessionType: newData['نوع الجلسة'],
+         decision: newData['القرار'],
+         text: newData['منطوق الحكم']
+       };
+       const engineOutput = applyJudgmentDefaultRules(engineInput, settings.judgmentDefaults);
+       
+       newData['_judgmentCategory'] = engineOutput.category;
+       newData['_judgmentResult'] = engineOutput.classification;
+       newData['_judgmentType'] = engineOutput.type;
+       newData['منطوق الحكم'] = engineOutput.text;
     }
 
     if (hasJudgmentData) {
