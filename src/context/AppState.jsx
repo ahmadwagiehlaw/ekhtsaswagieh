@@ -330,7 +330,7 @@ export const AppProvider = ({ children }) => {
   };
 
   const checkDuplicateCase = (caseNo, year, excludeId = null) => {
-    return cases.some(c => {
+    return rawCases.some(c => {
       const cNo = c['رقم الدعوى'] || c['رقم القضية'] || c['رقم_الدعوى'];
       const cYear = c['السنة'] || c['سنة'] || c['year'];
       

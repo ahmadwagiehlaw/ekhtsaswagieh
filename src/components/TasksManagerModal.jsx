@@ -950,7 +950,7 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                 const q = caseSearchQuery.toLowerCase();
                 return (c['رقم الدعوى']?.toString().includes(q)) ||
                   (c['السنة']?.toString().includes(q)) ||
-                  (c['المدعي']?.toLowerCase().includes(q)) ||
+                  ((c['المدعي'] || c['الطاعن'])?.toLowerCase().includes(q)) ||
                   (c['المطعون ضده']?.toLowerCase().includes(q));
               }).map(c => {
                 const isSelected = newTask.linkedCases?.includes(c.id);
@@ -975,7 +975,7 @@ export default function TasksManagerModal({ isOpen, onClose }) {
                         رقم {c['رقم الدعوى'] || c.id} لسنة {c['السنة']}
                       </h4>
                       <p className="text-xs font-bold text-slate-500 mt-1">
-                        {c['المدعي']} ضد {c['المطعون ضده']}
+                        {c['المدعي'] || c['الطاعن']} ضد {c['المطعون ضده']}
                       </p>
                     </div>
                     {isSelected && <CheckCircle2 className="w-5 h-5 text-indigo-600 shrink-0" />}

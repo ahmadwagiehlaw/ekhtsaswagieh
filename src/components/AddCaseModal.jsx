@@ -50,10 +50,7 @@ export default function AddCaseModal({ isOpen, onClose }) {
       if (firstWithChosenAddress) dataToSave['المقر المختار'] = firstWithChosenAddress.chosenAddress;
     }
     
-    if (dataToSave['المدعي']) {
-      dataToSave['الطاعن'] = dataToSave['المدعي'];
-      delete dataToSave['المدعي'];
-    }
+
     
     if (dataToSave.joinedCasesList && dataToSave.joinedCasesList.length > 0) {
        dataToSave['دعاوى منضمة'] = dataToSave.joinedCasesList.map(jc => `${jc.no} لسنة ${jc.year}`).join('، ');

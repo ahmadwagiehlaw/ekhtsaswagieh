@@ -82,8 +82,8 @@ export default function JudgmentRulesSection({
         { name: 'استنتاج ذكي: اعتبار للطاعن (خطر)', folder: 'قواعد: اعتبار الدعوى كأن لم تكن', conditions: { role: 'طاعن', type: 'اعتبار الدعوى كأن لم تكن' }, actions: { classification: 'ضد' } },
         { name: 'استنتاج ذكي: اعتبار للمطعون ضده', folder: 'قواعد: اعتبار الدعوى كأن لم تكن', conditions: { role: 'مطعون ضده', type: 'اعتبار الدعوى كأن لم تكن' }, actions: { classification: 'صالح' } },
         
-        { name: 'استنتاج ذكي: وقف جزائي للطاعن (خطر)', folder: 'قواعد: وقف جزائي', conditions: { role: 'طاعن', type: 'وقف جزائي' }, actions: { classification: 'إجرائي' } },
-        { name: 'استنتاج ذكي: وقف جزائي للمطعون ضده', folder: 'قواعد: وقف جزائي', conditions: { role: 'مطعون ضده', type: 'وقف جزائي' }, actions: { classification: 'إجرائي' } },
+        { name: 'استنتاج ذكي: وقف جزائي للطاعن (خطر)', folder: 'قواعد: وقف جزائي', conditions: { role: 'طاعن', type: 'وقف جزائي' }, actions: { classification: 'وقف جزائي' } },
+        { name: 'استنتاج ذكي: وقف جزائي للمطعون ضده', folder: 'قواعد: وقف جزائي', conditions: { role: 'مطعون ضده', type: 'وقف جزائي' }, actions: { classification: 'وقف جزائي' } },
       ];
       setLocalJudgmentDefaults([...localJudgmentDefaults, ...defaults]);
     }

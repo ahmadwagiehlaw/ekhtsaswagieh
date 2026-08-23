@@ -35,7 +35,7 @@ export default function Reports() {
             results.push({
               id: c.id + proc.id,
               caseNumber: `${c['رقم الدعوى'] || c.id} لسنة ${c['السنة']}`,
-              plaintiff: c['المدعي'] || '',
+              plaintiff: (c['المدعي'] || c['الطاعن']) || '',
               defendant: c['المطعون ضده'] || c['المطعون ضدنا'] || c['المدعى عليه'] || c['مدعى علينا'] || '',
               sessionDate: formatDateString(sessionDate),
               decision: c['القرار'] || '',
@@ -91,7 +91,7 @@ export default function Reports() {
           results.push({
             id: c.id + s.id,
             caseNumber: `${c['رقم الدعوى'] || c.id} لسنة ${c['السنة']}`,
-            plaintiff: c['المدعي'] || '',
+            plaintiff: (c['المدعي'] || c['الطاعن']) || '',
             defendant: c['المطعون ضده'] || c['المطعون ضدنا'] || c['المدعى عليه'] || c['مدعى علينا'] || '',
             sessionDate: formatDateString(s.date),
             decision: type,
@@ -115,7 +115,7 @@ export default function Reports() {
           results.push({
             id: c.id,
             caseNumber: `${c['رقم الدعوى'] || c.id} لسنة ${c['السنة']}`,
-            plaintiff: c['المدعي'] || '',
+            plaintiff: (c['المدعي'] || c['الطاعن']) || '',
             defendant: c['المطعون ضده'] || c['المطعون ضدنا'] || c['المدعى عليه'] || c['مدعى علينا'] || '',
             sessionDate: formatDateString(sessionDate),
             decision: c['القرار'] || '',
@@ -138,7 +138,7 @@ export default function Reports() {
           results.push({
             id: c.id,
             caseNumber: `${c['رقم الدعوى'] || c.id} لسنة ${c['السنة']}`,
-            plaintiff: c['المدعي'] || '',
+            plaintiff: (c['المدعي'] || c['الطاعن']) || '',
             defendant: c['المطعون ضده'] || c['المطعون ضدنا'] || c['المدعى عليه'] || c['مدعى علينا'] || '',
             sessionDate: formatDateString(sessionDate),
             decision: c['القرار'] || '',
@@ -168,7 +168,7 @@ export default function Reports() {
         results.push({
           id: t.id,
           caseNumber: linkedCase['رقم الدعوى'] ? `${linkedCase['رقم الدعوى']} لسنة ${linkedCase['السنة']}` : (t.caseContext?.roll ? `رول ${t.caseContext.roll}` : '---'),
-          plaintiff: linkedCase['المدعي'] || '',
+          plaintiff: (linkedCase['المدعي'] || linkedCase['الطاعن']) || '',
           defendant: linkedCase['المطعون ضده'] || linkedCase['المطعون ضدنا'] || linkedCase['المدعى عليه'] || linkedCase['مدعى علينا'] || '',
           sessionDate: formatDateString(sessionDate),
           decision: t.caseContext?.decision || linkedCase['القرار'] || '',

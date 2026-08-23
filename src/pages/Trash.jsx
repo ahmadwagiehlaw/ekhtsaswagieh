@@ -123,10 +123,10 @@ export default function Trash() {
               </div>
 
               <div className="space-y-2">
-                {c['المدعي'] && (
+                {(c['المدعي'] || c['الطاعن']) && (
                   <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg text-xs font-bold text-slate-500">
                     <span>المدعي:</span>
-                    <span className="truncate max-w-[150px]">{c['المدعي']}</span>
+                    <span className="truncate max-w-[150px]">{(c['المدعي'] || c['الطاعن'])}</span>
                   </div>
                 )}
                 {c['المدعى_عليه'] && (
