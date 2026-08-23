@@ -134,7 +134,9 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
     if (task.type === 'viewing') {
       success = await completeViewingTask(task.id, newStatus === 'completed');
     } else {
-      success = await completeGlobalTask(task.id, newStatus === 'completed');
+      success = newStatus === 'completed' 
+        ? await completeTask(task.id, task.notes || '') 
+        : await uncompleteTask(task.id);
     }
     if (success) {
       toast(newStatus === 'completed' ? "تم إنجاز المهمة" : "تمت إعادة المهمة", "success");
