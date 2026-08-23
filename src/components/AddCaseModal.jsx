@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { X, Save, Plus, Check, Trash2, MapPin, Settings2 } from 'lucide-react';
-import { useCasesContext } from '../context/CasesContext';
-import { useSettingsContext } from '../context/SettingsContext';
+import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { useNavigate } from 'react-router-dom';
 import SmartAutocomplete from './SmartAutocomplete';
@@ -10,8 +9,7 @@ import StrictSelectField from './StrictSelectField';
 import * as CASE_FIELDS from '../constants/caseFields';
 
 export default function AddCaseModal({ isOpen, onClose }) {
-  const { schema, createNewCase, cases, saveCaseToFirebase } = useCasesContext();
-  const { settings } = useSettingsContext();
+  const { schema, createNewCase, cases, saveCaseToFirebase, settings } = useAppContext();
   const { toast } = useUI();
   const [formData, setFormData] = useState({
     joinedCasesList: [],
@@ -42,11 +40,18 @@ export default function AddCaseModal({ isOpen, onClose }) {
     const dataToSave = { ...formData };
     
     if (dataToSave.defendantsList && dataToSave.defendantsList.length > 0) {
-      dataToSave['المدعى_عليه'] = dataToSave.defendantsList.map(d => d.name).join(' وآخرين');
+      const names = dataToSave.defendantsList.map(d => d.name).filter(Boolean);
+      const combined = names.length > 1 ? `${names[0]} وآخرين` : names[0] || '';
+      dataToSave['المطعون ضده'] = combined;
       const firstWithAddress = dataToSave.defendantsList.find(d => d.address);
       if (firstWithAddress) dataToSave['عنوان المدعى عليه'] = firstWithAddress.address;
       const firstWithChosenAddress = dataToSave.defendantsList.find(d => d.chosenAddress);
       if (firstWithChosenAddress) dataToSave['المقر المختار'] = firstWithChosenAddress.chosenAddress;
+    }
+    
+    if (dataToSave['المدعي']) {
+      dataToSave['الطاعن'] = dataToSave['المدعي'];
+      delete dataToSave['المدعي'];
     }
     
     if (dataToSave.joinedCasesList && dataToSave.joinedCasesList.length > 0) {

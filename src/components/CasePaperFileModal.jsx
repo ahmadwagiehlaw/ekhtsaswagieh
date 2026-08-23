@@ -32,10 +32,17 @@ export default function CasePaperFileModal({ isOpen, onClose, caseData }) {
 
   const toggleChecklistItem = async (item) => {
     let newContents = [...paperFileContents];
-    if (newContents.includes(item)) {
-      newContents = newContents.filter(i => i !== item);
+    const existingIndex = newContents.findIndex(i => typeof i === 'string' ? i === item : i.name === item);
+    if (existingIndex >= 0) {
+      newContents.splice(existingIndex, 1);
     } else {
-      newContents.push(item);
+      newContents.push({
+        id: `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: item,
+        addedAt: new Date().toISOString(),
+        addedBy: currentUser?.email || currentUser?.displayName || 'مجهول',
+        notes: ''
+      });
     }
     await saveCaseToFirebase(caseData.id, { paperFileContents: newContents });
   };
@@ -130,7 +137,7 @@ export default function CasePaperFileModal({ isOpen, onClose, caseData }) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {checklist.map(item => {
-                const isChecked = paperFileContents.includes(item);
+                const isChecked = paperFileContents.some(i => typeof i === 'string' ? i === item : i.name === item);
                 const hasAttachment = caseData.documents?.some(doc => doc.type === item || doc.title === item);
                 const isManualCheck = isChecked && !hasAttachment;
 
@@ -148,12 +155,18 @@ export default function CasePaperFileModal({ isOpen, onClose, caseData }) {
                   Icon = FileText; // Distinguishing icon for manual check
                 }
 
+                const paperObj = paperFileContents.find(i => typeof i === 'string' ? i === item : i.name === item);
+                let titleAttr = isManualCheck ? "تم التأشير يدوياً (بدون مرفق)" : isChecked ? "مرفق موجود" : "غير موجود";
+                if (paperObj && typeof paperObj === 'object' && paperObj.addedBy) {
+                  titleAttr += `\nبواسطة: ${paperObj.addedBy}\nبتاريخ: ${new Date(paperObj.addedAt).toLocaleDateString('ar-EG')}`;
+                }
+
                 return (
                   <button
                     key={item}
                     onClick={() => toggleChecklistItem(item)}
                     className={`flex items-center gap-3 p-3 rounded-xl border text-right transition-all relative ${btnClass}`}
-                    title={isManualCheck ? "تم التأشير يدوياً (بدون مرفق)" : isChecked ? "مرفق موجود" : "غير موجود"}
+                    title={titleAttr}
                   >
                     <div className={`w-5 h-5 rounded-md flex items-center justify-center border shrink-0 transition-colors ${iconBoxClass}`}>
                       {Icon && <Icon className="w-3.5 h-3.5" />}

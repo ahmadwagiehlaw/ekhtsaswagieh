@@ -266,7 +266,9 @@ export default function useCasesFilter({
         const year = c['السنة'] || c['سنة'] || c['year'] || '';
         const appName = c['المدعي'] || c['الطاعن'] || c['المستأنف'] || '';
         const applee = c['المدعى عليه'] || c['المطعون ضده'] || c['المدعى_عليه'] || '';
-        const srchStr = `${caseNo} ${year} ${appName} ${applee} ${c.id || ''}`.toLowerCase();
+        const subject = c['موضوع الدعوى'] || '';
+        const classification = c['تصنيف الدعوى'] || '';
+        const srchStr = `${caseNo} ${year} ${appName} ${applee} ${subject} ${classification} ${c.id || ''}`.toLowerCase();
         return srchStr.includes(q);
       });
     }

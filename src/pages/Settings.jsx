@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useCasesContext } from '../context/CasesContext';
-import { useSettingsContext } from '../context/SettingsContext';
+import { useAppContext } from '../context/AppState';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { firebaseConfig, USERS_DIRECTORY_REF } from '../lib/firebase';
@@ -11,8 +10,7 @@ import { useUI } from '../context/UIContext';
 import JudgmentRulesSection from '../components/JudgmentRulesSection';
 
 export default function Settings() {
-  const { cases, schema, deleteAllCases, saveBatchCasesToFirebase, saveSchemaToFirebase } = useCasesContext();
-  const { isAdmin, logoutAdmin, settings, saveSettingsToFirebase } = useSettingsContext();
+  const { cases, schema, deleteAllCases, saveBatchCasesToFirebase, saveSchemaToFirebase, isAdmin, logoutAdmin, settings, saveSettingsToFirebase } = useAppContext();
   const { userData, login, currentUser } = useAuth();
   const { toast, showConfirm, showPrompt } = useUI();
 

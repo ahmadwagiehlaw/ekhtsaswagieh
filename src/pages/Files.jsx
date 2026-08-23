@@ -1,9 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, Filter, FolderClosed, Plus, Clock, FileText, Upload, Download, Loader2, Info, Building2, Gavel, FileBox, X, CalendarDays, Printer, CheckSquare, Square, ClipboardList, AlertTriangle, Sparkles, MapPin, User, Users, BookOpen, Files as FilesIcon, ArrowUpDown, SlidersHorizontal, Edit3, Trash2, Pin, PinOff, Eye, Camera, LayoutGrid, List, Sidebar } from 'lucide-react';
-import { useCasesContext } from '../context/CasesContext';
-import { useSettingsContext } from '../context/SettingsContext';
-import { useTasksContext } from '../context/TasksContext';
+import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import ExportPDFModal from '../components/ExportPDFModal';
 import BulkAssignTaskModal from '../components/BulkAssignTaskModal';
@@ -14,15 +12,14 @@ import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 import useCasesFilter from '../hooks/useCasesFilter';
 import useCasesSort from '../hooks/useCasesSort';
 import { printViewingTasksList } from '../utils/printViewingTasks';
+import { getPrimaryValue } from '../utils/helpers';
 import CaseDetails from './CaseDetails';
 import CaseCard from '../components/ui/CaseCard';
 import useSessionState from '../hooks/useSessionState';
 import useDebounce from '../hooks/useDebounce';
 
 export default function Files() {
-  const { cases, schema, deleteCaseFromFirebase, saveCaseToFirebase, globalHideNoInterest, setGlobalHideNoInterest } = useCasesContext();
-  const { settings } = useSettingsContext();
-  const { globalTasks, viewingTasks } = useTasksContext();
+  const { cases, schema, deleteCaseFromFirebase, saveCaseToFirebase, globalHideNoInterest, setGlobalHideNoInterest, settings, globalTasks, viewingTasks } = useAppContext();
   const { toast, showConfirm } = useUI();
   const navigate = useNavigate();
   const location = useLocation();
@@ -216,13 +213,6 @@ export default function Files() {
     advancedParams,
     debouncedSearchQuery
   });
-
-  const getPrimaryValue = (cObj, possibleKeys) => {
-    for (let k of possibleKeys) {
-      if (cObj[k] !== undefined && cObj[k] !== null) return cObj[k];
-    }
-    return '';
-  };
 
   const { sortedCases } = useCasesSort({
     filteredCases,

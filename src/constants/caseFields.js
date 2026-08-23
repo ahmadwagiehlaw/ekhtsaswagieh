@@ -1,4 +1,4 @@
-export const SESSION_DATE_KEYS = ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة'];
+export const SESSION_DATE_KEYS = ['آخر جلسة', 'تاريخ الجلسة'];
 export const DECISION_KEYS     = ['القرار', 'قرار الجلسة', 'المنطوق'];
 export const CASE_NO_KEYS      = ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى'];
 export const YEAR_KEYS         = ['السنة', 'سنة', 'year'];

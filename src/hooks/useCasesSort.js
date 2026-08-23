@@ -2,12 +2,7 @@ import { useMemo } from 'react';
 import { getSafeDateObj } from '../utils/dateUtils';
 import { getCaseNo, getCaseYear, getSessionDate, getAppellantName, getCaseRoll } from '../utils/caseUtils';
 
-const getPrimaryValue = (cObj, possibleKeys) => {
-  for (let k of possibleKeys) {
-    if (cObj[k] !== undefined && cObj[k] !== null) return cObj[k];
-  }
-  return '';
-};
+import { getPrimaryValue } from '../utils/helpers';
 
 export default function useCasesSort({ filteredCases, sortBy, quickDateFilter }) {
   
