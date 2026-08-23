@@ -3,10 +3,16 @@ export function applyJudgmentDefaultRules(currentValues, judgmentDefaults) {
 
   const newData = { ...currentValues };
   
-  for (const rule of judgmentDefaults) {
+  // Sort rules by specificity (number of defined conditions) descending
+  const sortedRules = [...judgmentDefaults].sort((a, b) => {
+    const countA = Object.values(a.conditions || {}).filter(v => v && String(v).trim() !== '').length;
+    const countB = Object.values(b.conditions || {}).filter(v => v && String(v).trim() !== '').length;
+    return countB - countA;
+  });
+
+  for (const rule of sortedRules) {
     const conds = rule.conditions || {};
     
-    // Using SessionTable.jsx logic as the final reference
     const roleMatch = !conds.role || (newData.role && newData.role.includes(conds.role)) || conds.role === newData.role;
     const catMatch = !conds.category || newData.category === conds.category;
     const classMatch = !conds.classification || newData.classification === conds.classification;
@@ -14,13 +20,21 @@ export function applyJudgmentDefaultRules(currentValues, judgmentDefaults) {
     const sessionTypeMatch = !conds.sessionType || newData.sessionType === conds.sessionType;
     const decisionMatch = !conds.decision || newData.decision === conds.decision;
     
-    if (roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch && (conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision)) {
+    // keyword matches the trigger field (or fallback to decision/text if trigger isn't explicitly provided)
+    const triggerToSearch = newData.trigger || newData.decision || newData.text || '';
+    const keywordMatch = !conds.keyword || triggerToSearch.includes(conds.keyword);
+    
+    const hasConditions = conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision || conds.keyword;
+
+    if (hasConditions && roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch && keywordMatch) {
       const acts = rule.actions || {};
+      
       if (acts.category && !newData.category) newData.category = acts.category;
       if (acts.classification && !newData.classification) newData.classification = acts.classification;
       if (acts.type && !newData.type) newData.type = acts.type;
       if (acts.text && !newData.text) newData.text = acts.text;
-      break;
+      
+      break; // Apply only the most specific matching rule
     }
   }
   return newData;

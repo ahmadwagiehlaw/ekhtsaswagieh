@@ -296,6 +296,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
          type: newData['_judgmentType'],
          sessionType: newData['نوع الجلسة'],
          decision: newData['القرار'],
+         trigger: newData['_trigger'],
          text: newData['منطوق الحكم']
        };
        const engineOutput = applyJudgmentDefaultRules(engineInput, settings.judgmentDefaults);
@@ -737,7 +738,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                               onChange={e => setEditData({...editData, '_judgmentResult': e.target.value})}
                               className="flex-1 text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
                             >
-                              <option value="">-- النتيجة --</option>
+                              <option value="">-- تصنيف الحكم --</option>
                               {JUDGMENT_RESULTS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                             </select>
                           </div>
@@ -747,7 +748,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                             onChange={e => setEditData({...editData, '_judgmentType': e.target.value})}
                             className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
                           >
-                            <option value="">-- نوع الحكم --</option>
+                            <option value="">-- مختصر الحكم --</option>
                             {(settings?.judgmentTypes || ['قبول', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'شطب', 'إلغاء', 'تأييد']).map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
                           {/* Row 3: Final checkbox */}

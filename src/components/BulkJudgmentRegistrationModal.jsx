@@ -51,6 +51,7 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
       type: currentData._type,
       sessionType: currentData._sessionType,
       decision: currentData._decision,
+      trigger: currentData._trigger,
       text: currentData._verdict
     };
     
@@ -198,13 +199,13 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-black text-slate-600 block">نوع الحكم</label>
+            <label className="text-xs font-black text-slate-600 block">مختصر الحكم</label>
             <select
               value={formData._type}
               onChange={e => handleFieldChange('_type', e.target.value)}
               className="w-full text-sm font-bold p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition outline-none"
             >
-              <option value="">-- اختر نوع الحكم --</option>
+              <option value="">-- اختر مختصر الحكم --</option>
               {(settings?.judgmentTypes || ['قبول', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'شطب', 'إلغاء', 'تأييد']).map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
@@ -236,7 +237,7 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-black text-slate-600 block">منطوق الحكم</label>
+            <label className="text-xs font-black text-slate-600 block">منطوق الحكم كاملاً</label>
             <textarea
               value={formData._verdict}
               onChange={e => handleFieldChange('_verdict', e.target.value)}

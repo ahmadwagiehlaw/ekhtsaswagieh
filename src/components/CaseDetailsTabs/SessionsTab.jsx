@@ -324,8 +324,9 @@ export default function SessionsTab({
                            classification: changedField === 'classification' ? newValue : currentRes,
                            type: changedField === 'type' ? newValue : currentType,
                            sessionType: session.type,
-                           decision: session.decision || currentTrigger // SessionsTab used to pass trigger
-                           // the engine in SessionTable.jsx checks engineInput.decision
+                           decision: session.decision,
+                           trigger: changedField === 'trigger' ? newValue : currentTrigger,
+                           text: verd // passing current text if needed
                         };
                         
                         const engineOutput = applyJudgmentDefaultRules(engineInput, settings.judgmentDefaults);
