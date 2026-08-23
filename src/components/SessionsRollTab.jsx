@@ -132,7 +132,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
     if (searchQ.trim()) {
       const q = searchQ.toLowerCase();
       result = result.filter(c =>
-        [c['رقم الدعوى'], c['السنة'], c['المدعي'], c['المدعى_عليه'], c['القرار'], c['الرول']]
+        [c['رقم الدعوى'], c['السنة'], (c['المدعي'] || c['الطاعن']), c['المدعى_عليه'], c['القرار'], c['الرول']]
           .some(v => String(v || '').toLowerCase().includes(q))
       );
     }
@@ -523,7 +523,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                         <td>${i + 1}</td>
                         <td><strong>${c['الرول'] || ''}</strong></td>
                         <td dir="ltr">${c['رقم الدعوى'] || ''} / ${c['السنة'] || ''}</td>
-                        <td>${c['المدعي'] || ''}</td>
+                        <td>${c['المدعي'] || c['الطاعن'] || ''}</td>
                         <td>${c['المدعى_عليه'] || c['المدعى عليه'] || ''}</td>
                         <td>${c['الصفة'] || c['صفة'] || ''}</td>
                         <td>${c['نوع الجلسة'] || ''}</td>
@@ -727,7 +727,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                     {/* Plaintiff */}
                     {visibleCols.plaintiff && (
                       <td className="px-2 py-2">
-                        <span className="text-[11px] font-bold text-slate-700 line-clamp-2" title={cObj['المدعي']}>{cObj['المدعي'] || '-'}</span>
+                        <span className="text-[11px] font-bold text-slate-700 line-clamp-2" title={cObj['المدعي'] || cObj['الطاعن']}>{cObj['المدعي'] || cObj['الطاعن'] || '-'}</span>
                       </td>
                     )}
 

@@ -172,7 +172,7 @@ export default function BulkSessionRolloverModal({ isOpen, onClose, initialDateK
                         </div>
                         <div className="flex-1 truncate">
                           <p className="text-[11px] font-black text-navy-900">دعوى {caseNo} لسنة {year}</p>
-                          <p className="text-[9px] font-bold text-slate-500 truncate">{c['المدعي']} ضـد {c['المدعى_عليه']}</p>
+                          <p className="text-[9px] font-bold text-slate-500 truncate">{c['المدعي'] || c['الطاعن']} ضـد {c['المدعى_عليه']}</p>
                         </div>
                       </div>
                     )

@@ -14,7 +14,7 @@ export default function GlobalTemplatePrintModal({ cases, sessionDate, onClose }
   const [currentFolder, setCurrentFolder] = useState(null);
   const [repeatForDefendants, setRepeatForDefendants] = useState(true);
   const [taskFilter, setTaskFilter] = useState('');
-  const { toast } = useUI ? useUI() : { toast: window.toast || alert }; // fallback if useUI isn't imported
+  const { toast } = useUI();
 
   const filteredTemplates = templates.filter(t => t.name.includes(searchQuery));
   const sortedByUsage = [...templates].sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));

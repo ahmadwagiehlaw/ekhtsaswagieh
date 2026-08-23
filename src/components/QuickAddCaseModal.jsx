@@ -225,7 +225,7 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
               <input
                 type="text"
                 list="plaintiffs-list"
-                value={formData['المدعي']}
+                value={formData['المدعي'] || formData['الطاعن'] || ''}
                 onChange={e => handleChange('المدعي', e.target.value)}
                 placeholder="اسم المدعي"
                 className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"

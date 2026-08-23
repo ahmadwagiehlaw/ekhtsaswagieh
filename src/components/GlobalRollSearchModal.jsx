@@ -20,7 +20,7 @@ export default function GlobalRollSearchModal({ isOpen, onClose, initialQuery, s
     if (!searchQ.trim()) return [];
     const q = searchQ.toLowerCase();
     return cases.filter(c =>
-      [c['رقم الدعوى'], c['السنة'], c['المدعي'], c['المدعى_عليه'], c['الرول']]
+      [c['رقم الدعوى'], c['السنة'], (c['المدعي'] || c['الطاعن']), c['المدعى_عليه'], c['الرول']]
         .some(v => String(v || '').toLowerCase().includes(q))
     ).slice(0, 20); // Limit to 20 results for performance
   }, [cases, searchQ]);
@@ -119,7 +119,7 @@ export default function GlobalRollSearchModal({ isOpen, onClose, initialQuery, s
                         {c['رقم الدعوى']} لسنة {c['السنة']}
                       </div>
                       <div className="text-xs font-bold text-slate-500 mt-1">
-                        {c['المدعي']} <span className="text-rose-400 mx-1">ضد</span> {c['المدعى_عليه']}
+                        {c['المدعي'] || c['الطاعن']} <span className="text-rose-400 mx-1">ضد</span> {c['المدعى_عليه']}
                       </div>
                     </div>
                     <button

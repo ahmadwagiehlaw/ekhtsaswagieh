@@ -170,7 +170,7 @@ export default function BulkProcedureFromRollModal({ isOpen, onClose, selectedCa
               {selectedCases.map(c => (
                 <div key={c.id} className="text-[10px] font-bold text-navy-900 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-                  دعوى {c['رقم الدعوى']} لسنة {c['السنة']} - {c['المدعي'] || ''}
+                  دعوى {c['رقم الدعوى']} لسنة {c['السنة']} - {c['المدعي'] || c['الطاعن'] || ''}
                 </div>
               ))}
             </div>

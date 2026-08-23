@@ -658,7 +658,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                     </td>
                   )}
                   {visibleColumns['المدعي'] && (
-                    <td className="px-3 py-2.5 text-[11px] font-bold text-slate-700 truncate max-w-[120px]">{getFieldValueLocal(cObj, ['المدعي'])}</td>
+                    <td className="px-3 py-2.5 text-[11px] font-bold text-slate-700 truncate max-w-[120px]">{getFieldValueLocal(cObj, ['المدعي', 'الطاعن'])}</td>
                   )}
                   {visibleColumns['ضد'] && (
                     <td className="px-3 py-2.5 text-[11px] font-bold text-slate-700 truncate max-w-[120px]">{getFieldValueLocal(cObj, ['المدعى_عليه', 'المطعون ضده', 'المطعون ضدنا', 'مدعى علينا'])}</td>

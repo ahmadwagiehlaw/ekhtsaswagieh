@@ -1,0 +1,11 @@
+name = "ekhtsasi-upload"
+main = "src/index.js"
+compatibility_date = "2023-12-01"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "ekhtsasi-light-files"
+
+# ⚠️ أضف قيمة VITE_FIREBASE_API_KEY من ملف .env الخاص بالتطبيق هنا
+[vars]
+FIREBASE_API_KEY = "PUT_YOUR_FIREBASE_API_KEY_HERE"

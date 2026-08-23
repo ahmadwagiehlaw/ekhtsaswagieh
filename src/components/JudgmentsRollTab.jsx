@@ -268,7 +268,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
     if (searchQ.trim()) {
       const q = searchQ.toLowerCase();
       result = result.filter(c =>
-        [c['رقم الدعوى'], c['السنة'], c['المدعي'], c['المدعى_عليه'], c['الصفة']]
+        [c['رقم الدعوى'], c['السنة'], (c['المدعي'] || c['الطاعن']), c['المدعى_عليه'], c['الصفة']]
           .some(v => String(v || '').toLowerCase().includes(q))
       );
     }
@@ -731,7 +731,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                       {/* Plaintiff */}
                       {visibleCols.plaintiff && (
                         <td className="px-2 py-2">
-                          <p className="text-[10px] font-bold text-slate-700 line-clamp-1">{getFieldVal(cObj, ['المدعي'])}</p>
+                          <p className="text-[10px] font-bold text-slate-700 line-clamp-1">{getFieldVal(cObj, ['المدعي', 'الطاعن'])}</p>
                         </td>
                       )}
 
