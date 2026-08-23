@@ -29,6 +29,8 @@ export default function CaseInfoTab({
   isEmptyValue,
   legacyJoinedStr
 }) {
+  const [newPlaintName, setNewPlaintName] = React.useState('');
+
   return (
     <div className="bg-transparent space-y-4 mx-4 sm:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-300">
       {/* Dynamic Fields from Schema (Grouped & Redesigned) */}
@@ -642,7 +644,17 @@ export default function CaseInfoTab({
 
       {/* Custom fields not in schema (legacy/extra) */}
       {(() => {
-        const extraKeys = Object.keys(editData).filter(k => k !== 'id' && k !== 'sessions' && k !== 'documents' && k !== 'joinedCasesList' && !schema.find(s => s.id === k) && !['الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي', 'isImportant', 'procedures', 'urgentReminderDate', 'createdAt', 'updatedAt', 'userId'].includes(k));
+        const extraKeys = Object.keys(editData).filter(k => 
+          k !== 'id' && 
+          k !== 'sessions' && 
+          k !== 'documents' && 
+          k !== 'joinedCasesList' && 
+          k !== 'defendantsList' && 
+          k !== 'plaintiffsList' && 
+          k !== 'paperFileContents' && 
+          !schema.find(s => s.id === k) && 
+          !['isImportant', 'procedures', 'urgentReminderDate', 'createdAt', 'updatedAt', 'userId', 'المدعي', 'المدعى عليه', 'الصفة', 'المقر المختار', 'رقم الدعوى', 'السنة', 'عنوان المدعى عليه', 'عنوان المدعي', 'الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي'].includes(k)
+        );
         if (!isEditing || extraKeys.length === 0) return null;
 
         return (
