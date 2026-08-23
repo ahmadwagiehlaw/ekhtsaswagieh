@@ -25,7 +25,7 @@ export default function Settings() {
 
   // Schema state
   const [localSchema, setLocalSchema] = useState(schema || []);
-  const [activeTab, setActiveTab] = useState('system');
+  const [activeTab, setActiveTab] = useState('judgments');
   
   // Advanced state
     const [localDecisions, setLocalDecisions] = useState(settings?.decisions || []);
@@ -200,7 +200,7 @@ export default function Settings() {
 
   // ── Sub-tab state per main tab ──────────────────────────────
   const [systemSub,   setSystemSub]   = React.useState('general');
-  const [judgmentSub, setJudgmentSub] = React.useState('lists');
+  const [judgmentSub, setJudgmentSub] = React.useState('rules');
   const [sessionSub,  setSessionSub]  = React.useState('roles');
   const [advancedSub, setAdvancedSub] = React.useState('schema');
   if (!isAdmin) {

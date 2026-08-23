@@ -324,6 +324,22 @@ export default function JudgmentRulesSection({
                               </select>
                             </div>
                             <div>
+                              <label className="text-[9px] font-bold text-slate-500 block mb-1">نوع الجلسة</label>
+                              <select
+                                value={rule.conditions?.sessionType || ''}
+                                onChange={(e) => {
+                                  const newRules = [...localJudgmentDefaults];
+                                  if (!newRules[idx].conditions) newRules[idx].conditions = {};
+                                  newRules[idx].conditions.sessionType = e.target.value;
+                                  setLocalJudgmentDefaults(newRules);
+                                }}
+                                className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200"
+                              >
+                                <option value="">- أي نوع جلسة -</option>
+                                {localSessionTypes.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </div>
+                            <div>
                               <label className="text-[9px] font-bold text-slate-500 block mb-1">القرار (الجلسة)</label>
                               <select
                                 value={rule.conditions?.decision || ''}
