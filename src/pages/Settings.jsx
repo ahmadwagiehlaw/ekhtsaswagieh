@@ -198,6 +198,11 @@ export default function Settings() {
     setIsProcessing(false);
   };
 
+  // ── Sub-tab state per main tab ──────────────────────────────
+  const [systemSub,   setSystemSub]   = React.useState('general');
+  const [judgmentSub, setJudgmentSub] = React.useState('lists');
+  const [sessionSub,  setSessionSub]  = React.useState('roles');
+  const [advancedSub, setAdvancedSub] = React.useState('schema');
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
@@ -214,11 +219,6 @@ export default function Settings() {
     );
   }
 
-  // ── Sub-tab state per main tab ──────────────────────────────
-  const [systemSub,   setSystemSub]   = React.useState('general');
-  const [judgmentSub, setJudgmentSub] = React.useState('lists');
-  const [sessionSub,  setSessionSub]  = React.useState('roles');
-  const [advancedSub, setAdvancedSub] = React.useState('schema');
 
   const SubNav = ({ options, active, setActive }) => (
     <div className="flex gap-1.5 flex-wrap mb-5 pb-4 border-b border-slate-100">

@@ -50,6 +50,12 @@ export default function AddCaseModal({ isOpen, onClose }) {
       if (firstWithChosenAddress) dataToSave['المقر المختار'] = firstWithChosenAddress.chosenAddress;
     }
     
+    if (dataToSave.plaintiffsList && dataToSave.plaintiffsList.length > 0) {
+      const pNames = dataToSave.plaintiffsList.map(p => p.name).filter(Boolean);
+      const pCombined = pNames.length > 1 ? `${pNames[0]} وآخرين` : pNames[0] || '';
+      dataToSave['المدعي'] = pCombined;
+    }
+    
 
     
     if (dataToSave.joinedCasesList && dataToSave.joinedCasesList.length > 0) {

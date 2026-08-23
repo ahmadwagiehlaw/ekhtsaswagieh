@@ -23,21 +23,23 @@ export default function Trash() {
     }
   };
 
-  const handlePermanentDelete = (id, e) => {
+  const handlePermanentDelete = async (id, e) => {
     e.stopPropagation();
-    showConfirm('تأكيد الحذف النهائي', 'هل أنت متأكد من حذف هذه الدعوى نهائياً؟ هذا الإجراء لا يمكن التراجع عنه.', async () => {
+    const confirmed = await showConfirm('تأكيد الحذف النهائي', 'هل أنت متأكد من حذف هذه الدعوى نهائياً؟ هذا الإجراء لا يمكن التراجع عنه.');
+    if (confirmed) {
       try {
         await deleteCaseFromFirebase(id, true);
         toast('تم حذف الدعوى نهائياً', 'success');
       } catch (err) {
         toast('حدث خطأ أثناء الحذف', 'error');
       }
-    });
+    }
   };
 
-  const handleEmptyTrash = () => {
+  const handleEmptyTrash = async () => {
     if (deletedCases.length === 0) return;
-    showConfirm('إفراغ سلة المحذوفات', 'هل أنت متأكد من حذف جميع القضايا المحذوفة نهائياً؟ لا يمكن التراجع عن هذا الإجراء.', async () => {
+    const confirmed = await showConfirm('إفراغ سلة المحذوفات', 'هل أنت متأكد من حذف جميع القضايا المحذوفة نهائياً؟ لا يمكن التراجع عن هذا الإجراء.');
+    if (confirmed) {
       setIsProcessing(true);
       try {
         for (const c of deletedCases) {
@@ -49,7 +51,7 @@ export default function Trash() {
       } finally {
         setIsProcessing(false);
       }
-    }, 'danger');
+    }
   };
 
   return (
