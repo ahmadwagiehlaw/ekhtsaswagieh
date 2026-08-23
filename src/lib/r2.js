@@ -1,7 +1,7 @@
 import { auth } from './firebase';
 
 // ⚠️ ضع رابط الـ Worker الحقيقي هنا بعد النشر
-export const WORKER_URL = "https://ekhtsasi-upload.<your-subdomain>.workers.dev";
+export const WORKER_URL = "https://ekhtsasi-upload.aihubegypt.workers.dev";
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
 // R2 Config

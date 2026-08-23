@@ -8,4 +8,4 @@ bucket_name = "ekhtsasi-light-files"
 
 # ⚠️ أضف قيمة VITE_FIREBASE_API_KEY من ملف .env الخاص بالتطبيق هنا
 [vars]
-FIREBASE_API_KEY = "PUT_YOUR_FIREBASE_API_KEY_HERE"
+FIREBASE_API_KEY = "AIzaSyDpil-ZG7qzutPNK9A04Hrmv4DOXF2RgnA"
