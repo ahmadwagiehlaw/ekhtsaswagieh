@@ -29,7 +29,7 @@ export default function AddCaseModal({ isOpen, onClose }) {
   const navigate = useNavigate();
 
   const currentCourtDegree = settings?.courtDegree || 'أول درجة';
-  const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
+  const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا';
   const sessionTypeOptions = isSupreme ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة'];
 
   if (!isOpen) return null;

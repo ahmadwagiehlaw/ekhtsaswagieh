@@ -248,7 +248,7 @@ export const AppProvider = ({ children }) => {
 
       // Apply Court Degree State Machine Logic
       const currentCourtDegree = settings?.courtDegree || 'أول درجة';
-      const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
+      const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا';
       
       const newSessionType = payload['نوع الجلسة'];
       const newDecision = payload['القرار'];
@@ -353,7 +353,7 @@ export const AppProvider = ({ children }) => {
 
       let payload = { ...caseData };
       const currentCourtDegree = settings?.courtDegree || 'أول درجة';
-      const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
+      const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا';
       const newSessionType = payload['نوع الجلسة'];
       const newDecision = payload['القرار'];
       const hasJudgmentData = payload['الحكم'] || payload['منطوق الحكم'] || payload['تصنيف الحكم'];
