@@ -4,6 +4,9 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { firebaseConfig, USERS_DIRECTORY_REF } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import SettingsDataTab from '../components/settings/SettingsDataTab';
+import SettingsUsersTab from '../components/settings/SettingsUsersTab';
+import SettingsSystemTab from '../components/settings/SettingsSystemTab';
 import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList, Scale, Download, FileJson, ArrowUpFromLine, Copy, Clock, Fingerprint, Edit3, Search, Activity, ChevronUp, ChevronDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useUI } from '../context/UIContext';
@@ -25,16 +28,11 @@ export default function Settings() {
   // Schema state
   const [localSchema, setLocalSchema] = useState(schema || []);
   const [activeTab, setActiveTab] = useState('other'); // judgments, lists, schema, other, data
-  const [localConsultantName, setLocalConsultantName] = useState(settings?.consultantName || settings?.officeName || '');
-
+  
   // Advanced state
-  const [localEmployees, setLocalEmployees] = useState(settings?.employees || []);
-  const [localDecisions, setLocalDecisions] = useState(settings?.decisions || []);
-  const [localReviewTasks, setLocalReviewTasks] = useState(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
-  const [localRollTypes, setLocalRollTypes] = useState(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
-  const [localNumberFormat, setLocalNumberFormat] = useState(settings?.numberFormat || 'en');
-  const [localDateFormat, setLocalDateFormat] = useState(settings?.dateFormat || 'dd/MM/yyyy');
-  const [localRoles, setLocalRoles] = useState(settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص']);
+    const [localDecisions, setLocalDecisions] = useState(settings?.decisions || []);
+    const [localRollTypes, setLocalRollTypes] = useState(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
+      const [localRoles, setLocalRoles] = useState(settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص']);
   const [localSessionTypes, setLocalSessionTypes] = useState(settings?.sessionTypes || []);
   const [localFileLocations, setLocalFileLocations] = useState(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
   const [localViewingTasksPrintTemplate, setLocalViewingTasksPrintTemplate] = useState(settings?.viewingTasksPrintTemplate || {
@@ -63,9 +61,7 @@ export default function Settings() {
   ]);
   const [localCommonProcedures, setLocalCommonProcedures] = useState(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
   const [localCaseClassifications, setLocalCaseClassifications] = useState(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
-  const [localCourtDegree, setLocalCourtDegree] = useState(settings?.courtDegree || 'أول درجة');
-  const [localCourtSpecialization, setLocalCourtSpecialization] = useState(settings?.courtSpecialization || 'قضاء إداري');
-
+    
   const migrateJudgmentRule = (rule) => {
     if (rule.triggerField) {
       return {
@@ -107,122 +103,14 @@ export default function Settings() {
   const [localMemoCalculationMode, setLocalMemoCalculationMode] = useState(settings?.memoCalculationMode || 'session_date');
   const [localScratchpadPosition, setLocalScratchpadPosition] = useState(settings?.scratchpadPosition || 'right');
   const [localSearchTabPosition, setLocalSearchTabPosition] = useState(settings?.searchTabPosition || 'right');
-  const [deletePassword, setDeletePassword] = useState('');
-  const backupInputRef = useRef(null);
+    const backupInputRef = useRef(null);
   const [backupRestoreStatus, setBackupRestoreStatus] = useState(null); // { type: 'success'|'error'|'preview', data: ... }
-
-  // ===== BACKUP FUNCTIONS =====
-  const handleExportBackup = () => {
-    const backup = {
-      version: '1.0',
-      exportedAt: new Date().toISOString(),
-      cases: cases,
-      settings: settings,
-      schema: schema,
-    };
-    const json = JSON.stringify(backup, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `اختصاصي-backup-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast(`تم تصدير نسخة احتياطية شاملة (${cases.length} قضية)`, 'success');
-  };
-
-  const handleExportExcel = () => {
-    if (!cases || cases.length === 0) { toast('لا توجد بيانات للتصدير', 'error'); return; }
-    const rows = cases.map(c => {
-      const base = {};
-      Object.keys(c).forEach(k => {
-        if (typeof c[k] !== 'object') base[k] = c[k];
-      });
-      base['عدد الجلسات'] = (c.sessions || []).length;
-      base['عدد المرفقات'] = (c.documents || []).length;
-      base['عدد الإجراءات'] = (c.procedures || []).length;
-      return base;
-    });
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'القضايا');
-    XLSX.writeFile(wb, `اختصاصي-export-${new Date().toISOString().split('T')[0]}.xlsx`);
-    toast(`تم تصدير ${cases.length} قضية إلى Excel`, 'success');
-  };
-
-  const handleDownloadTemplate = () => {
-    // Generate empty template based on current visible schema
-    const headers = {};
-    localSchema.filter(s => s.visible).forEach(s => {
-      headers[s.id] = "";
-    });
-    
-    // Add a helper note row
-    const noteRow = {};
-    localSchema.filter(s => s.visible).forEach(s => {
-      noteRow[s.id] = s.primary ? "حقل إجباري" : "اختياري";
-    });
-
-    const ws = XLSX.utils.json_to_sheet([noteRow]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'قالب إدخال البيانات');
-    XLSX.writeFile(wb, `قالب-اختصاصي-لإدخال-البيانات.xlsx`);
-    toast('تم تحميل قالب الإكسيل بنجاح', 'success');
-  };
-
-  const handleImportBackup = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      if (!data.cases || !Array.isArray(data.cases)) {
-        toast('الملف غير صالح - لا يحتوي على بيانات قضايا', 'error');
-        return;
-      }
-      setBackupRestoreStatus({
-        type: 'preview',
-        data: data,
-        casesCount: data.cases.length,
-        exportedAt: data.exportedAt,
-      });
-    } catch (err) {
-      toast('فشل قراءة الملف - تأكد من أنه ملف JSON صحيح', 'error');
-    }
-    if (backupInputRef.current) backupInputRef.current.value = '';
-  };
-
-  const confirmRestoreBackup = async () => {
-    if (!backupRestoreStatus?.data) return;
-    const confirmed = await showConfirm(
-      'تأكيد الاستعادة',
-      `سيتم استبدال البيانات الحالية بـ ${backupRestoreStatus.casesCount} قضية من النسخة الاحتياطية. هل تريد المتابعة؟`
-    );
-    if (!confirmed) return;
-    setIsProcessing(true);
-    const { data } = backupRestoreStatus;
-    try {
-      await saveBatchCasesToFirebase(data.cases);
-      if (data.settings) await saveSettingsToFirebase(data.settings);
-      if (data.schema) await saveSchemaToFirebase(data.schema);
-      setBackupRestoreStatus({ type: 'success', casesCount: data.cases.length });
-      toast(`✅ تم استعادة ${data.cases.length} قضية بنجاح`, 'success');
-    } catch (err) {
-      toast('حدث خطأ أثناء الاستعادة', 'error');
-      setBackupRestoreStatus(null);
-    }
-    setIsProcessing(false);
-  };
 
   // Sync settings when loaded
   React.useEffect(() => {
-    setLocalEmployees(settings?.employees || []);
-    setLocalDecisions(settings?.decisions || []);
-    setLocalReviewTasks(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
-    setLocalRollTypes(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
-    setLocalNumberFormat(settings?.numberFormat || 'en');
-    setLocalDateFormat(settings?.dateFormat || 'dd/MM/yyyy');
-    setLocalRoles(settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص']);
+        setLocalDecisions(settings?.decisions || []);
+        setLocalRollTypes(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
+            setLocalRoles(settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص']);
     setLocalSessionTypes(settings?.sessionTypes || []);
     setLocalFileLocations(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
     setLocalCommonProcedures(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
@@ -230,9 +118,7 @@ export default function Settings() {
     setLocalJudgmentCategories(settings?.judgmentCategories || ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي']);
     setLocalJudgmentClassifications(settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء']);
     setLocalJudgmentTypes(settings?.judgmentTypes || ['قبول', 'إلغاء', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'شطب', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'إحالة', 'إحالة للخبراء']);
-    setLocalCourtDegree(settings?.courtDegree || 'أول درجة');
-    setLocalCourtSpecialization(settings?.courtSpecialization || 'قضاء إداري');
-
+        
     setLocalDeadlineRules(settings?.deadlineRules || [
       { name: 'الطعن العادي', days: 60, targetRole: 'طاعنين', description: 'ميعاد الطعن العادي 60 يوماً' },
       { name: 'تعجيل من الوقف الجزائي', days: 15, triggerAfterDays: 30, targetRole: 'طاعنين', description: 'يجب التعجيل خلال 15 يوماً بعد مرور شهر من الوقف' }
@@ -240,92 +126,15 @@ export default function Settings() {
   }, [settings]);
 
   const handleSaveSettings = async () => {
-    // Validate employees before processing
-    for (const emp of localEmployees) {
-      if (emp.password && emp.password.length > 0 && emp.password.length < 6) {
-        toast(`كلمة المرور للموظف "${emp.name || emp.username}" يجب أن تكون 6 أحرف/أرقام على الأقل`, 'error');
-        return; // Stop saving
-      }
-    }
-
-    setIsProcessing(true);
-
-    // Create accounts for new employees
-    if (userData?.tenantId) {
-      for (const emp of localEmployees) {
-        if (!emp.username || !emp.password) continue;
-
-        try {
-          const safeTenantId = userData.tenantId.replace(/_/g, '-').trim();
-          const email = `${emp.username.toLowerCase().trim()}@${safeTenantId}.ekhtsas.local`;
-
-          const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: email,
-              password: emp.password,
-              returnSecureToken: false
-            })
-          });
-
-          const data = await response.json();
-          if (response.ok && data.localId) {
-            // Write employee role to directory
-            await setDoc(doc(USERS_DIRECTORY_REF, data.localId), {
-              email: email,
-              role: 'employee',
-              tenantId: userData.tenantId,
-              name: emp.name
-            });
-          } else if (!response.ok) {
-            if (data.error?.message === 'EMAIL_EXISTS') {
-              // Attempt to update password if changed
-              const oldEmp = settings?.employees?.find(e => e.username.toLowerCase() === emp.username.toLowerCase());
-              if (oldEmp && oldEmp.password !== emp.password) {
-                try {
-                  const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: email, password: oldEmp.password, returnSecureToken: true })
-                  });
-                  const signInData = await signInRes.json();
-
-                  if (signInRes.ok && signInData.idToken) {
-                    await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ idToken: signInData.idToken, password: emp.password, returnSecureToken: false })
-                    });
-                  }
-                } catch (err) {
-                  console.error("Failed to update employee password", err);
-                }
-              }
-            } else {
-              console.error("Firebase Auth Error for employee:", data.error?.message);
-              toast(`تعذر إنشاء/تحديث حساب للموظف ${emp.username}: ${data.error?.message || 'خطأ غير معروف'}`, 'error');
-            }
-          }
-        } catch (error) {
-          console.error("Error provisioning employee:", error);
-          toast(`فشل الاتصال لإنشاء حساب الموظف ${emp.username}`, 'error');
-        }
-      }
-    }
+    
 
     await saveSettingsToFirebase({
       ...settings,
-      consultantName: localConsultantName,
-      viewingTasksPrintTemplate: localViewingTasksPrintTemplate,
+            viewingTasksPrintTemplate: localViewingTasksPrintTemplate,
       viewingTasksPrintOrder: localViewingTasksPrintOrder,
-      employees: localEmployees,
-      decisions: localDecisions,
-      reviewTasks: localReviewTasks,
-      rollTypes: localRollTypes,
-      numberFormat: localNumberFormat,
-      dateFormat: localDateFormat,
-      roles: localRoles,
+            decisions: localDecisions,
+            rollTypes: localRollTypes,
+                  roles: localRoles,
       sessionTypes: localSessionTypes,
       fileLocations: localFileLocations,
       commonProcedures: localCommonProcedures,
@@ -333,9 +142,7 @@ export default function Settings() {
       judgmentCategories: localJudgmentCategories,
       judgmentClassifications: localJudgmentClassifications,
       judgmentTypes: localJudgmentTypes,
-      courtDegree: localCourtDegree,
-      courtSpecialization: localCourtSpecialization,
-
+            
       judgmentDefaults: localJudgmentDefaults,
       deadlineRules: localDeadlineRules,
       memoCalculationMode: localMemoCalculationMode,
@@ -346,45 +153,8 @@ export default function Settings() {
     toast('تم حفظ الإعدادات المتقدمة بنجاح', 'success');
   };
 
-  const handleResetConfirms = () => {
-    localStorage.removeItem('disabledConfirms');
-    toast('تم إعادة تفعيل جميع الرسائل التأكيدية بنجاح!', 'success');
-  };
-
-  const handleDeleteAll = async () => {
-    if (!deletePassword) {
-      toast('يرجى إدخال كلمة المرور!', 'error');
-      return;
-    }
-
-    try {
-      setIsProcessing(true);
-      // Verify with Firebase using current user email and provided password
-      if (currentUser?.email) {
-        await login(currentUser.email, deletePassword);
-      }
-    } catch (err) {
-      setIsProcessing(false);
-      toast('كلمة المرور غير صحيحة!', 'error');
-      return;
-    }
-
-    setIsProcessing(false);
-    const confirmed = await showConfirm('تحذير نهائي', 'هل أنت متأكد من مسح جميع البيانات بشكل لا رجعة فيه؟');
-
-    if (confirmed) {
-      setIsProcessing(true);
-      const success = await deleteAllCases();
-      setIsProcessing(false);
-      if (success) {
-        toast('تم مسح جميع البيانات بنجاح.', 'success');
-        setDeletePassword('');
-      } else {
-        toast('حدث خطأ أثناء المسح.', 'error');
-      }
-    }
-  };
-
+  
+  
   const handleLogin = (e) => {
     e.preventDefault();
     if (loginAdmin(password)) {
@@ -397,119 +167,6 @@ export default function Settings() {
   };
 
   const sanitizeId = (str) => String(str).replace(/[\/\\?%*:|"<>\s]/g, '_');
-
-  const getCaseKey = (c) => {
-    const id = c['رقم الدعوى'] || c['رقم القضية'] || c['رقم_الدعوى'] || '';
-    const year = c['السنة'] || c['سنة'] || c['year'] || '';
-    if (!id && !year) return sanitizeId(`unnamed-${Date.now()}-${Math.random()}`);
-    return sanitizeId(`${id}-${year}`);
-  };
-
-  const processExcel = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setIsProcessing(true);
-    setSyncData(null);
-
-    try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array' });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rawData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
-
-      const excelCases = rawData.map(row => {
-        const clean = {};
-        for (let k in row) {
-          let val = row[k];
-          // Fix Excel Serial Dates for columns that look like dates
-          if (typeof val === 'number' && val > 30000 && val < 70000 && (k.includes('جلسة') || k.includes('تاريخ') || k.includes('حكم'))) {
-            const date = new Date(Math.round((val - 25569) * 86400 * 1000));
-            val = date.toISOString().split('T')[0];
-          }
-          clean[k.trim()] = String(val).trim();
-        }
-        return clean;
-      });
-
-      // We do NOT dynamically update the schema anymore based on user feedback.
-      // Filter out any columns from excelCases that do not exist in the current schema
-      const schemaKeys = localSchema.map(s => s.id);
-      
-      const mappedExcelCases = excelCases
-        .filter(ec => {
-           const val = String(ec['رقم الدعوى'] || ec['رقم القضية'] || ec['رقم_الدعوى'] || '').trim();
-           return val !== '' && val !== 'حقل إجباري' && val !== 'اختياري';
-        })
-        .map(ec => {
-        const mapped = {};
-        for (let k in ec) {
-          if (schemaKeys.includes(k)) {
-            mapped[k] = ec[k];
-          }
-        }
-        return mapped;
-      });
-
-      const existingMap = new Map();
-      cases.forEach(c => existingMap.set(c.id || getCaseKey(c), c));
-
-      let added = 0;
-      let updated = 0;
-      const newMergedData = [];
-
-      mappedExcelCases.forEach(excelCase => {
-        const key = getCaseKey(excelCase);
-        if (existingMap.has(key)) {
-          const existingCase = existingMap.get(key);
-          const merged = { ...existingCase, ...excelCase, id: key };
-
-          // Basic diff ignoring id
-          const { id: id1, ...c1 } = existingCase;
-          const { id: id2, ...c2 } = merged;
-          if (JSON.stringify(c1) !== JSON.stringify(c2)) {
-            updated++;
-          }
-          newMergedData.push(merged);
-          existingMap.delete(key);
-        } else {
-          added++;
-          newMergedData.push({ ...excelCase, id: key });
-        }
-      });
-
-      // Keep rest
-      const kept = existingMap.size;
-
-      setSyncData({
-        added,
-        updated,
-        kept,
-        total: newMergedData,
-        ready: true
-      });
-
-    } catch (err) {
-      toast("حدث خطأ أثناء قراءة الملف", "error");
-      console.error(err);
-    } finally {
-      setIsProcessing(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const confirmSync = async () => {
-    if (!syncData || !syncData.total) return;
-    setIsProcessing(true);
-    const success = await saveBatchCasesToFirebase(syncData.total);
-    setIsProcessing(false);
-    if (success) {
-      toast('تم تحديث ومزامنة البيانات بنجاح!', 'success');
-      setSyncData(null);
-    } else {
-      toast('حدث خطأ أثناء الحفظ.', 'error');
-    }
-  };
 
   const addSchemaField = () => {
     const id = `field_${Date.now()}`;
@@ -1083,355 +740,8 @@ export default function Settings() {
       )}
 
       {/* OTHER TAB */}
-      {activeTab === 'other' && (
-        <div className="space-y-6 animate-in fade-in zoom-in duration-300">
-
-          {/* Global Preferences */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-              <SettingsIcon className="w-5 h-5 text-indigo-600" />
-              <h3 className="font-black text-sm text-navy-900">تفضيلات العرض والرسائل</h3>
-            </div>
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col sm:flex-row gap-4 justify-between border-b border-slate-100 pb-4">
-                <div className="flex flex-col gap-2 flex-1">
-                  <label className="text-xs font-bold text-slate-700">تنسيق الأرقام (للعرض والطباعة):</label>
-                  <div className="flex bg-slate-100 p-1 rounded-xl self-start">
-                    <button
-                      onClick={() => setLocalNumberFormat('en')}
-                      className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'en' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                      إنجليزي (123)
-                    </button>
-                    <button
-                      onClick={() => setLocalNumberFormat('ar')}
-                      className={`px-4 py-2 rounded-lg text-xs font-black transition ${localNumberFormat === 'ar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                      عربي (١٢٣)
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2 flex-1">
-                  <label className="text-xs font-bold text-slate-700">تنسيق التواريخ الافتراضي:</label>
-                  <select
-                    value={localDateFormat}
-                    onChange={e => setLocalDateFormat(e.target.value)}
-                    className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
-                  >
-                    <option value="dd/MM/yyyy">يوم/شهر/سنة (31/12/2026)</option>
-                    <option value="yyyy/MM/dd">سنة/شهر/يوم (2026/12/31)</option>
-                    <option value="dd-MM-yyyy">يوم-شهر-سنة (31-12-2026)</option>
-                    <option value="d MMMM yyyy">نصي كامل (31 ديسمبر 2026)</option>
-                    <option value="MM/dd">رقمي مختصر (12/31)</option>
-                    <option value="d MMMM">نصي مختصر (31 ديسمبر)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-between border-b border-slate-100 pb-4">
-                <div className="flex flex-col gap-2 flex-1">
-                  <div className="flex items-center gap-1 group relative">
-                    <label className="text-xs font-bold text-slate-700">طريقة احتساب مذكرات الدفاع للإحصائية الشهرية:</label>
-                    <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-500 text-[9px] flex items-center justify-center cursor-help">?</span>
-                    <div className="absolute top-6 right-0 w-64 p-2 bg-navy-900 text-white text-[10px] rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition z-50">
-                      يحدد هذا الخيار طريقة عد مذكرات الدفاع في إحصائية الشهر. "تاريخ إضافة الإجراء" يعتمد على التاريخ الفعلي لتسجيل المذكرة في النظام كإجراء، بينما "تاريخ الجلسة" يعتمد على تاريخ الجلسة التي تم تقديم المذكرة فيها.
-                    </div>
-                  </div>
-                  <select
-                    value={localMemoCalculationMode}
-                    onChange={e => setLocalMemoCalculationMode(e.target.value)}
-                    className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
-                  >
-                    <option value="session_date">بناءً على تاريخ الجلسة المرتبطة (تاريخ الجلسة)</option>
-                    <option value="action_date">بناءً على تاريخ اعتماد وتسجيل الإجراء (تاريخ التنفيذ)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-4 border-b border-slate-100 pb-4">
-                <div className="flex flex-col gap-2 flex-1">
-                  <label className="text-xs font-bold text-slate-700">موقع المفكرة العائمة:</label>
-                  <select
-                    value={localScratchpadPosition}
-                    onChange={e => setLocalScratchpadPosition(e.target.value)}
-                    className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
-                  >
-                    <option value="right">يمين الشاشة</option>
-                    <option value="left">يسار الشاشة</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-4 border-b border-slate-100 pb-4">
-                <div className="flex flex-col gap-2 flex-1">
-                  <label className="text-xs font-bold text-slate-700">موقع زر البحث السريع:</label>
-                  <select
-                    value={localSearchTabPosition}
-                    onChange={e => setLocalSearchTabPosition(e.target.value)}
-                    className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
-                  >
-                    <option value="right">يمين الشاشة</option>
-                    <option value="left">يسار الشاشة</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3">
-                <div>
-                  <h4 className="text-xs font-black text-navy-900">الرسائل التأكيدية</h4>
-                  <p className="text-[10px] text-slate-500 font-bold">إعادة تفعيل الرسائل التأكيدية التي قمت بتعطيلها مسبقاً عبر خيار (عدم الإظهار مجدداً).</p>
-                </div>
-                <button
-                  onClick={handleResetConfirms}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-750 text-xs font-black px-4 py-2 rounded-xl border border-slate-200 transition shadow-sm self-start sm:self-auto"
-                >
-                  إعادة تفعيل النوافذ التأكيدية
-                </button>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-4 pt-3 border-t border-slate-100">
-                <div className="flex flex-col gap-2 flex-1">
-                  <h4 className="text-xs font-black text-navy-900">تخصيص الشعار واسم القسم</h4>
-                  <p className="text-[10px] text-slate-500 font-bold">يمكنك تغيير الاسم الافتراضي (أحمد وجيه) ليظهر اسمك الخاص أعلى التطبيق.</p>
-                  <input
-                    type="text"
-                    value={localConsultantName}
-                    onChange={(e) => setLocalConsultantName(e.target.value)}
-                    placeholder="مثال: مكتب الفهد للمحاماة والاستشارات القانونية"
-                    className="w-full text-sm font-bold p-3 rounded-xl border border-slate-200 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 bg-slate-50"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-between border-t border-slate-100 pt-4">
-                <div className="flex flex-col gap-2 flex-1">
-                  <label className="text-xs font-black text-navy-900">درجة التقاضي للقسم</label>
-                  <p className="text-[10px] text-slate-500 font-bold mb-1">يؤثر هذا الخيار على ظهور الحقول المتقدمة للطعون.</p>
-                  <select
-                    value={localCourtDegree}
-                    onChange={e => setLocalCourtDegree(e.target.value)}
-                    className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
-                  >
-                    <option value="أول درجة">أول درجة</option>
-                    <option value="ثان درجة">ثان درجة</option>
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-2 flex-1">
-                  <label className="text-xs font-black text-navy-900">تخصص المحكمة</label>
-                  <p className="text-[10px] text-slate-500 font-bold mb-1">يحدد المصطلحات (مثال: طاعن/مطعون، دعوى/طعن) في النظام.</p>
-                  <select
-                    value={localCourtSpecialization}
-                    onChange={e => {
-                      const spec = e.target.value;
-                      setLocalCourtSpecialization(spec);
-                    }}
-                    className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
-                  >
-                    <option value="قضاء إداري">قضاء إداري</option>
-                    <option value="الإدارية العليا">الإدارية العليا</option>
-                    <option value="قضاء مدني">قضاء مدني</option>
-                    <option value="نقض">نقض</option>
-                    <option value="قضاء تأديبي">قضاء تأديبي</option>
-                    <option value="استئنافية">استئنافية</option>
-                  </select>
-                </div>
-              </div>
-              <div className="bg-blue-50 text-blue-700 p-3 rounded-xl border border-blue-100 text-xs font-bold flex gap-2 items-start mt-2">
-                <span>💡</span>
-                <span>تغيير تخصص المحكمة سيعمل على ضبط المسميات في واجهة التطبيق، لتغيير قائمة "الصفة" و "نوع الجلسة"، يرجى تحديثها من نافذة "قوائم النظام".</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Review Tasks Management */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-              <ClipboardList className="w-5 h-5 text-emerald-600" />
-              <h3 className="font-black text-sm text-navy-900">إدارة مهام الإطلاع السريعة</h3>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {localReviewTasks.map((task, i) => (
-                <div key={i} className="flex items-center gap-1 bg-emerald-50 border border-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-bold">
-                  <span>{task}</span>
-                  <button onClick={() => setLocalReviewTasks(localReviewTasks.filter((_, idx) => idx !== i))} className="text-emerald-400 hover:text-rose-500 mr-2">
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={async () => {
-                  const newTask = await showPrompt('إضافة مهمة إطلاع', 'أدخل اسم المهمة الجديدة:');
-                  if (newTask?.trim()) setLocalReviewTasks([...localReviewTasks, newTask.trim()]);
-                }}
-                className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-200"
-              >
-                <Plus className="w-3 h-3" /> إضافة مهمة
-              </button>
-            </div>
-          </div>
-
-          {/* Employees Management */}
-          <details className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-0">
-            <summary className="flex items-center justify-between pb-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-slate-100 transition-colors">
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-emerald-600" />
-                <h3 className="font-black text-sm text-navy-900"><span className="text-[12px] opacity-70 group-open:hidden ml-1">▼</span><span className="text-[12px] opacity-70 hidden group-open:inline ml-1">▲</span> إدارة الموظفين والصلاحيات</h3>
-              </div>
-              {userData?.tenantId && (
-                <div className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-2">
-                  <Fingerprint className="w-4 h-4" />
-                  <span className="text-[10px] font-black">كود المستشار:</span>
-                  <span className="text-sm font-mono font-black tracking-wider">{userData.tenantId}</span>
-                </div>
-              )}</summary>
-            <div className="pt-2 space-y-4">
-              <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
-                لإضافة موظف، أدخل اسمه ومعرف الدخول بالإنجليزية (Username). سيتطلب من الموظف إدخال "معرف الدخول" و "كود المستشار" لتسجيل الدخول.
-              </p>
-
-              <div className="space-y-3">
-                {localEmployees.map((emp, index) => {
-                  const empPerms = emp.permissions || { canEditData: true, canDeleteData: true, canManageRolls: true, canManageTasks: true };
-                  return (
-                    <div key={index} className="flex flex-col gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                      <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-                        <input type="text" placeholder="الاسم" value={emp.name} onChange={e => {
-                          const newEmp = [...localEmployees];
-                          newEmp[index].name = e.target.value;
-                          setLocalEmployees(newEmp);
-                        }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
-
-                        <input type="text" placeholder="معرف الدخول (مثال: omar)" value={emp.username || ''} onChange={e => {
-                          const newEmp = [...localEmployees];
-                          newEmp[index].username = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
-                          setLocalEmployees(newEmp);
-                        }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto bg-slate-50" dir="ltr" />
-
-                        <input
-                          type="text"
-                          list="jobTitlesList"
-                          placeholder="الوظيفة (مثال: محامي)"
-                          value={emp.jobTitle || ''}
-                          onChange={e => {
-                            const newEmp = [...localEmployees];
-                            newEmp[index].jobTitle = e.target.value;
-                            setLocalEmployees(newEmp);
-                          }}
-                          className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto bg-white"
-                        />
-                        <datalist id="jobTitlesList">
-                          <option value="محامي" />
-                          <option value="سكرتارية" />
-                          <option value="إداري" />
-                          <option value="صادر" />
-                          <option value="إطلاع" />
-                        </datalist>
-
-                        <input type="text" placeholder="كلمة المرور" value={emp.password} onChange={e => {
-                          const newEmp = [...localEmployees];
-                          newEmp[index].password = e.target.value;
-                          setLocalEmployees(newEmp);
-                        }} className="flex-1 text-xs font-bold p-2 rounded-lg border border-slate-300 w-full sm:w-auto" />
-
-                        <button onClick={() => setLocalEmployees(localEmployees.filter((_, idx) => idx !== index))} className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg shrink-0 self-end sm:self-auto mt-2 sm:mt-0">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <div className="flex flex-wrap gap-3 mt-1 p-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
-                        <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-navy-900 transition">
-                          <input type="checkbox" checked={empPerms.canEditData} onChange={e => {
-                            const newEmp = [...localEmployees];
-                            newEmp[index].permissions = { ...empPerms, canEditData: e.target.checked };
-                            setLocalEmployees(newEmp);
-                          }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                          📝 إضافة وتعديل القضايا
-                        </label>
-
-                        <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-rose-600 transition">
-                          <input type="checkbox" checked={empPerms.canDeleteData} onChange={e => {
-                            const newEmp = [...localEmployees];
-                            newEmp[index].permissions = { ...empPerms, canDeleteData: e.target.checked };
-                            setLocalEmployees(newEmp);
-                          }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                          🗑️ حذف القضايا
-                        </label>
-
-                        <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-navy-900 transition">
-                          <input type="checkbox" checked={empPerms.canManageRolls} onChange={e => {
-                            const newEmp = [...localEmployees];
-                            newEmp[index].permissions = { ...empPerms, canManageRolls: e.target.checked };
-                            setLocalEmployees(newEmp);
-                          }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                          📅 إدارة رول الجلسات
-                        </label>
-
-                        <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:text-navy-900 transition">
-                          <input type="checkbox" checked={empPerms.canManageTasks} onChange={e => {
-                            const newEmp = [...localEmployees];
-                            newEmp[index].permissions = { ...empPerms, canManageTasks: e.target.checked };
-                            setLocalEmployees(newEmp);
-                          }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                          📋 إدارة المهام
-                        </label>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <button onClick={() => setLocalEmployees([...localEmployees, { name: '', username: '', jobTitle: '', password: '', permissions: { canEditData: true, canDeleteData: true, canManageRolls: true, canManageTasks: true } }])} className="w-full border-2 border-dashed border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-2">
-                <Plus className="w-4 h-4" /> إضافة موظف جديد
-              </button>
-
-            </div>
-          </details>
-          
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-right">
-              <h3 className="font-bold text-sm text-blue-900">الدليل الترحيبي والتثبيت</h3>
-              <p className="text-xs text-blue-700 mt-1">إذا كنت ترغب في إعادة عرض الدليل الترحيبي وخطوات تثبيت التطبيق التي تظهر في المرة الأولى.</p>
-            </div>
-            <button onClick={() => {
-              localStorage.removeItem('ekhtsas_onboarding_v1');
-              window.location.reload();
-            }} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-xs whitespace-nowrap transition shadow-sm">
-              إعادة عرض الدليل
-            </button>
-          </div>
-
-          {/* Save Settings Button */}
-          <button onClick={handleSaveSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">
-            {isProcessing ? 'جاري الحفظ...' : 'حفظ الإعدادات المتقدمة'}
-          </button>
-
-          {/* Factory Reset */}
-          <div className="bg-rose-50 rounded-2xl p-5 border border-rose-200 shadow-sm space-y-4 mt-8">
-            <div className="flex items-center gap-2 pb-3 border-b border-rose-200/50">
-              <ShieldAlert className="w-5 h-5 text-rose-600" />
-              <h3 className="font-black text-sm text-rose-900">منطقة الخطر: مسح البيانات</h3>
-            </div>
-            <p className="text-[11px] font-bold text-rose-700">تحذير: سيتم حذف جميع القضايا والملفات بشكل نهائي. تأكد من عمل نسخة احتياطية (Excel) قبل القيام بهذه الخطوة.</p>
-
-            <div className="flex gap-2">
-              <input
-                type="password"
-                placeholder="أدخل باسوورد المدير للتأكيد"
-                value={deletePassword}
-                onChange={e => setDeletePassword(e.target.value)}
-                className="flex-1 text-xs font-bold p-2 rounded-lg border border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
-              />
-              <button onClick={handleDeleteAll} disabled={isProcessing || !deletePassword} className="bg-rose-600 text-white font-bold px-4 py-2 rounded-lg text-xs hover:bg-rose-700 disabled:opacity-50 shadow-sm">
-                مسح جميع البيانات
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* LISTS TAB */}
+      {activeTab === 'other' && <SettingsSystemTab />}
+{/* LISTS TAB */}
       {activeTab === 'lists' && (
         <div className="space-y-6 animate-in fade-in zoom-in duration-300">
           {/* Core Field Options Management */}

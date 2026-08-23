@@ -305,29 +305,59 @@ export default function Files() {
           {/* Filters, Sorting, View Modes & Actions on the right (RTL start) */}
           <div className="flex gap-2 w-full sm:w-auto shrink-0 flex-wrap sm:flex-nowrap justify-start">
             
-            {/* Select All Toggle */}
-            <button
-              onClick={() => {
-                if (selectedCaseIds.length === filteredCases.length && filteredCases.length > 0) {
-                  setSelectedCaseIds([]);
-                } else {
-                  setSelectedCaseIds(filteredCases.map(c => c.id));
-                }
-              }}
-              className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border shrink-0 ${
-                selectedCaseIds.length > 0 && selectedCaseIds.length === filteredCases.length
-                  ? 'bg-amber-100 text-amber-700 border-amber-200'
-                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-              }`}
-              title={selectedCaseIds.length === filteredCases.length && filteredCases.length > 0 ? "إلغاء تحديد الكل" : "تحديد الكل (المطابق للبحث)"}
-            >
-              {selectedCaseIds.length === filteredCases.length && filteredCases.length > 0 ? (
-                <CheckSquare className="w-4 h-4" />
-              ) : (
-                <Square className="w-4 h-4" />
-              )}
-              <span className="hidden sm:inline">تحديد الكل</span>
-            </button>
+            {/* Selection Group */}
+            <div className="flex items-center rounded-xl shadow-sm border border-slate-200 overflow-hidden shrink-0">
+              
+              {/* Select Page Toggle */}
+              <button
+                onClick={() => {
+                  const pageIds = currentCases.map(c => c.id);
+                  const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedCaseIds.includes(id));
+                  if (allPageSelected) {
+                    setSelectedCaseIds(prev => prev.filter(id => !pageIds.includes(id)));
+                  } else {
+                    setSelectedCaseIds(prev => Array.from(new Set([...prev, ...pageIds])));
+                  }
+                }}
+                className={`px-3 py-2 text-xs font-black transition-all flex items-center gap-1.5 border-l border-slate-200 ${
+                  currentCases.length > 0 && currentCases.every(c => selectedCaseIds.includes(c.id))
+                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                }`}
+                title="تحديد الصفحة الحالية"
+              >
+                {currentCases.length > 0 && currentCases.every(c => selectedCaseIds.includes(c.id)) ? (
+                  <CheckSquare className="w-4 h-4" />
+                ) : (
+                  <Square className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">الصفحة</span>
+              </button>
+
+              {/* Select All Toggle */}
+              <button
+                onClick={() => {
+                  if (selectedCaseIds.length === sortedCases.length && sortedCases.length > 0) {
+                    setSelectedCaseIds([]);
+                  } else {
+                    setSelectedCaseIds(sortedCases.map(c => c.id));
+                  }
+                }}
+                className={`px-3 py-2 text-xs font-black transition-all flex items-center gap-1.5 ${
+                  selectedCaseIds.length === sortedCases.length && sortedCases.length > 0
+                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                }`}
+                title="تحديد كل النتائج في جميع الصفحات"
+              >
+                {selectedCaseIds.length === sortedCases.length && sortedCases.length > 0 ? (
+                  <CheckSquare className="w-4 h-4" />
+                ) : (
+                  <Square className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">الكل</span>
+              </button>
+            </div>
 
             {/* View Modes Toggle */}
             <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200 shadow-sm">
