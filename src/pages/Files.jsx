@@ -476,6 +476,16 @@ export default function Files() {
                 <CalendarDays className="w-5 h-5" />
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setIsAdvancedSearchOpen(!isAdvancedSearchOpen)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all border shadow-sm shrink-0 ${isAdvancedSearchOpen || (roleFilter !== 'all' || locationFilter !== 'all' || sessionTypeFilter !== 'all' || decisionFilter || quickDateFilter || showOngoingOnly || showImportantOnly || showJudgmentsOnly || showWithAttachmentsOnly || showSessionlessOnly || showMissingRoleOnly || showPastSessionsOnly) ? 'bg-indigo-600 border-indigo-600 text-white shadow-indigo-200' : 'bg-white border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-300'}`}
+              title="البحث المتقدم (تصفية النتائج)"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              <span className="text-xs font-black whitespace-nowrap hidden sm:inline">بحث متقدم</span>
+            </button>
+
             <div className="relative w-full sm:flex-1 max-w-xs">
               <input
                 ref={searchInputRef}
@@ -484,20 +494,10 @@ export default function Files() {
                 placeholder="بحث في القضايا... (اضغط / للبحث)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2 pl-36 pr-10 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2 pl-20 pr-10 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
               />
 
-              <button
-                type="button"
-                onClick={() => setIsAdvancedSearchOpen(!isAdvancedSearchOpen)}
-                className={`absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 h-7 rounded transition ${isAdvancedSearchOpen || (roleFilter !== 'all' || locationFilter !== 'all' || sessionTypeFilter !== 'all' || decisionFilter || quickDateFilter || showOngoingOnly || showImportantOnly || showJudgmentsOnly || showWithAttachmentsOnly || showSessionlessOnly || showMissingRoleOnly || showPastSessionsOnly) ? 'bg-indigo-500 text-white shadow-sm' : 'bg-indigo-50 text-indigo-500 hover:bg-indigo-100'}`}
-                title="البحث المتقدم"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-bold whitespace-nowrap hidden sm:inline">بحث متقدم</span>
-              </button>
-
-              <span className="absolute left-9 sm:left-24 top-1/2 -translate-y-1/2 bg-indigo-100/80 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded font-black border border-indigo-200 pointer-events-none select-none hidden sm:block">
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 bg-indigo-100/80 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded font-black border border-indigo-200 pointer-events-none select-none hidden sm:block">
                 {filteredCases.length} ملف
               </span>
 

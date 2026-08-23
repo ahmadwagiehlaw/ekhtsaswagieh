@@ -1,19 +1,23 @@
 import { getSafeDateObj } from './dateUtils';
 import { getSessionDate, getCaseRole, getCaseDecision } from './caseUtils';
 import { isAppellantRole, isAppelleeRole, isNoInterestRole, isOutOfJurisdictionRole } from '../constants/roleHelpers';
+import { getActiveMapping, resolveImpact, isStopImpact } from './statsMapping';
 
-function addToJudgments(target, computeAs, c = null) {
+function addToJudgments(target, computeAs, mapping, c = null) {
   target.total++;
-  if (computeAs === 'صالح')                                  { target.good++; if(c) target.lists.good.push(c); }
-  else if (computeAs === 'ضد')                               { target.bad++; if(c) target.lists.bad.push(c); }
-  else if (computeAs === 'وقف جزائي') {
-    target.stop++; if(c) target.lists.stop.push(c);
+  const impact = resolveImpact(computeAs, mapping);
+
+  if (impact === 'good')          { target.good++;          if (c) target.lists.good.push(c); }
+  else if (impact === 'bad')      { target.bad++;           if (c) target.lists.bad.push(c); }
+  else if (impact === 'stop')     {
+    target.stop++;
     target.penaltyStop = (target.penaltyStop || 0) + 1;
+    if (c) target.lists.stop.push(c);
   }
-  
-  else if (computeAs === 'اعتبار' || computeAs === 'اعتبار كأن لم تكن') { target.consideration++; if(c) target.lists.consideration.push(c); }
-  else if (computeAs === 'مختلط')                            { target.mixed = (target.mixed || 0) + 1; if(c) target.lists.mixed.push(c); }
-  else                                                        target.other++;
+  else if (impact === 'consideration') { target.consideration++; if (c) target.lists.consideration.push(c); }
+  else if (impact === 'mixed')    { target.mixed = (target.mixed || 0) + 1; if (c) target.lists.mixed.push(c); }
+  else if (impact === 'ignore')   { target.total--; } // don't count ignored values at all
+  else                             target.other++;
 }
 
 const emptyJudgments = () =>
@@ -30,6 +34,7 @@ export function computeMonthStats(cases, settings, targetMonth, targetYear) {
   let judgments  = emptyJudgments();
 
   const memoCalcMode = settings?.memoCalculationMode || 'session_date';
+  const mapping = getActiveMapping(settings);
 
   cases.forEach(c => {
     const role = getCaseRole(c);
@@ -69,30 +74,85 @@ export function computeMonthStats(cases, settings, targetMonth, targetYear) {
 
     // Calculate judgments
     rawSessions.forEach(s => {
-      // Must match the month!
       const sDate = getSafeDateObj(s.date);
       if (!sDate) return;
       if (sDate.getMonth() !== targetMonth || sDate.getFullYear() !== targetYear) return;
 
       if (s.hasJudgment) {
         const computeAs = s.judgmentClassification || s.judgment?.result || 'غير مصنف';
-        addToJudgments(judgments, computeAs, c);
+        addToJudgments(judgments, computeAs, mapping, c);
       } else {
         // Implicit examination judgments if not explicitly recorded
         const dec = String(s.decision || '').trim();
         const type = String(s.type || '').trim();
         if (dec.includes('رفض') && type.includes('فحص')) {
           const computeAs = isAppellant ? 'ضد' : isAppellee ? 'صالح' : 'ضد';
-          addToJudgments(judgments, computeAs, c);
+          addToJudgments(judgments, computeAs, mapping, c);
         } else if (dec.includes('قبول') && type.includes('فحص')) {
           const computeAs = isAppellant ? 'صالح' : isAppellee ? 'ضد' : 'صالح';
-          addToJudgments(judgments, computeAs, c);
+          addToJudgments(judgments, computeAs, mapping, c);
         }
       }
     });
   });
 
   return { sessions, memos, casesAdded, judgments };
+}
+
+export function calculateCaseAlerts(c, settings) {
+  if (!c || !settings?.deadlineRules) return [];
+  const alerts = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const role = getCaseRole(c);
+  const isAppellant = isAppellantRole(role);
+  const isAppellee  = isAppelleeRole(role);
+  const mapping = getActiveMapping(settings);
+
+  const deadlineRules = settings.deadlineRules || [];
+
+  const hasHukm = c.judgments && c.judgments.length > 0;
+  if (hasHukm) {
+    const sorted = [...c.judgments].sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0));
+    const latest = sorted[0];
+    const hukmDate = getSafeDateObj(latest.date);
+    if (hukmDate) {
+      const diffTime = Math.abs(today - hukmDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      deadlineRules.forEach(rule => {
+        if (!rule.name.includes('الطعن')) return;
+        const targetRole = rule.targetRole || 'طاعنين';
+        if ((targetRole === 'طاعنين' && !isAppellant) || (targetRole === 'مطعون ضده' && !isAppellee)) return;
+        const maxDays = parseInt(rule.days || 60);
+        if (diffDays <= maxDays && diffDays >= (maxDays - 15)) {
+          alerts.push({ type: 'deadline_alert', case: c, ruleName: rule.name, daysPassed: diffDays, daysLeft: maxDays - diffDays });
+        }
+      });
+    }
+  } else {
+    const lastSessionDate = getSafeDateObj(getSessionDate(c));
+    const deadlineDecision = getCaseDecision(c);
+    if (lastSessionDate) {
+      const diffTime = Math.abs(today - lastSessionDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      // Check if decision contains any stop-impact value
+      const hasStopDecision = mapping
+        .filter(m => m.impact === 'stop')
+        .some(m => deadlineDecision.includes(m.value));
+      deadlineRules.forEach(rule => {
+        if (!rule.name.includes('تعجيل') || !hasStopDecision) return;
+        const targetRole = rule.targetRole || 'طاعنين';
+        if ((targetRole === 'طاعنين' && !isAppellant) || (targetRole === 'مطعون ضده' && !isAppellee)) return;
+        const triggerAfter = parseInt(rule.triggerAfterDays || 30);
+        const daysWindow   = parseInt(rule.days || 15);
+        if (diffDays >= triggerAfter && diffDays <= (triggerAfter + daysWindow)) {
+          alerts.push({ type: 'deadline_alert', case: c, ruleName: rule.name, daysPassed: diffDays, daysLeft: (triggerAfter + daysWindow) - diffDays });
+        }
+      });
+    }
+  }
+  return alerts;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -122,6 +182,8 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
   const criticalConsidered = [];
   const criticalAgainst = [];
 
+  const mapping = getActiveMapping(settings);
+
   const today        = new Date();
   today.setHours(0, 0, 0, 0);
   const currentMonth = today.getMonth();
@@ -144,36 +206,29 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
     const isAppellant = isAppellantRole(role, settings);
     const isAppellee  = isAppelleeRole(role, settings);
 
-    // "آخر جلسة" field = next scheduled / most-recent session date
     const lastSessionStr  = getSessionDate(c);
     const lastSessionDate = getSafeDateObj(lastSessionStr);
 
     const year = c['السنة'] || c['سنة'] || c['year'] || 'غير محدد';
     yearCount[year] = (yearCount[year] || 0) + 1;
 
-    // ── Loop over all recorded sessions ──────────────────────
     const sessions = Array.isArray(c.sessions) ? c.sessions : Object.values(c.sessions || {});
 
     sessions.forEach(s => {
       const sDate = getSafeDateObj(s.date);
       if (!sDate) return;
       const sMonth = sDate.getMonth(), sYear = sDate.getFullYear();
-
-      // 6-month trend
       const slot = last6Months.find(m => m.month === sMonth && m.year === sYear);
       if (slot) slot.count++;
     });
 
-    // ── Sort sessions (most recent first) for status logic ───
     sessions.sort((a, b) => {
       const da = getSafeDateObj(a.date), db = getSafeDateObj(b.date);
       if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
       return db.getTime() - da.getTime();
     });
 
-    // Latest recorded session (for decision text)
-    const latestSession        = sessions[0];
-    // Latest session with hasJudgment=true (judgment entered) or implicit judgment (فحص)
+    const latestSession = sessions[0];
     const latestJudgmentSession = sessions.find(s => {
       if (s.hasJudgment) return true;
       const dec = String(s.decision || '').trim();
@@ -181,9 +236,8 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
       if ((dec.includes('رفض') || dec.includes('قبول')) && type.includes('فحص')) return true;
       return false;
     });
-    const hasHukm              = !!latestJudgmentSession;
+    const hasHukm = !!latestJudgmentSession;
 
-    // Last session's decision / قرار
     const lastDecisionRaw = String(
       latestSession?.decision || latestSession?.['القرار'] || latestSession?.['قرار'] || ''
     ).trim();
@@ -192,16 +246,13 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
     const deadlineDecision = String(c['القرار'] || c['قرار الجلسة'] || c['المنطوق'] || '');
     const deadlineRules    = settings?.deadlineRules || [];
 
-    // ── Status classification ────────────────────────────────
     let computeAs = 'غير مصنف';
     
     if (hasHukm) {
-      // Judgment has been recorded by the user
       const hukmDate = getSafeDateObj(latestJudgmentSession.date);
       judgedCount++;
-      judgedCases.push(c); // Count as judged regardless of date (judgment was recorded)
+      judgedCases.push(c);
 
-      // Overall judgment distribution
       if (latestJudgmentSession.hasJudgment) {
         computeAs = latestJudgmentSession.judgmentClassification || latestJudgmentSession.judgment?.result || 'غير مصنف';
       } else {
@@ -215,14 +266,23 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
       
       judgmentsCount[computeAs] = (judgmentsCount[computeAs] || 0) + 1;
       
+      const impact = resolveImpact(computeAs, mapping);
+      const mappingEntry = mapping.find(m => m.value === computeAs);
+      const countInPerf = mappingEntry ? mappingEntry.countsInPerformance : false;
       const roleKey = isAppellant ? 'appellant' : 'appellee';
-      performanceSplit[roleKey].total++;
-      if (computeAs === 'صالح') performanceSplit[roleKey].good++;
-      else if (computeAs === 'ضد') performanceSplit[roleKey].bad++;
-      else if (computeAs === 'مختلط') performanceSplit[roleKey].mixed++;
-      else performanceSplit[roleKey].procedural++;
 
-      if (computeAs === 'ضد') { criticalAgainst.push(c); }
+      if (countInPerf) {
+        performanceSplit[roleKey].total++;
+        if (impact === 'good')  performanceSplit[roleKey].good++;
+        else if (impact === 'bad')   performanceSplit[roleKey].bad++;
+        else if (impact === 'mixed') performanceSplit[roleKey].mixed++;
+        else                         performanceSplit[roleKey].procedural++;
+      }
+
+      // Critical cases: bad or stop impacts
+      if (impact === 'bad')  { criticalAgainst.push(c); }
+      if (impact === 'stop') { criticalSuspended.push(c); }
+      if (impact === 'consideration') { criticalConsidered.push(c); }
 
       // Deadline alerts (طعن window)
       if (hukmDate) {
@@ -240,32 +300,42 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
       }
 
     } else if (isDecidedForJudgment) {
-      // No judgment recorded yet, but last decision says "للحكم"
-      // = محجوز للحكم
       reservedCount++;
       reservedCases.push(c);
 
     } else {
-      // Active ongoing case (has sessions, not reserved, not judged)
-      // = إجمالي المتداول
       ongoingCount++;
       ongoingCases.push(c);
 
-      // Deadline alerts (وقف جزائي)
+      // Deadline alerts (وقف جزائي) — detect any stop-impact value in decision text
       if (lastSessionDate) {
-        const diffTime = Math.abs(today - lastSessionDate);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        deadlineRules.forEach(rule => {
-          if (!rule.name.includes('وقف') || !deadlineDecision.includes('وقف جزائي')) return;
-          const targetRole = rule.targetRole || 'طاعنين';
-          if ((targetRole === 'طاعنين' && !isAppellant) || (targetRole === 'مطعون ضدنا' && !isAppellee)) return;
-          const triggerAfter = parseInt(rule.triggerAfterDays || 30);
-          const daysWindow   = parseInt(rule.days || 15);
-          if (diffDays >= triggerAfter && diffDays <= (triggerAfter + daysWindow)) {
-            alerts.push({ type: 'deadline_alert', case: c, ruleName: rule.name, daysPassed: diffDays, daysLeft: (triggerAfter + daysWindow) - diffDays });
-          }
-        });
+        const hasStopDecision = mapping
+          .filter(m => m.impact === 'stop')
+          .some(m => deadlineDecision.includes(m.value) || lastDecisionRaw.includes(m.value));
+
+        if (hasStopDecision) {
+          const diffTime = Math.abs(today - lastSessionDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          deadlineRules.forEach(rule => {
+            if (!rule.name.includes('وقف')) return;
+            const targetRole = rule.targetRole || 'طاعنين';
+            if ((targetRole === 'طاعنين' && !isAppellant) || (targetRole === 'مطعون ضدنا' && !isAppellee)) return;
+            const triggerAfter = parseInt(rule.triggerAfterDays || 30);
+            const daysWindow   = parseInt(rule.days || 15);
+            if (diffDays >= triggerAfter && diffDays <= (triggerAfter + daysWindow)) {
+              alerts.push({ type: 'deadline_alert', case: c, ruleName: rule.name, daysPassed: diffDays, daysLeft: (triggerAfter + daysWindow) - diffDays });
+            }
+          });
+        }
       }
+    }
+
+    // ── Critical Judgments (for ongoing cases — session-level detection) ──
+    if (!hasHukm) {
+      const hasStopDecision = mapping.filter(m => m.impact === 'stop').some(m => lastDecisionRaw.includes(m.value) || deadlineDecision.includes(m.value));
+      const hasConsideration = mapping.filter(m => m.impact === 'consideration').some(m => lastDecisionRaw.includes(m.value) || deadlineDecision.includes(m.value));
+      if (isAppellant && hasStopDecision)    criticalSuspended.push(c);
+      if (isAppellant && hasConsideration)   criticalConsidered.push(c);
     }
 
     // ── القضايا النشطة: cases with FUTURE session date ──────
@@ -280,21 +350,7 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
       if (isAppellee)  appelleeCount++;
     }
 
-    // ── Critical Appellant Judgments (وقف جزائي / اعتبار كأن لم يكن) ──────
-    const isCriticalSuspended = isAppellant && (
-      (hasHukm && computeAs === 'وقف جزائي') ||
-      (!hasHukm && (lastDecisionRaw.includes('وقف جزائي') || deadlineDecision.includes('وقف جزائي')))
-    );
-
-    const isCriticalConsidered = isAppellant && (
-      (hasHukm && (computeAs === 'اعتبار' || computeAs === 'اعتبار كأن لم تكن')) ||
-      (!hasHukm && (lastDecisionRaw.includes('اعتبار') || deadlineDecision.includes('اعتبار')))
-    );
-
-    if (isCriticalSuspended) { criticalSuspended.push(c); }
-    if (isCriticalConsidered) { criticalConsidered.push(c); }
-
-    // Month-level session counts (for trend badge on header)
+    // Month-level session counts
     if (lastSessionDate) {
       const lm = lastSessionDate.getMonth(), ly = lastSessionDate.getFullYear();
       const isThisMonth = (lm === currentMonth && ly === currentYear);
@@ -310,8 +366,6 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
       if (entity) opponentsCount[entity] = (opponentsCount[entity] || 0) + 1;
     }
   });
-
-
 
   const topYears     = Object.entries(yearCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const topOpponents = Object.entries(opponentsCount).sort((a, b) => b[1] - a[1]).slice(0, 5);

@@ -5,9 +5,8 @@ import { useUI } from '../../context/UIContext';
 import { Settings as SettingsIcon, Plus, Trash2, ShieldAlert } from 'lucide-react';
 
 export default function SettingsSystemTab() {
-  const { settings, saveSettingsToFirebase, deleteAllCases } = useAppContext();
-  const { currentUser } = useAuth();
-  const { login } = useAuth(); // Needed for re-auth
+  const { settings, saveSettingsToFirebase } = useAppContext();
+  const { currentUser, login, changePassword } = useAuth();
   const { toast, showConfirm, showPrompt } = useUI();
   
   const [localNumberFormat, setLocalNumberFormat] = useState('en');
@@ -16,17 +15,58 @@ export default function SettingsSystemTab() {
   const [localCourtDegree, setLocalCourtDegree] = useState('أول درجة');
   const [localCourtSpecialization, setLocalCourtSpecialization] = useState('قضاء إداري');
   const [localReviewTasks, setLocalReviewTasks] = useState([]);
+
+  const [localMemoCalculationMode, setLocalMemoCalculationMode] = useState(settings?.memoCalculationMode || 'session_date');
+  const [localScratchpadPosition, setLocalScratchpadPosition] = useState(settings?.scratchpadPosition || 'right');
+  const [localSearchTabPosition, setLocalSearchTabPosition] = useState(settings?.searchTabPosition || 'right');
   
   const [isProcessing, setIsProcessing] = useState(false);
-  const [deletePassword, setDeletePassword] = useState('');
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword) {
+      toast('يرجى إدخال كلمة المرور الحالية والجديدة', 'error');
+      return;
+    }
+    
+    setIsChangingPassword(true);
+    try {
+      // Re-authenticate first
+      if (currentUser?.email) {
+        await login(currentUser.email, currentPassword);
+      }
+      
+      await changePassword(newPassword);
+      toast('تم تغيير كلمة المرور بنجاح', 'success');
+      setCurrentPassword('');
+      setNewPassword('');
+    } catch (err) {
+      console.error(err);
+      toast('فشل تغيير كلمة المرور. تأكد من كلمة المرور الحالية.', 'error');
+    }
+    setIsChangingPassword(false);
+  };
 
   useEffect(() => {
     setLocalNumberFormat(settings?.numberFormat || 'en');
     setLocalDateFormat(settings?.dateFormat || 'dd/MM/yyyy');
-    setLocalConsultantName(settings?.consultantName || settings?.officeName || '');
+    setLocalConsultantName(settings?.consultantName || '');
     setLocalCourtDegree(settings?.courtDegree || 'أول درجة');
     setLocalCourtSpecialization(settings?.courtSpecialization || 'قضاء إداري');
     setLocalReviewTasks(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
+
+    setLocalMemoCalculationMode(settings?.memoCalculationMode || 'session_date');
+    setLocalScratchpadPosition(settings?.scratchpadPosition || 'right');
+    setLocalSearchTabPosition(settings?.searchTabPosition || 'right');
+
+    setLocalMemoCalculationMode(settings?.memoCalculationMode || 'session_date');
+    setLocalScratchpadPosition(settings?.scratchpadPosition || 'right');
+    setLocalSearchTabPosition(settings?.searchTabPosition || 'right');
   }, [settings]);
 
   const handleSaveSystemSettings = async () => {
@@ -38,7 +78,10 @@ export default function SettingsSystemTab() {
       consultantName: localConsultantName,
       courtDegree: localCourtDegree,
       courtSpecialization: localCourtSpecialization,
-      reviewTasks: localReviewTasks
+      reviewTasks: localReviewTasks,
+      memoCalculationMode: localMemoCalculationMode,
+      scratchpadPosition: localScratchpadPosition,
+      searchTabPosition: localSearchTabPosition,
     });
     setIsProcessing(false);
     toast('تم حفظ إعدادات النظام بنجاح', 'success');
@@ -47,39 +90,6 @@ export default function SettingsSystemTab() {
   const handleResetConfirms = () => {
     localStorage.removeItem('disabledConfirms');
     toast('تم إعادة تفعيل جميع الرسائل التأكيدية بنجاح!', 'success');
-  };
-
-  const handleDeleteAll = async () => {
-    if (!deletePassword) {
-      toast('يرجى إدخال كلمة المرور!', 'error');
-      return;
-    }
-
-    try {
-      setIsProcessing(true);
-      if (currentUser?.email) {
-        await login(currentUser.email, deletePassword);
-      }
-    } catch (err) {
-      setIsProcessing(false);
-      toast('كلمة المرور غير صحيحة!', 'error');
-      return;
-    }
-
-    setIsProcessing(false);
-    const confirmed = await showConfirm('تحذير نهائي', 'هل أنت متأكد من مسح جميع البيانات بشكل لا رجعة فيه؟');
-
-    if (confirmed) {
-      setIsProcessing(true);
-      const success = await deleteAllCases();
-      setIsProcessing(false);
-      if (success) {
-        toast('تم مسح جميع البيانات بنجاح.', 'success');
-        setDeletePassword('');
-      } else {
-        toast('حدث خطأ أثناء المسح.', 'error');
-      }
-    }
   };
 
   return (
@@ -157,6 +167,46 @@ export default function SettingsSystemTab() {
               />
             </div>
           </div>
+          
+          <div className="border-t border-slate-100 pt-4 mt-2">
+            <h4 className="text-xs font-black text-navy-900 mb-3">تفضيلات الواجهة والمواعيد</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-[11px] font-bold text-slate-700">طريقة حساب مواعيد المذكرات:</label>
+                <select
+                  value={localMemoCalculationMode}
+                  onChange={e => setLocalMemoCalculationMode(e.target.value)}
+                  className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
+                >
+                  <option value="session_date">من تاريخ الجلسة (الافتراضي)</option>
+                  <option value="decision_date">من تاريخ القرار</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[11px] font-bold text-slate-700">موقع المسودة (Scratchpad):</label>
+                <select
+                  value={localScratchpadPosition}
+                  onChange={e => setLocalScratchpadPosition(e.target.value)}
+                  className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
+                >
+                  <option value="right">يمين الشاشة</option>
+                  <option value="left">يسار الشاشة</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[11px] font-bold text-slate-700">موقع لوحة البحث (Search):</label>
+                <select
+                  value={localSearchTabPosition}
+                  onChange={e => setLocalSearchTabPosition(e.target.value)}
+                  className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 bg-slate-50"
+                >
+                  <option value="right">يمين الشاشة</option>
+                  <option value="left">يسار الشاشة</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           <div className="flex justify-end pt-2 border-t border-slate-100">
             <button onClick={handleResetConfirms} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline transition">
               إعادة تفعيل جميع رسائل التأكيد المخفية
@@ -195,6 +245,46 @@ export default function SettingsSystemTab() {
         </div>
       </div>
 
+      {/* Change Password */}
+      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4 mt-6">
+        <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+          <ShieldAlert className="w-5 h-5 text-indigo-600" />
+          <h3 className="font-black text-sm text-navy-900">تغيير كلمة المرور</h3>
+        </div>
+        
+        <form onSubmit={handleChangePassword} className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+          <div>
+            <label className="text-[11px] font-black text-slate-500 block mb-1">كلمة المرور الحالية</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={e => setCurrentPassword(e.target.value)}
+              className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+              placeholder="••••••••"
+            />
+          </div>
+          <div>
+            <label className="text-[11px] font-black text-slate-500 block mb-1">كلمة المرور الجديدة</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+              placeholder="••••••••"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <button 
+              type="submit" 
+              disabled={isChangingPassword || !currentPassword || !newPassword}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-xs shadow-sm disabled:opacity-50 transition"
+            >
+              {isChangingPassword ? 'جاري التغيير...' : 'تغيير كلمة المرور'}
+            </button>
+          </div>
+        </form>
+      </div>
+      
       {/* Save Settings Button */}
       <button onClick={handleSaveSystemSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm hover:bg-navy-800 transition disabled:opacity-50">
         {isProcessing ? 'جاري الحفظ...' : 'حفظ إعدادات النظام'}
@@ -211,28 +301,6 @@ export default function SettingsSystemTab() {
         }} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-xs whitespace-nowrap transition shadow-sm">
           إعادة عرض الدليل
         </button>
-      </div>
-
-      {/* Factory Reset */}
-      <div className="bg-rose-50 rounded-2xl p-5 border border-rose-200 shadow-sm space-y-4 mt-8">
-        <div className="flex items-center gap-2 pb-3 border-b border-rose-200/50">
-          <ShieldAlert className="w-5 h-5 text-rose-600" />
-          <h3 className="font-black text-sm text-rose-900">منطقة الخطر: مسح البيانات</h3>
-        </div>
-        <p className="text-[11px] font-bold text-rose-700">تحذير: سيتم حذف جميع القضايا والملفات بشكل نهائي. تأكد من عمل نسخة احتياطية (Excel) قبل القيام بهذه الخطوة.</p>
-
-        <div className="flex gap-2">
-          <input
-            type="password"
-            placeholder="أدخل باسوورد المدير للتأكيد"
-            value={deletePassword}
-            onChange={e => setDeletePassword(e.target.value)}
-            className="flex-1 text-xs font-bold p-2 rounded-lg border border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
-          />
-          <button onClick={handleDeleteAll} disabled={isProcessing || !deletePassword} className="bg-rose-600 text-white font-bold px-4 py-2 rounded-lg text-xs hover:bg-rose-700 disabled:opacity-50 shadow-sm">
-            مسح جميع البيانات
-          </button>
-        </div>
       </div>
     </div>
   );

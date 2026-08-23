@@ -16,7 +16,7 @@ import StrictSelectField from '../components/StrictSelectField';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 import { localizeNumber } from '../utils/numberUtils';
 import { calculateLitigationStage } from '../utils/caseUtils';
-import { calculateDashboardStats } from '../utils/statsUtils';
+import { calculateCaseAlerts } from '../utils/statsUtils';
 import { uploadToR2 } from '../lib/r2';
 import imageCompression from 'browser-image-compression';
 import { useRef } from 'react';
@@ -253,7 +253,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
     }
   };
 
-  const caseStats = React.useMemo(() => calculateDashboardStats(caseData ? [caseData] : [], settings), [caseData, settings]);
+  const dynamicAlerts = React.useMemo(() => calculateCaseAlerts(caseData, settings), [caseData, settings]);
 
   if (!caseData) {
     return (
@@ -327,7 +327,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
     textColorClass = 'text-slate-500';
   }
 
-  const dynamicAlerts = caseStats.alerts;
+
 
   const coverImageDoc = (caseData.documents || []).find(doc => doc.type === 'غلاف الملف' && doc.fileType === 'image');
   const coverImageUrl = coverImageDoc ? coverImageDoc.url : null;
@@ -371,8 +371,26 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
     }
 
     try {
+      const dataToSave = { ...editData };
+      dataToSave.defendantsList = (dataToSave.defendantsList || []).filter(d => d.name.trim());
+      dataToSave.plaintiffsList = (dataToSave.plaintiffsList || []).filter(d => d.name.trim());
+      
+      if (dataToSave.plaintiffsList && dataToSave.plaintiffsList.length > 0) {
+        const names = dataToSave.plaintiffsList.map(p => p.name).filter(Boolean);
+        const combined = names.length > 1 ? `${names[0]} وآخرين` : names[0] || '';
+        dataToSave['المدعي'] = combined;
+        dataToSave['الطاعن'] = combined;
+      }
+      
+      if (dataToSave.defendantsList && dataToSave.defendantsList.length > 0) {
+        const names = dataToSave.defendantsList.map(p => p.name).filter(Boolean);
+        const combined = names.length > 1 ? `${names[0]} وآخرين` : names[0] || '';
+        dataToSave['المدعى عليه'] = combined;
+        dataToSave['المطعون ضده'] = combined;
+      }
+
       const previousData = { ...caseData };
-      await saveCaseToFirebase(caseData.id, editData);
+      await saveCaseToFirebase(caseData.id, dataToSave);
       setIsEditing(false);
       toast("تم حفظ التعديلات بنجاح!", "success", {
         actionLabel: "تراجع",

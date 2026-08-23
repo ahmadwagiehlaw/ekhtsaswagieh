@@ -1,11 +1,14 @@
 import React, { useRef, useState } from 'react';
 import { useAppContext } from '../../context/AppState';
 import { useUI } from '../../context/UIContext';
-import { Download, Upload, Check, Database, ArrowUpFromLine } from 'lucide-react';
+import { Download, Upload, Check, Database, ArrowUpFromLine, Activity, ShieldAlert } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import * as XLSX from 'xlsx';
 
 export default function SettingsDataTab() {
-  const { cases, schema, saveBatchCasesToFirebase, saveSettingsToFirebase, saveSchemaToFirebase } = useAppContext();
+  const { cases, schema, saveBatchCasesToFirebase, saveSettingsToFirebase, saveSchemaToFirebase, deleteAllCases } = useAppContext();
+  const { login, currentUser } = useAuth();
   const { toast, showConfirm } = useUI();
 
   const [syncData, setSyncData] = useState(null); // { added: [], updated: [], kept: [] }
@@ -14,6 +17,39 @@ export default function SettingsDataTab() {
   
   const backupInputRef = useRef(null);
   const [backupRestoreStatus, setBackupRestoreStatus] = useState(null);
+  const [deletePassword, setDeletePassword] = useState('');
+
+  const handleDeleteAll = async () => {
+    if (!deletePassword) {
+      toast('يرجى إدخال كلمة المرور!', 'error');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      if (currentUser?.email) {
+        await login(currentUser.email, deletePassword);
+      }
+    } catch (err) {
+      setIsProcessing(false);
+      toast('كلمة المرور غير صحيحة!', 'error');
+      return;
+    }
+
+    setIsProcessing(false);
+    const confirmed = await showConfirm('مسح البيانات', 'هل أنت متأكد من أنك تريد مسح جميع البيانات؟ هذا الإجراء لا يمكن التراجع عنه.');
+    if (confirmed) {
+      setIsProcessing(true);
+      const success = await deleteAllCases();
+      setIsProcessing(false);
+      if (success) {
+        toast('تم مسح جميع البيانات بنجاح.', 'success');
+        setDeletePassword('');
+      } else {
+        toast('حدث خطأ أثناء المسح.', 'error');
+      }
+    }
+  };
 
   const getCaseKey = (c) => {
     const id = c['رقم الدعوى'] || c['رقم القضية'] || c['رقم_الدعوى'] || '';
@@ -281,6 +317,26 @@ export default function SettingsDataTab() {
         )}
       </div>
 
+      {/* Audit Logs Section */}
+      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+        <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+          <Activity className="w-5 h-5 text-indigo-600" />
+          <h3 className="font-black text-sm text-navy-900">سجل النشاطات (مراقبة الموظفين)</h3>
+        </div>
+        <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+          تتبع جميع عمليات الإضافة والتعديل والحذف التي يقوم بها الموظفون داخل التطبيق مع تسجيل الوقت والتفاصيل.
+        </p>
+        <div className="mt-4">
+          <Link 
+            to="/audit-logs" 
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 border-2 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 transition rounded-xl px-4 py-3 font-black text-xs"
+          >
+            <Activity className="w-4 h-4" />
+            فتح سجل النشاطات
+          </Link>
+        </div>
+      </div>
+
       {/* Export Section */}
       <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
         <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
@@ -372,6 +428,27 @@ export default function SettingsDataTab() {
             <button onClick={() => setBackupRestoreStatus(null)} className="text-xs font-bold text-emerald-700 underline">إخفاء</button>
           </div>
         )}
+      </div>
+      {/* Factory Reset */}
+      <div className="bg-rose-50 rounded-2xl p-5 border border-rose-200 shadow-sm space-y-4 mt-8">
+        <div className="flex items-center gap-2 pb-3 border-b border-rose-200/50">
+          <ShieldAlert className="w-5 h-5 text-rose-600" />
+          <h3 className="font-black text-sm text-rose-900">منطقة الخطر: مسح البيانات</h3>
+        </div>
+        <p className="text-[11px] font-bold text-rose-700">تحذير: سيتم حذف جميع القضايا والملفات بشكل نهائي. تأكد من عمل نسخة احتياطية (Excel أو JSON) قبل القيام بهذه الخطوة.</p>
+
+        <div className="flex gap-2">
+          <input
+            type="password"
+            placeholder="أدخل باسوورد الإدارة للتأكيد"
+            value={deletePassword}
+            onChange={e => setDeletePassword(e.target.value)}
+            className="flex-1 text-xs font-bold p-2 rounded-lg border border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
+          />
+          <button onClick={handleDeleteAll} disabled={isProcessing || !deletePassword} className="bg-rose-600 text-white font-bold px-4 py-2 rounded-lg text-xs hover:bg-rose-700 disabled:opacity-50 shadow-sm">
+            مسح جميع البيانات
+          </button>
+        </div>
       </div>
     </div>
   );

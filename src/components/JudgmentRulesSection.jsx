@@ -306,7 +306,7 @@ export default function JudgmentRulesSection({
                               </select>
                             </div>
                             <div>
-                              <label className="text-[9px] font-bold text-slate-500 block mb-1">نوع الحكم</label>
+                              <label className="text-[9px] font-bold text-slate-500 block mb-1">المُحفز / الكلمة المفتاحية</label>
                               <select
                                 value={rule.conditions?.type || ''}
                                 onChange={(e) => {
@@ -317,7 +317,7 @@ export default function JudgmentRulesSection({
                                 }}
                                 className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200"
                               >
-                                <option value="">- أي نوع حكم -</option>
+                                <option value="">- أي محفز -</option>
                                 {localJudgmentTypes.map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </div>
@@ -361,7 +361,7 @@ export default function JudgmentRulesSection({
                           <p className="text-xs font-black text-emerald-700 mb-3 border-b border-emerald-100 pb-2">تعبئة البيانات تلقائياً بـ:</p>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="text-[9px] font-bold text-slate-500 block mb-1">فئة الحكم (الجديدة)</label>
+                              <label className="text-[9px] font-bold text-slate-500 block mb-1">فئة الحكم</label>
                               <select
                                 value={rule.actions?.category || ''}
                                 onChange={(e) => {
@@ -374,6 +374,22 @@ export default function JudgmentRulesSection({
                               >
                                 <option value="">-- بدون تغيير --</option>
                                 {localJudgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-bold text-slate-500 block mb-1">مختصر الحكم</label>
+                              <select
+                                value={rule.actions?.type || ''}
+                                onChange={(e) => {
+                                  const newRules = [...localJudgmentDefaults];
+                                  if (!newRules[idx].actions) newRules[idx].actions = {};
+                                  newRules[idx].actions.type = e.target.value;
+                                  setLocalJudgmentDefaults(newRules);
+                                }}
+                                className="w-full text-[10px] font-bold p-1.5 rounded-md border border-emerald-200"
+                              >
+                                <option value="">-- بدون تغيير --</option>
+                                {localJudgmentTypes.map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </div>
                             <div>

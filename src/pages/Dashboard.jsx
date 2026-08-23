@@ -8,25 +8,19 @@ import {
 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { calculateDashboardStats, computeMonthStats } from '../utils/statsUtils';
+import { getActiveMapping, resolveColor } from '../utils/statsMapping';
 import useDashboardStats from '../hooks/useDashboardStats';
 import { useUI } from '../context/UIContext';
 import { getSafeDateObj } from '../utils/dateUtils';
 import BulkAssignTaskModal from '../components/BulkAssignTaskModal';
 
-// ─────────────────────────────────────────────────────────────
-// Color helpers
-// ─────────────────────────────────────────────────────────────
-const JUDGMENT_COLORS = {
-  'صالح': '#10b981', 'ضد': '#ef4444', 'وقف جزائي': '#f97316',
-  'وقف تعليقي': '#fb923c', 'خبراء': '#8b5cf6', 'اعتبار': '#eab308',
-  'تمهيدي': '#06b6d4', 'لا شأن بالحكم': '#94a3b8', 'غير مصنف': '#cbd5e1',
-  'غير منه للخصومة': '#64748b', 'حكم منه للخصومة': '#22c55e',
-};
-const getJColor = (name) => {
-  for (const [k, v] of Object.entries(JUDGMENT_COLORS)) {
-    if (name === k || name.includes(k) || k.includes(name)) return v;
-  }
-  return '#94a3b8';
+// Color helpers are now driven by settings.statsMapping via resolveColor()
+// Fallback static map is used if settings not loaded yet
+const FALLBACK_COLORS = {
+  'صالح': '#10b981', 'ضد': '#ef4444', 'وقف جزائي': '#f97316', 'وقف والدولة مدعية': '#f97316',
+  'اعتبار كأن لم تكن': '#8b5cf6', 'اعتبار': '#eab308',
+  'تمهيدي': '#06b6d4', 'لا شأن بالحكم': '#94a3b8', 'لا شأن لنا بالحكم': '#94a3b8', 'غير مصنف': '#cbd5e1',
+  'غير منه للخصومة': '#64748b', 'حكم غير منه للخصومة': '#64748b', 'حكم منه للخصومة': '#22c55e',
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -71,6 +65,18 @@ export default function Dashboard() {
   const selectedMonthStats = useMemo(() => computeMonthStats(cases, settings, viewMonth.month, viewMonth.year), [cases, settings, viewMonth]);
   const prevViewMonth = useMemo(() => ({ month: viewMonth.month === 0 ? 11 : viewMonth.month - 1, year: viewMonth.month === 0 ? viewMonth.year - 1 : viewMonth.year }), [viewMonth]);
   const prevMonthStats = useMemo(() => computeMonthStats(cases, settings, prevViewMonth.month, prevViewMonth.year), [cases, settings, prevViewMonth]);
+
+  // Dynamic color resolver: reads from settings.statsMapping, falls back to FALLBACK_COLORS
+  const activeMapping = useMemo(() => getActiveMapping(settings), [settings]);
+  const getJColor = (name) => {
+    const fromMapping = resolveColor(name, activeMapping);
+    if (fromMapping && fromMapping !== '#cbd5e1') return fromMapping;
+    // Fuzzy fallback from FALLBACK_COLORS
+    for (const [k, v] of Object.entries(FALLBACK_COLORS)) {
+      if (name === k || name.includes(k) || k.includes(name)) return v;
+    }
+    return '#94a3b8';
+  };
 
   // Agenda popup modal state
   const [agendaModal, setAgendaModal] = useState({ isOpen: false, title: '', casesList: [] });

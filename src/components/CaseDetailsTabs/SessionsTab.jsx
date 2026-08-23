@@ -302,41 +302,98 @@ export default function SessionsTab({
                       const [res, setRes] = React.useState(initialRes);
                       const [type, setType] = React.useState(initialType);
                       const [verd, setVerd] = React.useState(initialVerd);
-                      const [final, setFinal] = React.useState(j.isFinal !== undefined ? j.isFinal : (j._isFinal || false));
+                      const [triggerValue, setTriggerValue] = React.useState('');
 
                       const [isEditing, setIsEditing] = React.useState(!session.hasJudgment);
 
-                      React.useEffect(() => {
-                        // 1. Dynamic Rules from Settings
-                        if (settings?.judgmentDefaults?.length > 0) {
-                          let matched = false;
-                          const currentRole = String(caseData['الصفة'] || caseData['صفة'] || '');
+                      const [lastAutoFilledText, setLastAutoFilledText] = React.useState('');
 
-                          for (const rule of settings.judgmentDefaults) {
-                            const conds = rule.conditions || {};
-                            const roleMatch = !conds.role || currentRole.includes(conds.role) || conds.role === currentRole;
-                            const catMatch = !conds.category || cat === conds.category;
-                            const classMatch = !conds.classification || res === conds.classification;
-                            const typeMatch = !conds.type || type === conds.type;
-                            const sessionTypeMatch = !conds.sessionType || session.type === conds.sessionType;
-                            const decisionMatch = !conds.decision || session.decision === conds.decision;
+                      const calculateCategory = (currentRes) => {
+                        if (session.type === 'موضوع' && ['صالح', 'ضد', 'مختلط'].includes(currentRes)) return 'حكم نهائي';
+                        if (session.type === 'فحص' && (session.decision || '').includes('للحكم')) return 'قرار فحص';
+                        if (currentRes && !['صالح', 'ضد', 'مختلط'].includes(currentRes)) return 'حكم إجرائي';
+                        return '';
+                      };
 
-                            if (roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch && (conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision)) {
-                              const acts = rule.actions || {};
-                              if (acts.category && !cat) setCat(acts.category);
-                              if (acts.classification && !res) setRes(acts.classification);
-                              if (acts.type && !type) setType(acts.type);
-                              if (acts.text && !verd) setVerd(acts.text);
-                              matched = true;
-                              break;
+                      const applyRules = (changedField, newValue, currentCat, currentRes, currentType, currentTrigger) => {
+                        if (!settings?.judgmentDefaults?.length) return;
+                        
+                        const currentRole = String(caseData['الصفة'] || caseData['صفة'] || '').trim();
+                        const tempCat = changedField === 'category' ? newValue : currentCat;
+                        const tempRes = changedField === 'classification' ? newValue : currentRes;
+                        const tempType = changedField === 'type' ? newValue : currentType;
+                        const tempTrigger = changedField === 'trigger' ? newValue : currentTrigger;
+
+                        for (const rule of settings.judgmentDefaults) {
+                          const conds = rule.conditions || {};
+                          
+                          const roleMatch = !conds.role || currentRole.includes(conds.role) || conds.role === currentRole;
+                          const catMatch = !conds.category || tempCat === conds.category;
+                          const classMatch = !conds.classification || tempRes === conds.classification;
+                          // TRIGGER matching conds.type
+                          const typeMatch = !conds.type || tempTrigger === conds.type;
+                          const sessionTypeMatch = !conds.sessionType || session.type === conds.sessionType;
+                          const decisionMatch = !conds.decision || session.decision === conds.decision;
+
+                          const hasConditions = conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision;
+
+                          if (hasConditions && roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch) {
+                            const acts = rule.actions || {};
+                            
+                            let newCat = tempCat;
+                            if (acts.category) {
+                              setCat(acts.category);
+                              newCat = acts.category;
                             }
+                            if (acts.classification) {
+                              setRes(acts.classification);
+                              if (!acts.category) {
+                                const autoCat = calculateCategory(acts.classification);
+                                if (autoCat) setCat(autoCat);
+                              }
+                            }
+                            if (acts.type) setType(acts.type);
+                            
+                            if (acts.text) {
+                              setVerd(prev => {
+                                if (!prev || prev === lastAutoFilledText) {
+                                  setLastAutoFilledText(acts.text);
+                                  return acts.text;
+                                }
+                                return prev;
+                              });
+                            }
+                            break;
                           }
                         }
-                      }, [cat, res, type, settings?.judgmentDefaults, caseData]);
+                      };
+
+                      const handleTriggerChange = (newTrigger) => {
+                        setTriggerValue(newTrigger);
+                        applyRules('trigger', newTrigger, cat, res, type, newTrigger);
+                      };
 
                       const handleTypeChange = (newType) => {
                         setType(newType);
+                        applyRules('type', newType, cat, res, newType, triggerValue);
                       };
+
+                      const handleCatChange = (newCat) => {
+                        setCat(newCat);
+                        applyRules('category', newCat, newCat, res, type, triggerValue);
+                      };
+
+                      const handleResChange = (newRes) => {
+                        setRes(newRes);
+                        const autoCat = calculateCategory(newRes);
+                        if (autoCat) setCat(autoCat);
+                        applyRules('classification', newRes, autoCat || cat, newRes, type, triggerValue);
+                      };
+
+                      const clearAll = () => {
+                        setCat(''); setRes(''); setType(''); setVerd(''); setTriggerValue(''); setLastAutoFilledText('');
+                      };
+
                       const [saving, setSaving] = React.useState(false);
                       const rc = resColorMap[res] || 'slate';
 
@@ -352,7 +409,8 @@ export default function SessionsTab({
                         }
 
                         setSaving(true);
-                        const newJudgmentObj = { category: cat, type, result: res, fullVerdict: verd, isFinal: final, recordedAt: new Date().toISOString().split('T')[0] };
+                        const isFinal = (cat === 'حكم نهائي');
+                        const newJudgmentObj = { category: cat, type, result: res, fullVerdict: verd, isFinal: isFinal, recordedAt: new Date().toISOString().split('T')[0] };
                         const newSessions = [...caseData.sessions];
                         newSessions[idx] = { ...newSessions[idx], judgment: newJudgmentObj, shortJudgment: type, judgmentClassification: res, verdict: verd, hasJudgment: true };
 
@@ -390,7 +448,7 @@ export default function SessionsTab({
                             </div>
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-[10px] font-black text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">⚖️ حكم مسجل</span>
-                              {final && <span className="text-[9px] font-black px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">نهائي</span>}
+                              {(cat === 'حكم نهائي' || j.isFinal || j._isFinal) && <span className="text-[9px] font-black px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">نهائي</span>}
                               {res && <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border bg-${rc}-50 text-${rc}-700 border-${rc}-200 mr-auto`}>{res}</span>}
                             </div>
                             <div className="grid grid-cols-2 gap-3 text-xs mb-1">
@@ -413,49 +471,73 @@ export default function SessionsTab({
 
                       return (
                         <div className="flex flex-col gap-2 bg-rose-50/60 p-3 rounded-xl border border-rose-100 mt-1 shadow-sm">
+                          {!(caseData['الصفة'] || caseData['صفة'])?.trim() && (
+                            <div className="bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded-lg text-[10px] font-bold flex items-center gap-2 mb-1 shadow-sm">
+                              <span>⚠️</span>
+                              <span>يرجى تحديد "صفة الموكل" في بيانات الدعوى لضمان عمل التعبئة التلقائية.</span>
+                            </div>
+                          )}
                           <div className="flex items-center justify-between mb-0.5">
-                            <span className="text-[10px] font-black text-rose-700">⚖️ بيانات الحكم</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black text-rose-700">⚖️ بيانات الحكم</span>
+                              <button onClick={clearAll} className="text-[9px] font-bold text-slate-400 hover:text-rose-600 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-200 hover:border-rose-200 transition shadow-sm" title="تفريغ الحقول">
+                                🧹 مسح الكل
+                              </button>
+                            </div>
                             {res && <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border bg-${rc}-50 text-${rc}-700 border-${rc}-200`}>{res}</span>}
                           </div>
-                          <div className="mb-2">
-                            <label className="text-[9px] font-bold text-slate-500 block mb-0.5">نوع الحكم</label>
+                          
+                          {/* Trigger Field */}
+                          <div className="mb-2 p-2 bg-indigo-50/50 rounded-lg border border-indigo-100">
+                            <label className="text-[9px] font-bold text-indigo-700 block mb-0.5 flex justify-between">
+                              <span>🎯 مُحفز التعبئة التلقائية (اختياري)</span>
+                            </label>
+                            <input
+                              list="trigger-options"
+                              value={triggerValue}
+                              onChange={e => handleTriggerChange(e.target.value)}
+                              placeholder="اختر أو اكتب الكلمة المفتاحية لاستدعاء القاعدة..."
+                              className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-indigo-200 focus:outline-none focus:border-indigo-400"
+                            />
+                            <datalist id="trigger-options">
+                              {(settings?.judgmentTypes || ['قبول', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'شطب', 'إلغاء', 'تأييد']).map(t => <option key={t} value={t} />)}
+                            </datalist>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 mb-2">
                             <div>
+                              <label className="text-[9px] font-bold text-slate-500 block mb-0.5">مختصر الحكم</label>
                               <select
                                 value={type}
                                 onChange={e => handleTypeChange(e.target.value)}
                                 className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400"
                               >
-                                <option value="">-- اختر نوع الحكم --</option>
-                                {(settings?.judgmentTypes || ['قبول', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'شطب', 'إلغاء', 'تأييد']).map(t => <option key={t} value={t}>{t}</option>)}
-                              </select>
-
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 mb-2">
-                            <div>
-                              <label className="text-[9px] font-bold text-slate-500 block mb-0.5">فئة الحكم</label>
-                              <select value={cat} onChange={e => { setCat(e.target.value); }} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
                                 <option value="">-- اختر --</option>
-                                {(settings?.judgmentCategories || []).map(c => <option key={c} value={c}>{c}</option>)}
+                                {(settings?.judgmentTypes || ['قبول', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'شطب', 'إلغاء', 'تأييد']).map(t => <option key={t} value={t}>{t}</option>)}
                               </select>
                             </div>
                             <div>
                               <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تصنيف الحكم</label>
-                              <select value={res} onChange={e => { setRes(e.target.value); }} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
+                              <select value={res} onChange={e => handleResChange(e.target.value)} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
                                 <option value="">-- اختر --</option>
-                                {(settings?.judgmentClassifications || []).map(r => <option key={r} value={r}>{r}</option>)}
+                                {(settings?.judgmentClassifications?.length ? settings.judgmentClassifications : ['صالح', 'ضد', 'مختلط', 'تمهيدي']).map(r => <option key={r} value={r}>{r}</option>)}
                               </select>
                             </div>
                           </div>
+                          
+                          <div className="mb-2">
+                            <label className="text-[9px] font-bold text-slate-500 block mb-0.5">فئة الحكم</label>
+                            <select value={cat} onChange={e => handleCatChange(e.target.value)} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
+                              <option value="">-- اختر فئة الحكم --</option>
+                              {Array.from(new Set([...(settings?.judgmentCategories?.length ? settings.judgmentCategories : ['قرار فحص', 'حكم نهائي', 'حكم إجرائي', 'حكم منه للخصومة'])])).map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                          </div>
+
                           <div>
                             <label className="text-[9px] font-bold text-slate-500 block mb-0.5">منطوق الحكم كاملاً</label>
                             <textarea value={verd} onChange={e => setVerd(e.target.value)} placeholder="أكتب منطوق الحكم كاملاً..." className="w-full text-[10px] font-bold bg-white p-2 rounded-lg border border-rose-200 whitespace-pre-wrap focus:outline-none focus:border-rose-400 resize-none min-h-[50px]" rows={2} />
                           </div>
-                          <div className="flex items-center justify-between pt-1 border-t border-rose-100 mt-2">
-                            <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer">
-                              <input type="checkbox" checked={final} onChange={e => setFinal(e.target.checked)} className="rounded accent-rose-600" />
-                              حكم نهائي في الدعوى
-                            </label>
+                          <div className="flex items-center justify-end pt-1 border-t border-rose-100 mt-2">
                             <div className="flex gap-2">
                               <button onClick={() => {
                                 if (session.hasJudgment) setIsEditing(false);

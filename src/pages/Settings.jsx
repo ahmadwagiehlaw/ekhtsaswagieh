@@ -11,18 +11,16 @@ import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Pl
 import * as XLSX from 'xlsx';
 import { useUI } from '../context/UIContext';
 import JudgmentRulesSection from '../components/JudgmentRulesSection';
+import SettingsDeadlinesSection from '../components/settings/SettingsDeadlinesSection';
+import SettingsStatsMappingSection from '../components/settings/SettingsStatsMappingSection';
+import { DEFAULT_STATS_MAP } from '../utils/statsMapping';
 
 export default function Settings() {
   const { cases, schema, deleteAllCases, saveBatchCasesToFirebase, saveSchemaToFirebase, isAdmin, logoutAdmin, settings, saveSettingsToFirebase } = useAppContext();
   const { userData, login, currentUser } = useAuth();
   const { toast, showConfirm, showPrompt } = useUI();
 
-  const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
-  const fileInputRef = useRef(null);
-
   // Sync state
-  const [syncData, setSyncData] = useState(null); // { added: [], updated: [], kept: [] }
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Schema state
@@ -88,8 +86,8 @@ export default function Settings() {
   };
 
   const [localJudgmentDefaults, setLocalJudgmentDefaults] = useState((settings?.judgmentDefaults || []).map(migrateJudgmentRule));
-  const [localJudgmentCategories, setLocalJudgmentCategories] = useState(settings?.judgmentCategories || ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي']);
-  const [localJudgmentClassifications, setLocalJudgmentClassifications] = useState(settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'وقف جزائي', 'اعتبار', 'خبراء']);
+  const [localJudgmentCategories, setLocalJudgmentCategories] = useState(settings?.judgmentCategories || ['قرار فحص', 'حكم نهائي', 'حكم إجرائي', 'حكم منه للخصومة']);
+  const [localJudgmentClassifications, setLocalJudgmentClassifications] = useState(settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'تمهيدي']);
   const [localJudgmentTypes, setLocalJudgmentTypes] = useState(settings?.judgmentTypes || [
     'قبول', 'إلغاء', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'شطب', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'إحالة', 'إحالة للخبراء'
   ]);
@@ -103,8 +101,8 @@ export default function Settings() {
   const [localMemoCalculationMode, setLocalMemoCalculationMode] = useState(settings?.memoCalculationMode || 'session_date');
   const [localScratchpadPosition, setLocalScratchpadPosition] = useState(settings?.scratchpadPosition || 'right');
   const [localSearchTabPosition, setLocalSearchTabPosition] = useState(settings?.searchTabPosition || 'right');
-    const backupInputRef = useRef(null);
-  const [backupRestoreStatus, setBackupRestoreStatus] = useState(null); // { type: 'success'|'error'|'preview', data: ... }
+  const [localStatsMapping, setLocalStatsMapping] = useState(settings?.statsMapping?.length ? settings.statsMapping : [...DEFAULT_STATS_MAP]);
+  
 
   // Sync settings when loaded
   React.useEffect(() => {
@@ -115,14 +113,15 @@ export default function Settings() {
     setLocalFileLocations(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
     setLocalCommonProcedures(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
     setLocalCaseClassifications(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
-    setLocalJudgmentCategories(settings?.judgmentCategories || ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي']);
-    setLocalJudgmentClassifications(settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء']);
+    setLocalJudgmentCategories(settings?.judgmentCategories || ['قرار فحص', 'حكم نهائي', 'حكم إجرائي', 'حكم منه للخصومة']);
+    setLocalJudgmentClassifications(settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'تمهيدي']);
     setLocalJudgmentTypes(settings?.judgmentTypes || ['قبول', 'إلغاء', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'شطب', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'إحالة', 'إحالة للخبراء']);
         
     setLocalDeadlineRules(settings?.deadlineRules || [
       { name: 'الطعن العادي', days: 60, targetRole: 'طاعنين', description: 'ميعاد الطعن العادي 60 يوماً' },
       { name: 'تعجيل من الوقف الجزائي', days: 15, triggerAfterDays: 30, targetRole: 'طاعنين', description: 'يجب التعجيل خلال 15 يوماً بعد مرور شهر من الوقف' }
     ]);
+    setLocalStatsMapping(settings?.statsMapping?.length ? settings.statsMapping : [...DEFAULT_STATS_MAP]);
   }, [settings]);
 
   const handleSaveSettings = async () => {
@@ -147,7 +146,8 @@ export default function Settings() {
       deadlineRules: localDeadlineRules,
       memoCalculationMode: localMemoCalculationMode,
       scratchpadPosition: localScratchpadPosition,
-      searchTabPosition: localSearchTabPosition
+      searchTabPosition: localSearchTabPosition,
+      statsMapping: localStatsMapping,
     });
     setIsProcessing(false);
     toast('تم حفظ الإعدادات المتقدمة بنجاح', 'success');
@@ -155,16 +155,7 @@ export default function Settings() {
 
   
   
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (loginAdmin(password)) {
-      setLoginError('');
-      setPassword('');
-      setLocalSchema(schema);
-    } else {
-      setLoginError('كلمة المرور غير صحيحة');
-    }
-  };
+
 
   const sanitizeId = (str) => String(str).replace(/[\/\\?%*:|"<>\s]/g, '_');
 
@@ -211,25 +202,13 @@ export default function Settings() {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
         <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-200 w-full max-w-sm text-center space-y-6">
-          <div className="w-16 h-16 bg-navy-50 rounded-2xl mx-auto flex items-center justify-center">
-            <ShieldCheck className="w-8 h-8 text-navy-900" />
+          <div className="w-16 h-16 bg-rose-50 rounded-2xl mx-auto flex items-center justify-center">
+            <ShieldAlert className="w-8 h-8 text-rose-600" />
           </div>
           <div>
-            <h2 className="text-xl font-black text-navy-900">تسجيل دخول الإدارة</h2>
+            <h2 className="text-xl font-black text-navy-900">غير مصرح لك بالدخول</h2>
+            <p className="text-xs font-bold text-slate-500 mt-2">هذه الصفحة مخصصة لمدير النظام فقط.</p>
           </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="كلمة المرور..."
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-center text-sm font-bold focus:outline-none focus:border-navy-900"
-              />
-              {loginError && <p className="text-rose-500 text-[11px] font-bold mt-2">{loginError}</p>}
-            </div>
-            <button type="submit" className="w-full bg-navy-900 hover:bg-navy-800 text-amber-300 font-bold py-3 rounded-xl">دخول</button>
-          </form>
         </div>
       </div>
     );
@@ -255,13 +234,14 @@ export default function Settings() {
 
       {/* Tabs */}
       <div className="flex bg-slate-200/50 p-1 rounded-xl flex-wrap">
-        <button onClick={() => setActiveTab('other')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'other' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚙️ الإعدادات الأساسية</button>
+        <button onClick={() => setActiveTab('other')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'other' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚙️ عام</button>
         <button onClick={() => setActiveTab('judgments')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'judgments' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⚖️ الجلسات والأحكام</button>
         <button onClick={() => setActiveTab('lists')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'lists' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>📁 قوائم النظام</button>
-        <button onClick={() => setActiveTab('deadlines')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'deadlines' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>⏰ المواعيد</button>
+        <button onClick={() => setActiveTab('stats')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'stats' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>📊 محرك الإحصائيات</button>
         <button onClick={() => setActiveTab('schema')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'schema' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🧩 هيكلة الحقول</button>
         <button onClick={() => setActiveTab('data')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'data' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🛡️ بيانات ونسخ</button>
         <button onClick={() => setActiveTab('print')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'print' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>🖨️ الطباعة</button>
+        <button onClick={() => setActiveTab('users')} className={`flex-1 min-w-[80px] text-[11px] sm:text-xs font-bold py-2 rounded-lg transition ${activeTab === 'users' ? 'bg-white shadow text-navy-900' : 'text-slate-500'}`}>👥 المستخدمون</button>
       </div>
 
       {/* PRINT TAB */}
@@ -373,305 +353,41 @@ export default function Settings() {
         </div>
       )}
 
-      {/* DATA TAB: Sync + Backup merged */}
-      {activeTab === 'data' && (
-        <div className="space-y-4 animate-in fade-in zoom-in duration-300">
+      {/* DATA TAB */}
+      {activeTab === 'data' && <SettingsDataTab />}
 
-          {/* Smart Sync Section */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-              <Database className="w-5 h-5 text-navy-900" />
-              <h3 className="font-black text-sm text-navy-900">مزامنة البيانات من Excel (Smart Sync)</h3>
-            </div>
-            <p className="text-[11px] font-bold text-slate-500">استيراد ملف إكسيل ودمجه بذكاء مع البيانات الحالية دون حذف أي بيانات موجودة.</p>
+      {/* USERS TAB */}
+      {activeTab === 'users' && <SettingsUsersTab />}
 
-            <input type="file" accept=".xlsx, .xls" ref={fileInputRef} onChange={processExcel} className="hidden" />
+      {/* SYSTEM/OTHER TAB */}
+      {activeTab === 'other' && <SettingsSystemTab />}
 
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => handleDownloadTemplate()} className="flex flex-col items-center gap-2 p-4 border-2 border-emerald-200 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100 text-emerald-700 font-bold rounded-2xl transition">
-                <Download className="w-6 h-6 text-emerald-500" />
-                <span className="text-xs text-center">تحميل قالب إكسيل فارغ</span>
-              </button>
-              
-              <button onClick={() => fileInputRef.current?.click()} disabled={isProcessing} className="flex flex-col items-center gap-2 p-4 border-2 border-dashed border-slate-300 hover:border-navy-900 hover:bg-slate-50 text-slate-600 font-bold rounded-2xl transition">
-                {isProcessing ? (
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-navy-900"></div>
-                ) : (
-                  <>
-                    <Upload className="w-6 h-6 text-amber-500" />
-                    <span className="text-xs text-center">رفع ملف إكسيل للمزامنة</span>
-                  </>
-                )}
-              </button>
-            </div>
+      {/* DEADLINES TAB CONTENT WAS MOVED TO JUDGMENTS */}
 
-            {syncData && syncData.ready && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-4">
-                <h4 className="font-black text-sm text-emerald-900 flex items-center gap-2">
-                  <Check className="w-4 h-4" /> تحليل البيانات جاهز
-                </h4>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-white rounded-lg p-2 shadow-sm border border-emerald-100">
-                    <p className="text-lg font-black text-emerald-600">{syncData.added}</p>
-                    <p className="text-[10px] font-bold text-slate-500">قضية جديدة</p>
-                  </div>
-                  <div className="bg-white rounded-lg p-2 shadow-sm border border-emerald-100">
-                    <p className="text-lg font-black text-blue-600">{syncData.updated}</p>
-                    <p className="text-[10px] font-bold text-slate-500">تم تحديثها</p>
-                  </div>
-                  <div className="bg-white rounded-lg p-2 shadow-sm border border-emerald-100">
-                    <p className="text-lg font-black text-slate-600">{syncData.kept}</p>
-                    <p className="text-[10px] font-bold text-slate-500">بدون تغيير</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setSyncData(null)} className="flex-1 bg-white border border-slate-200 py-2 rounded-xl text-xs font-bold">إلغاء</button>
-                  <button onClick={confirmSync} className="flex-[2] bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs shadow-sm">حفظ ومزامنة</button>
-                </div>
+      {/* STATS MAPPING TAB */}
+      {activeTab === 'stats' && (
+        <div className="space-y-5 animate-in fade-in zoom-in duration-300">
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-5 pb-4 border-b border-slate-100">
+              <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <span className="text-base">📊</span>
               </div>
-            )}
-          </div>
-
-          {/* Audit Logs Section */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-              <Activity className="w-5 h-5 text-indigo-600" />
-              <h3 className="font-black text-sm text-navy-900">سجل النشاطات (مراقبة الموظفين)</h3>
-            </div>
-            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
-              تتبع جميع عمليات الإضافة والتعديل والحذف التي يقوم بها الموظفون داخل التطبيق مع تسجيل الوقت والتفاصيل.
-            </p>
-            <div className="mt-4">
-              <Link 
-                to="/audit-logs" 
-                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 border-2 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 transition rounded-xl px-4 py-3 font-black text-xs"
-              >
-                <Activity className="w-4 h-4" />
-                فتح سجل النشاطات
-              </Link>
-            </div>
-          </div>
-
-          {/* Export Section */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-              <Download className="w-5 h-5 text-emerald-600" />
-              <h3 className="font-black text-sm text-navy-900">تصدير نسخة احتياطية</h3>
-            </div>
-            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
-              تصدير نسخة احتياطية شاملة (قضايا، جلسات، مرفقات، إجراءات، إعدادات) بصيغة JSON أو Excel.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={handleExportBackup}
-                className="flex flex-col items-center gap-2 p-4 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 hover:border-emerald-400 rounded-2xl transition group"
-              >
-                <div className="w-10 h-10 bg-emerald-100 group-hover:bg-emerald-200 rounded-xl flex items-center justify-center transition">
-                  <FileJson className="w-5 h-5 text-emerald-700" />
-                </div>
-                <span className="text-xs font-black text-emerald-800">JSON شامل</span>
-                <span className="text-[10px] font-bold text-emerald-600 text-center">كل البيانات + الإعدادات</span>
-              </button>
-              <button
-                onClick={handleExportExcel}
-                className="flex flex-col items-center gap-2 p-4 bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 hover:border-blue-400 rounded-2xl transition group"
-              >
-                <div className="w-10 h-10 bg-blue-100 group-hover:bg-blue-200 rounded-xl flex items-center justify-center transition">
-                  <Download className="w-5 h-5 text-blue-700" />
-                </div>
-                <span className="text-xs font-black text-blue-800">Excel مبسط</span>
-                <span className="text-[10px] font-bold text-blue-600 text-center">البيانات الأساسية فقط</span>
-              </button>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-              <p className="text-[11px] font-bold text-slate-600">
-                📊 إجمالي البيانات الحالية: <span className="text-navy-900 font-black">{cases.length} قضية</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Import/Restore Section */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-              <ArrowUpFromLine className="w-5 h-5 text-amber-600" />
-              <h3 className="font-black text-sm text-navy-900">استعادة من نسخة احتياطية</h3>
-            </div>
-            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
-              استعد بيانات كاملة من ملف JSON تم تصديره سابقاً. سيتم دمج البيانات بذكاء مع البيانات الحالية.
-            </p>
-
-            <input type="file" accept=".json" ref={backupInputRef} onChange={handleImportBackup} className="hidden" />
-
-            {!backupRestoreStatus && (
-              <button
-                onClick={() => backupInputRef.current?.click()}
-                disabled={isProcessing}
-                className="w-full border-2 border-dashed border-amber-300 hover:border-amber-500 hover:bg-amber-50 text-slate-600 font-bold py-5 rounded-2xl flex flex-col items-center justify-center gap-2 transition"
-              >
-                <ArrowUpFromLine className="w-7 h-7 text-amber-500" />
-                <span className="text-sm">اختر ملف النسخة الاحتياطية (.json)</span>
-              </button>
-            )}
-
-            {backupRestoreStatus?.type === 'preview' && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
-                <h4 className="font-black text-sm text-amber-900 flex items-center gap-2">
-                  <Check className="w-4 h-4" /> تم قراءة الملف بنجاح
-                </h4>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-white rounded-lg p-2 border border-amber-100 text-center">
-                    <p className="text-lg font-black text-amber-700">{backupRestoreStatus.casesCount}</p>
-                    <p className="text-[10px] font-bold text-slate-500">قضية في النسخة</p>
-                  </div>
-                  <div className="bg-white rounded-lg p-2 border border-amber-100 text-center">
-                    <p className="text-lg font-black text-navy-900">{cases.length}</p>
-                    <p className="text-[10px] font-bold text-slate-500">قضية حالية</p>
-                  </div>
-                </div>
-                {backupRestoreStatus.exportedAt && (
-                  <p className="text-[10px] font-bold text-slate-500">
-                    تاريخ التصدير: {new Date(backupRestoreStatus.exportedAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                )}
-                <div className="flex gap-2">
-                  <button onClick={() => setBackupRestoreStatus(null)} className="flex-1 bg-white border border-slate-200 py-2 rounded-xl text-xs font-bold">إلغاء</button>
-                  <button onClick={confirmRestoreBackup} disabled={isProcessing} className="flex-[2] bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 rounded-xl text-xs shadow-sm disabled:opacity-50">
-                    {isProcessing ? 'جاري الاستعادة...' : '✅ تأكيد الاستعادة'}
-                  </button>
-                </div>
+              <div>
+                <h3 className="font-black text-sm text-navy-900">محرك ربط الإحصائيات</h3>
+                <p className="text-[10px] font-bold text-slate-500">تحكم كامل في كيفية حساب كل تصنيف حكم في لوحة القيادة</p>
               </div>
-            )}
-
-            {backupRestoreStatus?.type === 'success' && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center space-y-2">
-                <p className="text-2xl">✅</p>
-                <p className="font-black text-emerald-800">تمت الاستعادة بنجاح!</p>
-                <p className="text-[11px] font-bold text-emerald-600">تم استعادة {backupRestoreStatus.casesCount} قضية</p>
-                <button onClick={() => setBackupRestoreStatus(null)} className="text-xs font-bold text-emerald-700 underline">إغلاق</button>
-              </div>
-            )}
+            </div>
+            <SettingsStatsMappingSection mapping={localStatsMapping} setMapping={setLocalStatsMapping} />
+          </div>
+          <div className="pt-2">
+            <button onClick={handleSaveSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm hover:bg-navy-800 transition disabled:opacity-50">
+              {isProcessing ? 'جاري الحفظ...' : '💾 حفظ إعدادات محرك الإحصائيات'}
+            </button>
           </div>
         </div>
       )}
 
-      {/* DEADLINES TAB */}
-      {activeTab === 'deadlines' && (
-        <details className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-0 animate-in fade-in zoom-in duration-300">
-          <summary className="flex items-center justify-between pb-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-slate-100 transition-colors">
-            <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-rose-600" />
-              <h3 className="font-black text-sm text-navy-900"><span className="text-[12px] opacity-70 group-open:hidden ml-1">▼</span><span className="text-[12px] opacity-70 hidden group-open:inline ml-1">▲</span> محرك قواعد المواعيد الإجرائية</h3>
-            </div>
-            <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}><button
-              onClick={() => {
-                setLocalDeadlineRules([...localDeadlineRules, { name: 'قاعدة جديدة', days: 30, targetRole: 'طاعنين', description: '' }]);
-              }}
-              className="bg-amber-100 text-amber-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-amber-200"
-            >
-              <Plus className="w-4 h-4" /> إضافة قاعدة
-            </button></div></summary>
-          <div className="pt-2 space-y-4">
 
-            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
-              تتحكم هذه القواعد في التنبيهات التي تظهر في لوحة القيادة. إذا كانت القاعدة مرتبطة بـ "الطعن" سيتم حسابها من تاريخ الحكم. وإذا كانت مرتبطة بـ "وقف جزائي" سيتم حسابها من تاريخ الجلسة بعد انقضاء مدة الوقف.
-            </p>
-
-            <div className="space-y-3">
-              {localDeadlineRules.map((rule, idx) => (
-                <div key={idx} className="flex flex-col sm:flex-row gap-2 bg-slate-50 p-4 rounded-xl border border-slate-200 items-start sm:items-center">
-                  <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[9px] text-slate-500 font-bold block mb-1">اسم القاعدة (مثال: الطعن، وقف جزائي)</label>
-                      <input
-                        type="text"
-                        value={rule.name}
-                        onChange={e => {
-                          const newRules = [...localDeadlineRules];
-                          newRules[idx].name = e.target.value;
-                          setLocalDeadlineRules(newRules);
-                        }}
-                        className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 focus:border-rose-400 focus:ring-1 focus:ring-rose-400 outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9px] text-slate-500 font-bold block mb-1">صفة المصلحة الموجهة لها التنبيه</label>
-                      <select
-                        value={rule.targetRole || 'طاعنين'}
-                        onChange={e => {
-                          const newRules = [...localDeadlineRules];
-                          newRules[idx].targetRole = e.target.value;
-                          setLocalDeadlineRules(newRules);
-                        }}
-                        className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 focus:border-rose-400 focus:ring-1 focus:ring-rose-400 outline-none"
-                      >
-                        <option value="طاعنين">الطاعن / المدعي</option>
-                        <option value="مطعون ضدنا">المطعون ضده / المدعى عليه</option>
-                      </select>
-                    </div>
-                    <div className="flex gap-2">
-                      {rule.name.includes('وقف') && (
-                        <div className="flex-1">
-                          <label className="text-[9px] text-slate-500 font-bold block mb-1">تفعيل بعد (يوم)</label>
-                          <input
-                            type="number"
-                            value={rule.triggerAfterDays || 30}
-                            onChange={e => {
-                              const newRules = [...localDeadlineRules];
-                              newRules[idx].triggerAfterDays = e.target.value;
-                              setLocalDeadlineRules(newRules);
-                            }}
-                            className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 outline-none"
-                          />
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <label className="text-[9px] text-slate-500 font-bold block mb-1">المهلة (يوم)</label>
-                        <input
-                          type="number"
-                          value={rule.days}
-                          onChange={e => {
-                            const newRules = [...localDeadlineRules];
-                            newRules[idx].days = e.target.value;
-                            setLocalDeadlineRules(newRules);
-                          }}
-                          className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 outline-none"
-                        />
-                      </div>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="text-[9px] text-slate-500 font-bold block mb-1">وصف الميعاد</label>
-                      <input
-                        type="text"
-                        value={rule.description || ''}
-                        onChange={e => {
-                          const newRules = [...localDeadlineRules];
-                          newRules[idx].description = e.target.value;
-                          setLocalDeadlineRules(newRules);
-                        }}
-                        className="w-full text-xs font-bold p-2 rounded-lg border border-slate-300 outline-none"
-                      />
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setLocalDeadlineRules(localDeadlineRules.filter((_, i) => i !== idx))}
-                    className="p-2 text-rose-500 hover:bg-rose-100 rounded-lg transition self-end sm:self-auto mt-2 sm:mt-0"
-                    title="حذف"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="pt-3 border-t border-slate-100">
-              <button onClick={handleSaveSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm">
-                {isProcessing ? 'جاري الحفظ...' : 'حفظ المواعيد'}
-              </button>
-            </div>
-
-          </div>
-        </details>
-      )}
 
       {/* SCHEMA TAB */}
       {activeTab === 'schema' && (
@@ -739,9 +455,7 @@ export default function Settings() {
         </details>
       )}
 
-      {/* OTHER TAB */}
-      {activeTab === 'other' && <SettingsSystemTab />}
-{/* LISTS TAB */}
+      {/* LISTS TAB */}
       {activeTab === 'lists' && (
         <div className="space-y-6 animate-in fade-in zoom-in duration-300">
           {/* Core Field Options Management */}
@@ -888,6 +602,12 @@ export default function Settings() {
       {/* JUDGMENTS TAB */}
       {activeTab === 'judgments' && (
         <div className="space-y-6 animate-in fade-in zoom-in duration-300">
+          <SettingsDeadlinesSection 
+            localDeadlineRules={localDeadlineRules}
+            setLocalDeadlineRules={setLocalDeadlineRules}
+            handleSaveSettings={handleSaveSettings}
+            isProcessing={isProcessing}
+          />
           {/* Default Judgment Settings Management */}
           <JudgmentRulesSection 
             localJudgmentDefaults={localJudgmentDefaults}

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, updatePassword } from 'firebase/auth';
 import { auth, db, USERS_DIRECTORY_REF } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -76,13 +76,19 @@ export const AuthProvider = ({ children }) => {
     return userCredential;
   };
 
+  const changePassword = async (newPassword) => {
+    if (!currentUser) throw new Error("No user logged in");
+    return updatePassword(currentUser, newPassword);
+  };
+
   const value = {
     currentUser,
     userData,
     loading,
     login,
     logout,
-    signup
+    signup,
+    changePassword
   };
 
   return (
