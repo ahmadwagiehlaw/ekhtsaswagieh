@@ -353,7 +353,6 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
       type: currentData._type,
       sessionType: currentData._sessionType,
       decision: currentData._decision,
-      trigger: currentData._trigger,
       text: currentData._verdict
     };
     

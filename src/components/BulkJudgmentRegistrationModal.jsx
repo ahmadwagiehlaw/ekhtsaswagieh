@@ -51,7 +51,6 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
       type: currentData._type,
       sessionType: currentData._sessionType,
       decision: currentData._decision,
-      trigger: currentData._trigger,
       text: currentData._verdict
     };
     
@@ -198,15 +197,6 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
             </select>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-black text-slate-600 block">🎯 محفز التعبئة التلقائية (اختياري)</label>
-            <input
-              type="text"
-              value={formData._trigger || ''}
-              onChange={e => handleFieldChange('_trigger', e.target.value)}
-              className="w-full text-sm font-bold p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition outline-none"
-            />
-          </div>
           <div className="space-y-1.5">
             <label className="text-xs font-black text-slate-600 block">مختصر الحكم</label>
             <select

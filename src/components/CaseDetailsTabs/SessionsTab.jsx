@@ -1,6 +1,7 @@
 import React from 'react';
 import { CalendarPlus, Scale, MessageSquare, X, FileText, Paperclip, Loader2, BookOpen, Save, Edit3, Trash2 } from 'lucide-react';
 import { formatDateString } from '../../utils/dateUtils';
+import { applyJudgmentDefaultRules } from '../../utils/judgmentRulesEngine';
 
 export default function SessionsTab({
   caseData,
@@ -302,8 +303,6 @@ export default function SessionsTab({
                       const [res, setRes] = React.useState(initialRes);
                       const [type, setType] = React.useState(initialType);
                       const [verd, setVerd] = React.useState(initialVerd);
-                      const [triggerValue, setTriggerValue] = React.useState('');
-
                       const [isEditing, setIsEditing] = React.useState(!session.hasJudgment);
 
                       const [lastAutoFilledText, setLastAutoFilledText] = React.useState('');
@@ -315,7 +314,7 @@ export default function SessionsTab({
                         return '';
                       };
 
-                      const applyRules = (changedField, newValue, currentCat, currentRes, currentType, currentTrigger) => {
+                      const applyRules = (changedField, newValue, currentCat, currentRes, currentType) => {
                         if (!settings?.judgmentDefaults?.length) return;
                         
                         const engineInput = {
@@ -325,8 +324,7 @@ export default function SessionsTab({
                            type: changedField === 'type' ? newValue : currentType,
                            sessionType: session.type,
                            decision: session.decision,
-                           trigger: changedField === 'trigger' ? newValue : currentTrigger,
-                           text: verd // passing current text if needed
+                                                      text: verd // passing current text if needed
                         };
                         
                         const engineOutput = applyJudgmentDefaultRules(engineInput, settings.judgmentDefaults);
@@ -354,30 +352,25 @@ export default function SessionsTab({
                         }
                       };
 
-                      const handleTriggerChange = (newTrigger) => {
-                        setTriggerValue(newTrigger);
-                        applyRules('trigger', newTrigger, cat, res, type, newTrigger);
-                      };
-
                       const handleTypeChange = (newType) => {
                         setType(newType);
-                        applyRules('type', newType, cat, res, newType, triggerValue);
+                        applyRules('type', newType, cat, res, newType);
                       };
 
                       const handleCatChange = (newCat) => {
                         setCat(newCat);
-                        applyRules('category', newCat, newCat, res, type, triggerValue);
+                        applyRules('category', newCat, newCat, res, type);
                       };
 
                       const handleResChange = (newRes) => {
                         setRes(newRes);
                         const autoCat = calculateCategory(newRes);
                         if (autoCat) setCat(autoCat);
-                        applyRules('classification', newRes, autoCat || cat, newRes, type, triggerValue);
+                        applyRules('classification', newRes, autoCat || cat, newRes, type);
                       };
 
                       const clearAll = () => {
-                        setCat(''); setRes(''); setType(''); setVerd(''); setTriggerValue(''); setLastAutoFilledText('');
+                        setCat(''); setRes(''); setType(''); setVerd(''); setLastAutoFilledText('');
                       };
 
                       const [saving, setSaving] = React.useState(false);
@@ -473,22 +466,7 @@ export default function SessionsTab({
                             {res && <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border bg-${rc}-50 text-${rc}-700 border-${rc}-200`}>{res}</span>}
                           </div>
                           
-                          {/* Trigger Field */}
-                          <div className="mb-2 p-2 bg-indigo-50/50 rounded-lg border border-indigo-100">
-                            <label className="text-[9px] font-bold text-indigo-700 block mb-0.5 flex justify-between">
-                              <span>🎯 مُحفز التعبئة التلقائية (اختياري)</span>
-                            </label>
-                            <input
-                              list="trigger-options"
-                              value={triggerValue}
-                              onChange={e => handleTriggerChange(e.target.value)}
-                              placeholder="اختر أو اكتب الكلمة المفتاحية لاستدعاء القاعدة..."
-                              className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-indigo-200 focus:outline-none focus:border-indigo-400"
-                            />
-                            <datalist id="trigger-options">
-                              {(settings?.judgmentTypes || ['قبول', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'شطب', 'إلغاء', 'تأييد']).map(t => <option key={t} value={t} />)}
-                            </datalist>
-                          </div>
+                          
 
                           <div className="grid grid-cols-2 gap-2 mb-2">
                             <div>

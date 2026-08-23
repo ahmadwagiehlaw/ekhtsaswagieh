@@ -296,7 +296,6 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
          type: newData['_judgmentType'],
          sessionType: newData['نوع الجلسة'],
          decision: newData['القرار'],
-         trigger: newData['_trigger'],
          text: newData['منطوق الحكم']
        };
        const engineOutput = applyJudgmentDefaultRules(engineInput, settings.judgmentDefaults);
@@ -742,13 +741,6 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                               {JUDGMENT_RESULTS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                             </select>
                           </div>
-                          <input
-                            type="text"
-                            placeholder="🎯 محفز التعبئة التلقائية (اختياري)"
-                            value={editData['_trigger'] || ''}
-                            onChange={e => setEditData({...editData, '_trigger': e.target.value})}
-                            className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
-                          />
                           {/* Row 2: Type */}
                           <select
                             value={editData['_judgmentType'] || ''}

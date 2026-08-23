@@ -308,21 +308,6 @@ export default function JudgmentRulesSection({
                             </div>
 
                             <div>
-                              <label className="text-[9px] font-bold text-slate-500 block mb-1 text-indigo-600">المُحفز (الكلمة المفتاحية)</label>
-                              <input
-                                type="text"
-                                placeholder="مثال: حكمت المحكمة..."
-                                value={rule.conditions?.keyword || ''}
-                                onChange={(e) => {
-                                  const newRules = [...localJudgmentDefaults];
-                                  if (!newRules[idx].conditions) newRules[idx].conditions = {};
-                                  newRules[idx].conditions.keyword = e.target.value;
-                                  setLocalJudgmentDefaults(newRules);
-                                }}
-                                className="w-full text-[10px] font-bold p-1.5 rounded-md border border-indigo-200 focus:border-indigo-400 outline-none"
-                              />
-                            </div>
-                            <div>
                               <label className="text-[9px] font-bold text-slate-500 block mb-1">نوع الحكم (مختصر)</label>
                               <select
                                 value={rule.conditions?.type || ''}

@@ -20,13 +20,9 @@ export function applyJudgmentDefaultRules(currentValues, judgmentDefaults) {
     const sessionTypeMatch = !conds.sessionType || newData.sessionType === conds.sessionType;
     const decisionMatch = !conds.decision || newData.decision === conds.decision;
     
-    // keyword matches the trigger field (or fallback to decision/text if trigger isn't explicitly provided)
-    const triggerToSearch = newData.trigger || newData.decision || newData.text || '';
-    const keywordMatch = !conds.keyword || triggerToSearch.includes(conds.keyword);
-    
-    const hasConditions = conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision || conds.keyword;
+    const hasConditions = conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision;
 
-    if (hasConditions && roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch && keywordMatch) {
+    if (hasConditions && roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch) {
       const acts = rule.actions || {};
       
       if (acts.category && !newData.category) newData.category = acts.category;
