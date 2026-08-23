@@ -16,18 +16,18 @@
  *  ignore       → لا يُحسب إطلاقاً في الإحصائيات
  */
 export const DEFAULT_STATS_MAP = [
-  { value: 'صالح',               impact: 'good',          color: '#10b981', label: 'أحكام لصالحنا',       countsInPerformance: true  },
-  { value: 'ضد',                  impact: 'bad',           color: '#ef4444', label: 'أحكام ضدنا',           countsInPerformance: true  },
-  { value: 'مختلط',              impact: 'mixed',          color: '#3b82f6', label: 'أحكام مختلطة',         countsInPerformance: true  },
-  { value: 'وقف جزائي',          impact: 'stop',          color: '#f97316', label: 'وقف جزائي',            countsInPerformance: false },
-  { value: 'وقف والدولة مدعية', impact: 'stop',          color: '#f97316', label: 'وقف (الدولة مدعية)',   countsInPerformance: false },
-  { value: 'اعتبار',             impact: 'consideration', color: '#eab308', label: 'اعتبار كأن لم تكن',    countsInPerformance: false },
-  { value: 'اعتبار كأن لم تكن', impact: 'consideration', color: '#8b5cf6', label: 'اعتبار كأن لم تكن',    countsInPerformance: false },
-  { value: 'تمهيدي',             impact: 'procedural',    color: '#06b6d4', label: 'أحكام تمهيدية',        countsInPerformance: false },
-  { value: 'حكم منه للخصومة',   impact: 'procedural',    color: '#22c55e', label: 'منه للخصومة',          countsInPerformance: false },
-  { value: 'حكم غير منه للخصومة', impact: 'procedural', color: '#64748b', label: 'غير منه للخصومة',      countsInPerformance: false },
-  { value: 'لا شأن لنا بالحكم', impact: 'ignore',        color: '#94a3b8', label: 'لا شأن بالحكم',        countsInPerformance: false },
-  { value: 'لا شأن بالحكم',     impact: 'ignore',        color: '#94a3b8', label: 'لا شأن بالحكم',        countsInPerformance: false },
+  { value: 'صالح',               impact: 'good',          color: '#10b981', label: 'أحكام لصالحنا',       countsInPerformance: true  , sourceField: 'تصنيف الحكم', dashboardVisible: true},
+  { value: 'ضد',                  impact: 'bad',           color: '#ef4444', label: 'أحكام ضدنا',           countsInPerformance: true  , sourceField: 'تصنيف الحكم', dashboardVisible: true},
+  { value: 'مختلط',              impact: 'mixed',          color: '#3b82f6', label: 'أحكام مختلطة',         countsInPerformance: true  , sourceField: 'تصنيف الحكم', dashboardVisible: true},
+  { value: 'وقف جزائي',          impact: 'stop',          color: '#f97316', label: 'وقف جزائي',            countsInPerformance: false , sourceField: 'تصنيف الحكم', dashboardVisible: true},
+  { value: 'وقف والدولة مدعية', impact: 'stop',          color: '#f97316', label: 'وقف (الدولة مدعية)',   countsInPerformance: false , sourceField: 'تصنيف الحكم', dashboardVisible: true},
+  { value: 'اعتبار',             impact: 'consideration', color: '#eab308', label: 'اعتبار كأن لم تكن',    countsInPerformance: false , sourceField: 'تصنيف الحكم', dashboardVisible: true},
+  { value: 'اعتبار كأن لم تكن', impact: 'consideration', color: '#8b5cf6', label: 'اعتبار كأن لم تكن',    countsInPerformance: false , sourceField: 'تصنيف الحكم', dashboardVisible: true},
+  { value: 'تمهيدي',             impact: 'procedural',    color: '#06b6d4', label: 'أحكام تمهيدية',        countsInPerformance: false , sourceField: 'تصنيف الحكم', dashboardVisible: true},
+  { value: 'حكم منه للخصومة',   impact: 'procedural',    color: '#22c55e', label: 'منه للخصومة',          countsInPerformance: false , sourceField: 'تصنيف الحكم', dashboardVisible: true},
+  { value: 'حكم غير منه للخصومة', impact: 'procedural', color: '#64748b', label: 'غير منه للخصومة',      countsInPerformance: false , sourceField: 'تصنيف الحكم', dashboardVisible: true},
+  { value: 'لا شأن لنا بالحكم', impact: 'ignore',        color: '#94a3b8', label: 'لا شأن بالحكم',        countsInPerformance: false , sourceField: 'تصنيف الحكم', dashboardVisible: true},
+  { value: 'لا شأن بالحكم',     impact: 'ignore',        color: '#94a3b8', label: 'لا شأن بالحكم',        countsInPerformance: false , sourceField: 'تصنيف الحكم', dashboardVisible: true},
 ];
 
 /**
@@ -85,4 +85,32 @@ export function isCriticalImpact(value, mapping) {
  */
 export function isStopImpact(value, mapping) {
   return resolveImpact(value, mapping) === 'stop';
+}
+
+/**
+ * Evaluates a session against the stats mapping rules top-to-bottom.
+ * Returns the first matched rule.
+ * @param {object} session - The session object to evaluate (can also pass a case object containing target fields)
+ * @param {Array} mapping - The active stats mapping array
+ * @returns {object|null} - The matched rule or null
+ */
+export function evaluateSessionRule(session, mapping) {
+  if (!session || !mapping) return null;
+  for (const rule of mapping) {
+    const field = rule.sourceField || 'تصنيف الحكم';
+    // For backward compatibility, check judgmentClassification if field is تصنيف الحكم
+    let val = session[field];
+    if (field === 'تصنيف الحكم' && session.judgmentClassification) {
+        val = session.judgmentClassification;
+    }
+    // Also check judgment.result if field is الحكم
+    if (field === 'الحكم' && session.judgment && session.judgment.result) {
+        val = session.judgment.result;
+    }
+
+    if (val && String(val).trim() === String(rule.value).trim()) {
+      return rule;
+    }
+  }
+  return null;
 }

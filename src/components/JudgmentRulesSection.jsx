@@ -288,7 +288,7 @@ export default function JudgmentRulesSection({
                         {/* Conditions */}
                         <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                           <p className="text-xs font-black text-indigo-700 mb-3 border-b border-indigo-100 pb-2">شروط التطبيق (متى تُطبق القاعدة؟)</p>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                             <div>
                               <label className="text-[9px] font-bold text-slate-500 block mb-1">الصفة</label>
                               <select
@@ -305,8 +305,24 @@ export default function JudgmentRulesSection({
                                 {localRoles.map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </div>
+
                             <div>
-                              <label className="text-[9px] font-bold text-slate-500 block mb-1">المُحفز / الكلمة المفتاحية</label>
+                              <label className="text-[9px] font-bold text-slate-500 block mb-1 text-indigo-600">المُحفز (الكلمة المفتاحية)</label>
+                              <input
+                                type="text"
+                                placeholder="مثال: حكمت المحكمة..."
+                                value={rule.conditions?.keyword || ''}
+                                onChange={(e) => {
+                                  const newRules = [...localJudgmentDefaults];
+                                  if (!newRules[idx].conditions) newRules[idx].conditions = {};
+                                  newRules[idx].conditions.keyword = e.target.value;
+                                  setLocalJudgmentDefaults(newRules);
+                                }}
+                                className="w-full text-[10px] font-bold p-1.5 rounded-md border border-indigo-200 focus:border-indigo-400 outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-bold text-slate-500 block mb-1">نوع الحكم (مختصر)</label>
                               <select
                                 value={rule.conditions?.type || ''}
                                 onChange={(e) => {
@@ -317,7 +333,7 @@ export default function JudgmentRulesSection({
                                 }}
                                 className="w-full text-[10px] font-bold p-1.5 rounded-md border border-slate-200"
                               >
-                                <option value="">- أي محفز -</option>
+                                <option value="">- أي نوع -</option>
                                 {localJudgmentTypes.map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </div>

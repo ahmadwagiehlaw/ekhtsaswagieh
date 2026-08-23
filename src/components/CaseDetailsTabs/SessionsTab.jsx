@@ -288,7 +288,7 @@ export default function SessionsTab({
                   </div>
 
                   {/* Judgment Fields Block */}
-                  {activeJudgmentSessionIdx === idx && (() => {
+                  {(session.hasJudgment ? activeJudgmentSessionIdx !== idx : activeJudgmentSessionIdx === idx) && (() => {
                     const resColorMap = { 'صالح': 'emerald', 'ضد': 'rose', 'مختلط': 'indigo', 'اعتبار': 'amber', 'وقف جزائي': 'orange', 'وقف تعليقي': 'purple', 'خبراء': 'cyan', 'حكم منه للخصومة': 'amber', 'غير منه للخصومة': 'orange', 'تمهيدي': 'indigo' };
                     const j = session.judgment || {};
 
@@ -330,14 +330,17 @@ export default function SessionsTab({
                           const roleMatch = !conds.role || currentRole.includes(conds.role) || conds.role === currentRole;
                           const catMatch = !conds.category || tempCat === conds.category;
                           const classMatch = !conds.classification || tempRes === conds.classification;
-                          // TRIGGER matching conds.type
-                          const typeMatch = !conds.type || tempTrigger === conds.type;
+                          
+                          // Fix: type matches type, keyword matches trigger
+                          const typeMatch = !conds.type || tempType === conds.type;
+                          const keywordMatch = !conds.keyword || (tempTrigger && tempTrigger.includes(conds.keyword));
+                          
                           const sessionTypeMatch = !conds.sessionType || session.type === conds.sessionType;
                           const decisionMatch = !conds.decision || session.decision === conds.decision;
 
-                          const hasConditions = conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision;
+                          const hasConditions = conds.role || conds.category || conds.classification || conds.type || conds.sessionType || conds.decision || conds.keyword;
 
-                          if (hasConditions && roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch) {
+                          if (hasConditions && roleMatch && catMatch && classMatch && typeMatch && sessionTypeMatch && decisionMatch && keywordMatch) {
                             const acts = rule.actions || {};
                             
                             let newCat = tempCat;

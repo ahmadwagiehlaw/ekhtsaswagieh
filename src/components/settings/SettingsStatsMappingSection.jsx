@@ -16,6 +16,31 @@ const IMPACT_COLORS = Object.fromEntries(IMPACT_OPTIONS.map(o => [o.value, o.col
 
 export default function SettingsStatsMappingSection({ mapping, setMapping }) {
   const [newValue, setNewValue] = useState('');
+  const [draggedIdx, setDraggedIdx] = useState(null);
+
+  const handleDragStart = (e, idx) => {
+    setDraggedIdx(idx);
+    e.dataTransfer.effectAllowed = 'move';
+    // Small hack to ensure drag image is somewhat clean
+    e.dataTransfer.setDragImage(e.target, 20, 20);
+  };
+
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    if (draggedIdx === null || draggedIdx === idx) return;
+    
+    const newMap = [...mapping];
+    const draggedItem = newMap[draggedIdx];
+    newMap.splice(draggedIdx, 1);
+    newMap.splice(idx, 0, draggedItem);
+    
+    setDraggedIdx(idx);
+    setMapping(newMap);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIdx(null);
+  };
 
   const updateEntry = (idx, key, val) => {
     const updated = [...mapping];
@@ -74,11 +99,14 @@ export default function SettingsStatsMappingSection({ mapping, setMapping }) {
       {/* Table */}
       <div className="space-y-2">
         {/* Table Head */}
-        <div className="grid grid-cols-[1fr_1.4fr_40px_80px_28px] gap-2 px-2">
-          <span className="text-[9px] font-black text-slate-400">قيمة التصنيف</span>
+        <div className="grid grid-cols-[15px_1fr_1fr_1.2fr_40px_70px_70px_28px] gap-2 px-2 items-center text-center">
+          <span />
+          <span className="text-[9px] font-black text-slate-400 text-right">قيمة التصنيف</span>
+          <span className="text-[9px] font-black text-slate-400">الحقل المصدر</span>
           <span className="text-[9px] font-black text-slate-400">التأثير الإحصائي</span>
           <span className="text-[9px] font-black text-slate-400">اللون</span>
-          <span className="text-[9px] font-black text-slate-400">في شريط الأداء؟</span>
+          <span className="text-[9px] font-black text-slate-400">شريط الأداء؟</span>
+          <span className="text-[9px] font-black text-slate-400">الداشبورد؟</span>
           <span />
         </div>
 
@@ -88,9 +116,14 @@ export default function SettingsStatsMappingSection({ mapping, setMapping }) {
           return (
             <div
               key={idx}
-              className="grid grid-cols-[1fr_1.4fr_40px_80px_28px] gap-2 items-center bg-white border rounded-xl px-3 py-2 shadow-sm hover:border-indigo-200 transition-all"
+              draggable
+              onDragStart={(e) => handleDragStart(e, idx)}
+              onDragOver={(e) => handleDragOver(e, idx)}
+              onDragEnd={handleDragEnd}
+              className={`grid grid-cols-[15px_1fr_1fr_1.2fr_40px_70px_70px_28px] gap-2 items-center bg-white border rounded-xl px-3 py-2 shadow-sm transition-all ${draggedIdx === idx ? 'opacity-50' : 'hover:border-indigo-200'}`}
               style={{ borderColor: impactColor + '30' }}
             >
+              <div className="cursor-move text-slate-300 hover:text-slate-500 font-black" title="اسحب لترتيب القاعدة">⋮⋮</div>
               {/* Value */}
               <input
                 value={entry.value}
@@ -98,6 +131,20 @@ export default function SettingsStatsMappingSection({ mapping, setMapping }) {
                 className="text-[11px] font-black text-navy-900 bg-transparent outline-none border-b border-transparent focus:border-indigo-300 transition"
                 placeholder="اسم التصنيف"
               />
+
+              {/* Source Field */}
+              <select
+                value={entry.sourceField || 'تصنيف الحكم'}
+                onChange={e => updateEntry(idx, 'sourceField', e.target.value)}
+                className="text-[10px] font-bold rounded-lg border border-slate-200 px-1.5 py-1 outline-none focus:border-indigo-400 bg-slate-50 transition"
+              >
+                <option value="تصنيف الحكم">تصنيف الحكم</option>
+                <option value="فئة الحكم">فئة الحكم</option>
+                <option value="نوع الحكم">نوع الحكم</option>
+                <option value="القرار">القرار</option>
+                <option value="الحكم">الحكم</option>
+                <option value="قرار الجلسة">قرار الجلسة</option>
+              </select>
 
               {/* Impact */}
               <select
@@ -132,6 +179,18 @@ export default function SettingsStatsMappingSection({ mapping, setMapping }) {
                 }`}
               >
                 {entry.countsInPerformance ? '✓ نعم' : '— لا'}
+              </button>
+
+              {/* Dashboard Visible */}
+              <button
+                onClick={() => updateEntry(idx, 'dashboardVisible', entry.dashboardVisible === false ? true : false)}
+                className={`text-[9px] font-black px-2 py-1 rounded-lg border transition-all ${
+                  entry.dashboardVisible !== false
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-300'
+                    : 'bg-slate-50 text-slate-400 border-slate-200'
+                }`}
+              >
+                {entry.dashboardVisible !== false ? '✓ نعم' : '— لا'}
               </button>
 
               {/* Delete */}

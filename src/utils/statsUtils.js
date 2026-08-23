@@ -1,7 +1,7 @@
 import { getSafeDateObj } from './dateUtils';
 import { getSessionDate, getCaseRole, getCaseDecision } from './caseUtils';
 import { isAppellantRole, isAppelleeRole, isNoInterestRole, isOutOfJurisdictionRole } from '../constants/roleHelpers';
-import { getActiveMapping, resolveImpact, isStopImpact } from './statsMapping';
+import { getActiveMapping, resolveImpact, isStopImpact, evaluateSessionRule } from './statsMapping';
 
 function addToJudgments(target, computeAs, mapping, c = null) {
   target.total++;
@@ -253,22 +253,42 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
       judgedCount++;
       judgedCases.push(c);
 
-      if (latestJudgmentSession.hasJudgment) {
-        computeAs = latestJudgmentSession.judgmentClassification || latestJudgmentSession.judgment?.result || 'غير مصنف';
-      } else {
-        const dec = String(latestJudgmentSession.decision || '').trim();
-        if (dec.includes('رفض')) {
-          computeAs = isAppellant ? 'ضد' : isAppellee ? 'صالح' : 'ضد';
-        } else if (dec.includes('قبول')) {
-          computeAs = isAppellant ? 'صالح' : isAppellee ? 'ضد' : 'صالح';
+      // New dynamic rule-based evaluation
+      const evalContext = { ...c, ...(latestJudgmentSession || {}) };
+      let rule = evaluateSessionRule(evalContext, mapping);
+      
+      // Fallback if no rule matches
+      if (!rule) {
+        if (latestJudgmentSession.hasJudgment) {
+          computeAs = latestJudgmentSession.judgmentClassification || latestJudgmentSession.judgment?.result || 'غير محدد';
+        } else {
+          const dec = String(latestJudgmentSession.decision || '').trim();
+          if (dec.includes('صالح')) {
+            computeAs = isAppellant ? 'صالح' : isAppellee ? 'ضد' : 'مختلط';
+          } else if (dec.includes('مرفوض')) {
+            computeAs = isAppellant ? 'ضد' : isAppellee ? 'صالح' : 'مختلط';
+          }
         }
+        rule = mapping.find(m => m.value === computeAs);
+      } else {
+        computeAs = rule.value;
       }
       
-      judgmentsCount[computeAs] = (judgmentsCount[computeAs] || 0) + 1;
+      const impact = rule ? rule.impact : 'procedural';
       
-      const impact = resolveImpact(computeAs, mapping);
-      const mappingEntry = mapping.find(m => m.value === computeAs);
-      const countInPerf = mappingEntry ? mappingEntry.countsInPerformance : false;
+      if (impact === 'ignore') {
+        // completely ignore this case in judgment stats
+        judgedCount--;
+        judgedCases.pop(); // remove from judged array we pushed to earlier
+        return; // skip the rest of the loop for this case
+      }
+      
+      const dashboardVisible = rule ? (rule.dashboardVisible !== false) : true;
+      if (dashboardVisible) {
+        judgmentsCount[computeAs] = (judgmentsCount[computeAs] || 0) + 1;
+      }
+      
+      const countInPerf = rule ? rule.countsInPerformance : false;
       const roleKey = isAppellant ? 'appellant' : 'appellee';
 
       if (countInPerf) {
@@ -332,10 +352,25 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
 
     // ── Critical Judgments (for ongoing cases — session-level detection) ──
     if (!hasHukm) {
-      const hasStopDecision = mapping.filter(m => m.impact === 'stop').some(m => lastDecisionRaw.includes(m.value) || deadlineDecision.includes(m.value));
-      const hasConsideration = mapping.filter(m => m.impact === 'consideration').some(m => lastDecisionRaw.includes(m.value) || deadlineDecision.includes(m.value));
-      if (isAppellant && hasStopDecision)    criticalSuspended.push(c);
-      if (isAppellant && hasConsideration)   criticalConsidered.push(c);
+      const evalContext = { ...c, ...(latestSession || {}) };
+      // Fallback: copy last decision into 'القرار' so rules targeting 'القرار' work on ongoing cases too
+      if (!evalContext['القرار'] && lastDecisionRaw) {
+          evalContext['القرار'] = lastDecisionRaw;
+      }
+      
+      let rule = evaluateSessionRule(evalContext, mapping);
+      const impact = rule ? rule.impact : 'procedural';
+
+      if (isAppellant && impact === 'stop')    criticalSuspended.push(c);
+      if (isAppellant && impact === 'consideration')   criticalConsidered.push(c);
+      
+      // Fallback for substring matching if rule didn't explicitly hit
+      if (impact !== 'stop' && impact !== 'consideration') {
+          const hasStopDecision = mapping.filter(m => m.impact === 'stop').some(m => lastDecisionRaw.includes(m.value) || deadlineDecision.includes(m.value));
+          const hasConsideration = mapping.filter(m => m.impact === 'consideration').some(m => lastDecisionRaw.includes(m.value) || deadlineDecision.includes(m.value));
+          if (isAppellant && hasStopDecision)    criticalSuspended.push(c);
+          if (isAppellant && hasConsideration)   criticalConsidered.push(c);
+      }
     }
 
     // ── القضايا النشطة: cases with FUTURE session date ──────
