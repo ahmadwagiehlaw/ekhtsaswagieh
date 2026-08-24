@@ -111,7 +111,9 @@ export default function BulkViewingTaskModal({ isOpen, onClose, selectedCaseIds,
                 <Camera className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-black">إنشاء مهام إطلاع مجمعة</h3>
+                <h3 className="text-xl font-black">
+                  {selectedCaseIds && selectedCaseIds.size === 1 ? 'إنشاء مهمة إطلاع' : 'إنشاء مهام إطلاع مجمعة'}
+                </h3>
                 <p className="text-indigo-100 text-sm font-bold mt-1">توليد مهام لـ {selectedCases.length} ملف</p>
               </div>
             </div>

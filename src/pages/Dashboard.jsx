@@ -684,11 +684,11 @@ export default function Dashboard() {
               { l: 'صالح', v: selectedMonthStats.judgments.good, cases: selectedMonthStats.judgments.lists.good, color: 'text-emerald-400' },
               { l: 'ضد', v: selectedMonthStats.judgments.bad, cases: selectedMonthStats.judgments.lists.bad, color: 'text-rose-400' },
               { l: 'مختلط', v: selectedMonthStats.judgments.mixed, cases: selectedMonthStats.judgments.lists.mixed, color: 'text-indigo-400' },
-              { l: 'وقف', v: selectedMonthStats.judgments.stop, cases: selectedMonthStats.judgments.lists.stop, color: 'text-orange-400' },
+              { l: 'وقف مدعين', v: selectedMonthStats.judgments.stop, cases: selectedMonthStats.judgments.lists.stop, color: 'text-orange-400' },
               { l: 'اعتبار', v: selectedMonthStats.judgments.consideration, cases: selectedMonthStats.judgments.lists.consideration, color: 'text-yellow-400' },
               
             ].map(item => {
-              const isCritical = (item.l === 'وقف' && stats.criticalSuspended.length > 0) || (item.l === 'اعتبار' && stats.criticalConsidered.length > 0);
+              const isCritical = (item.l === 'وقف مدعين' && stats.criticalSuspended.length > 0) || (item.l === 'اعتبار مدعين' && stats.criticalConsidered.length > 0);
               return (
               <button key={item.l} onClick={() => setAgendaModal({ isOpen: true, title: `أحكام (${item.l}) لشهر ${viewMonthLabel}`, casesList: item.cases })}
                 className={`relative flex-1 min-w-[45px] bg-slate-900/20 hover:bg-slate-800 rounded-lg py-1.5 px-2 text-center border transition flex flex-col items-center justify-center gap-0.5 cursor-pointer shadow-sm active:scale-95 ${isCritical ? 'border-rose-500/30 hover:border-rose-500/60' : 'border-slate-700/20 hover:border-slate-600'}`}>

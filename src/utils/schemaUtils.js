@@ -1,5 +1,6 @@
 export const DEFAULT_SCHEMA = [
   { id: 'رقم الدعوى', label: 'رقم الدعوى', type: 'text', visible: true, primary: true },
+  { id: 'تاريخ رفع الدعوى', label: 'تاريخ رفع الدعوى', type: 'date', visible: true, isDate: true },
   { id: 'السنة', label: 'السنة', type: 'text', visible: true, primary: true },
   { id: 'المدعي', label: 'المدعي', type: 'text', visible: true },
   { id: 'المدعى_عليه', label: 'المدعى عليه', type: 'text', visible: true },

@@ -3,14 +3,25 @@ import { getSessionDate, getCaseRole, getCaseDecision } from './caseUtils';
 import { isAppellantRole, isAppelleeRole, isNoInterestRole, isOutOfJurisdictionRole } from '../constants/roleHelpers';
 import { getActiveMapping, resolveImpact, isStopImpact, evaluateSessionRule } from './statsMapping';
 
-function addToJudgments(target, computeAs, mapping, c = null) {
+function addToJudgments(target, computeAs, mapping, c = null, settings = {}) {
   const entry = mapping.find(m => m.value === computeAs);
   if (entry && entry.dashboardVisible === false) {
     return; // Ignore completely
   }
 
   target.total++;
-  const impact = entry ? entry.impact : resolveImpact(computeAs, mapping);
+  let impact = entry ? entry.impact : resolveImpact(computeAs, mapping);
+
+  // Enforce Appellant constraint for Stop and Consideration
+  if (impact === 'stop' || impact === 'consideration') {
+    const role = c ? getCaseRole(c) : '';
+    const isAppel = isAppellantRole(role, settings);
+    if (!isAppel) {
+       // If the state is not the appellant, it shouldn't be counted in the negative "وقف مدعين" buckets.
+       // Redirect to 'other' unless they explicitly mapped it to 'good' in evaluateSessionRule (which isn't used here).
+       impact = 'other';
+    }
+  }
 
   if (impact === 'good')          { target.good++;          if (c) target.lists.good.push(c); }
   else if (impact === 'bad')      { target.bad++;           if (c) target.lists.bad.push(c); }
@@ -187,7 +198,7 @@ export function calculateDashboardStats(cases, settings) {
     const lastDecisionRaw = String(
       latestSession?.decision || latestSession?.['القرار'] || latestSession?.['قرار'] || ''
     ).trim();
-    const isDecidedForJudgment = lastDecisionRaw.includes('للحكم');
+    const isDecidedForJudgment = lastDecisionRaw.includes('للحكم') || (String(c['القرار'] || '').includes('للحكم'));
 
     const deadlineDecision = String(c['القرار'] || c['قرار الجلسة'] || c['المنطوق'] || '');
     const deadlineRules    = settings?.deadlineRules || [];
@@ -200,7 +211,8 @@ export function calculateDashboardStats(cases, settings) {
       judgedCases.push(c);
       if (sessions.length > 0) {
         const firstSession = sessions[sessions.length - 1];
-        const firstDate = getSafeDateObj(firstSession.date);
+        const dateFromSystem = c['تاريخ رفع الدعوى'] || c['تاريخ الإيداع'] || c['تاريخ قيد الدعوى'];
+        let firstDate = getSafeDateObj(dateFromSystem);
         if (hukmDate && firstDate && hukmDate >= firstDate) {
           totalResolutionDays += (hukmDate - firstDate) / (1000 * 60 * 60 * 24);
           resolvedCasesCount++;
@@ -282,7 +294,8 @@ export function calculateDashboardStats(cases, settings) {
       ongoingCases.push(c);
       if (isAppellant) ongoingAppellantCount++;
       if (isAppellee) ongoingAppelleeCount++;
-      if (!lastSessionDate || lastSessionDate < today) staleOngoingCases.push(c);
+      const isForInquiry = deadlineDecision.includes('للاستعلام') || lastDecisionRaw.includes('للاستعلام');
+      if (!lastSessionDate || isForInquiry) staleOngoingCases.push(c);
 
       // Deadline alerts (وقف جزائي) — detect any stop-impact value in decision text
       if (lastSessionDate) {
@@ -392,6 +405,10 @@ export function calculateDashboardStats(cases, settings) {
     criticalConsidered,
     criticalAgainst,
     performanceSplit,
+    ongoingAppellantCount,
+    ongoingAppelleeCount,
+    staleOngoingCases,
+    avgResolutionDays: resolvedCasesCount > 0 ? totalResolutionDays / resolvedCasesCount : 0
   };
 }
 
@@ -433,16 +450,16 @@ export function computeMultiMonthStats(cases, settings, monthsList) {
 
       if (s.hasJudgment) {
         const computeAs = s.judgmentClassification || s.judgment?.result || 'غير مصنف';
-        addToJudgments(bucket.judgments, computeAs, mapping, c);
+        addToJudgments(bucket.judgments, computeAs, mapping, c, settings);
       } else {
         const dec = String(s.decision || '').trim();
         const type = String(s.type || '').trim();
         if (dec.includes('رفض') && type.includes('فحص')) {
           const computeAs = isAppellant ? 'ضد' : isAppellee ? 'صالح' : 'ضد';
-          addToJudgments(bucket.judgments, computeAs, mapping, c);
+          addToJudgments(bucket.judgments, computeAs, mapping, c, settings);
         } else if (dec.includes('قبول') && type.includes('فحص')) {
           const computeAs = isAppellant ? 'صالح' : isAppellee ? 'ضد' : 'صالح';
-          addToJudgments(bucket.judgments, computeAs, mapping, c);
+          addToJudgments(bucket.judgments, computeAs, mapping, c, settings);
         }
       }
     });
