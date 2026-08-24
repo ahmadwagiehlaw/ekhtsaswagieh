@@ -782,7 +782,11 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
                                 value={editData._type || ''}
                                 onChange={e => {
                                   const v = e.target.value;
-                                  setEditData(d => applyDefaultRules('_type', v, { ...d, _type: v }));
+                                  if (!v) {
+                                    setEditData(d => ({ ...d, _type: '' }));
+                                  } else {
+                                    setEditData(d => applyDefaultRules('_type', v, { ...d, _type: v }));
+                                  }
                                 }}
                                 className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
                               >

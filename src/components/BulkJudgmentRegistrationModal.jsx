@@ -69,10 +69,12 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
 
   const handleFieldChange = (field, value) => {
     let newData = { ...formData, [field]: value };
-    if (field === '_category' || field === '_result') {
+    if (!value) {
+      setFormData(newData);
+    } else {
       newData = applyDefaultRules(field, value, newData);
+      setFormData(newData);
     }
-    setFormData(newData);
   };
 
   const handleSave = async (e) => {
@@ -212,28 +214,16 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
             </select>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-black text-slate-600 block">مختصر الحكم</label>
-            <select
-              value={formData._type}
-              onChange={e => handleFieldChange('_type', e.target.value)}
-              className="w-full text-sm font-bold p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition outline-none"
-            >
-              <option value="">-- اختر مختصر الحكم --</option>
-              {(settings?.judgmentTypes || ['قبول', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'شطب', 'إلغاء', 'تأييد']).map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-black text-slate-600 block">فئة الحكم</label>
+              <label className="text-xs font-black text-slate-600 block">مختصر الحكم</label>
               <select
-                value={formData._category}
-                onChange={e => handleFieldChange('_category', e.target.value)}
+                value={formData._type}
+                onChange={e => handleFieldChange('_type', e.target.value)}
                 className="w-full text-sm font-bold p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition outline-none"
               >
-                <option value="">–– فئة الحكم ––</option>
-                {judgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value="">-- اختر --</option>
+                {(settings?.judgmentTypes || ['قبول', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'شطب', 'إلغاء', 'تأييد']).map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
 
@@ -244,10 +234,22 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
                 onChange={e => handleFieldChange('_result', e.target.value)}
                 className="w-full text-sm font-bold p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition outline-none"
               >
-                <option value="">–– التصنيف ––</option>
+                <option value="">-- اختر --</option>
                 {judgmentClassifications.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-black text-slate-600 block">فئة الحكم</label>
+            <select
+              value={formData._category}
+              onChange={e => handleFieldChange('_category', e.target.value)}
+              className="w-full text-sm font-bold p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition outline-none"
+            >
+              <option value="">-- اختر فئة الحكم --</option>
+              {judgmentCategories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
 
           <div className="space-y-1.5">

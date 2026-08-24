@@ -76,6 +76,46 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
     }));
   };
 
+
+  const applyDefaultRulesLocal = (field, value, currentValues) => {
+    if (!settings?.judgmentDefaults?.length) return currentValues;
+    const engineInput = {
+      role: currentValues.role,
+      category: currentValues.judgmentCategory,
+      classification: currentValues.judgmentResult,
+      type: currentValues.shortJudgment,
+      sessionType: currentValues.sessionType,
+      decision: currentValues.decision,
+      text: currentValues.verdict
+    };
+    const engineOutput = applyJudgmentDefaultRules(engineInput, settings.judgmentDefaults);
+    
+    // Automatically enable fields that are auto-filled
+    const newFieldsToUpdate = { ...fieldsToUpdate };
+    
+    const newCategory = engineOutput.category || currentValues.judgmentCategory;
+    if (newCategory && newCategory !== currentValues.judgmentCategory) newFieldsToUpdate.judgmentCategory = true;
+    
+    const newClassification = engineOutput.classification || currentValues.judgmentResult;
+    if (newClassification && newClassification !== currentValues.judgmentResult) newFieldsToUpdate.judgmentResult = true;
+    
+    const newType = engineOutput.type || currentValues.shortJudgment;
+    if (newType && newType !== currentValues.shortJudgment) newFieldsToUpdate.shortJudgment = true;
+    
+    const newVerdict = engineOutput.text || currentValues.verdict;
+    if (newVerdict && newVerdict !== currentValues.verdict) newFieldsToUpdate.verdict = true;
+    
+    setFieldsToUpdate(newFieldsToUpdate);
+    
+    return {
+      ...currentValues,
+      judgmentCategory: newCategory,
+      judgmentResult: newClassification,
+      shortJudgment: newType,
+      verdict: newVerdict
+    };
+  };
+
   const handleSave = async () => {
     const hasAnyFieldSelected = Object.values(fieldsToUpdate).some(v => v);
     if (!hasAnyFieldSelected) {
@@ -211,13 +251,7 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
   const fileLocationOptions = settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي'];
   const decisionOptions = settings?.decisions || ['للحكم', 'تصريح', 'للإطلاع', 'للإعلان', 'آخر أجل'];
   const JUDGMENT_CATEGORIES = settings?.judgmentCategories || ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
-  const JUDGMENT_RESULTS = [
-    { value: 'صالح', label: 'صالح' },
-    { value: 'ضد', label: 'ضد' },
-    { value: 'حكم منه للخصومة', label: 'حكم منه للخصومة' },
-    { value: 'غير منه للخصومة', label: 'غير منه للخصومة' },
-    { value: 'تمهيدي', label: 'تمهيدي' }
-  ];
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -242,6 +276,22 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
         {/* Body */}
         <div className="p-4 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar">
           
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                const isAllSelected = Object.values(fieldsToUpdate).every(v => v);
+                const newFields = {};
+                Object.keys(fieldsToUpdate).forEach(k => newFields[k] = !isAllSelected);
+                setFieldsToUpdate(newFields);
+              }}
+              className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5"
+            >
+              <CheckSquare className="w-3 h-3" />
+              {Object.values(fieldsToUpdate).every(v => v) ? 'إلغاء تحديد كل الحقول' : 'تحديد كل الحقول'}
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
             {/* 1. مكان الملف */}
@@ -443,14 +493,71 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
             </div>
             {/* 6. بيانات الحكم (Comprehensive) */}
             <div className={`p-4 rounded-2xl border transition-all md:col-span-2 ${fieldsToUpdate.judgmentCategory || fieldsToUpdate.judgmentResult || fieldsToUpdate.shortJudgment || fieldsToUpdate.verdict || fieldsToUpdate.isFinal ? 'bg-rose-50/40 border-rose-300 shadow-sm' : 'bg-slate-50 border-slate-200 opacity-80'}`}>
-              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200">
-                <Gavel className="w-4 h-4 text-rose-600" />
-                <h3 className="text-xs font-black text-rose-900">تعديل بيانات الحكم</h3>
+              <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <Gavel className="w-4 h-4 text-rose-600" />
+                  <h3 className="text-xs font-black text-rose-900">تعديل بيانات الحكم</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const isAllSelected = fieldsToUpdate.judgmentCategory && fieldsToUpdate.judgmentResult && fieldsToUpdate.shortJudgment && fieldsToUpdate.verdict && fieldsToUpdate.isFinal;
+                    setFieldsToUpdate({
+                      ...fieldsToUpdate,
+                      judgmentCategory: !isAllSelected,
+                      judgmentResult: !isAllSelected,
+                      shortJudgment: !isAllSelected,
+                      verdict: !isAllSelected,
+                      isFinal: !isAllSelected
+                    });
+                  }}
+                  className="text-[10px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded transition flex items-center gap-1"
+                >
+                  {fieldsToUpdate.judgmentCategory && fieldsToUpdate.judgmentResult && fieldsToUpdate.shortJudgment && fieldsToUpdate.verdict && fieldsToUpdate.isFinal ? (
+                    <><CheckSquare className="w-3 h-3" /> إلغاء تحديد الكل</>
+                  ) : (
+                    <><CheckSquare className="w-3 h-3" /> تحديد الكل</>
+                  )}
+                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Category */}
+                {/* Type */}
                 <div>
+                  <button type="button" onClick={() => toggleField('shortJudgment')} className="flex items-center gap-2 text-xs font-black text-navy-900 select-none cursor-pointer mb-2">
+                    {fieldsToUpdate.shortJudgment ? <CheckSquare className="w-4 h-4 text-rose-500 shrink-0" /> : <Square className="w-4 h-4 text-slate-400 shrink-0" />}
+                    <span>مختصر الحكم</span>
+                  </button>
+                  <select
+                    disabled={!fieldsToUpdate.shortJudgment}
+                    value={values.shortJudgment}
+                    onChange={e => { const val = e.target.value; if (!val) { setValues(d => ({ ...d, shortJudgment: '' })); } else { setValues(d => applyDefaultRulesLocal('shortJudgment', val, { ...d, shortJudgment: val })); } }}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <option value="">-- اختر --</option>
+                    {(settings?.judgmentTypes || ['قبول', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'شطب', 'إلغاء', 'تأييد']).map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+
+                {/* Result */}
+                <div>
+                  <button type="button" onClick={() => toggleField('judgmentResult')} className="flex items-center gap-2 text-xs font-black text-navy-900 select-none cursor-pointer mb-2">
+                    {fieldsToUpdate.judgmentResult ? <CheckSquare className="w-4 h-4 text-rose-500 shrink-0" /> : <Square className="w-4 h-4 text-slate-400 shrink-0" />}
+                    <span>تصنيف الحكم</span>
+                  </button>
+                  <select 
+                    disabled={!fieldsToUpdate.judgmentResult}
+                    value={values.judgmentResult}
+                    onChange={e => { const val = e.target.value; if (!val) { setValues(d => ({ ...d, judgmentResult: '' })); } else { setValues(d => applyDefaultRulesLocal('judgmentResult', val, { ...d, judgmentResult: val })); } }}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <option value="">-- اختر --</option>
+                    {(settings?.judgmentClassifications?.length ? settings.judgmentClassifications : ['صالح', 'ضد', 'مختلط', 'تمهيدي']).map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                {/* Category */}
+                <div className="md:col-span-2">
                   <button type="button" onClick={() => toggleField('judgmentCategory')} className="flex items-center gap-2 text-xs font-black text-navy-900 select-none cursor-pointer mb-2">
                     {fieldsToUpdate.judgmentCategory ? <CheckSquare className="w-4 h-4 text-rose-500 shrink-0" /> : <Square className="w-4 h-4 text-slate-400 shrink-0" />}
                     <span>فئة الحكم</span>
@@ -461,54 +568,9 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
                     onChange={e => { const val = e.target.value; if (!val) { setValues(d => ({ ...d, judgmentCategory: '' })); } else { setValues(d => applyDefaultRulesLocal('judgmentCategory', val, { ...d, judgmentCategory: val })); } }}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
                   >
-                    <option value="">-- اختر الفئة --</option>
-                    {JUDGMENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    <option value="">-- اختر فئة الحكم --</option>
+                    {(settings?.judgmentCategories || ['حكم قطعي', 'حكم تمهيدي', 'حكم إجرائي', 'غير ذلك']).map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
-                </div>
-
-                {/* Result */}
-                <div>
-                  <button type="button" onClick={() => toggleField('judgmentResult')} className="flex items-center gap-2 text-xs font-black text-navy-900 select-none cursor-pointer mb-2">
-                    {fieldsToUpdate.judgmentResult ? <CheckSquare className="w-4 h-4 text-rose-500 shrink-0" /> : <Square className="w-4 h-4 text-slate-400 shrink-0" />}
-                    <span>تصنيف الحكم (النتيجة)</span>
-                  </button>
-                  <select 
-                    disabled={!fieldsToUpdate.judgmentResult}
-                    value={values.judgmentResult}
-                    onChange={e => { const val = e.target.value; if (!val) { setValues(d => ({ ...d, judgmentResult: '' })); } else { setValues(d => applyDefaultRulesLocal('judgmentResult', val, { ...d, judgmentResult: val })); } }}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
-                  >
-                    <option value="">-- اختر التصنيف --</option>
-                    {JUDGMENT_RESULTS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                  </select>
-                </div>
-
-                {/* Type */}
-                <div>
-                  <button type="button" onClick={() => toggleField('shortJudgment')} className="flex items-center gap-2 text-xs font-black text-navy-900 select-none cursor-pointer mb-2">
-                    {fieldsToUpdate.shortJudgment ? <CheckSquare className="w-4 h-4 text-rose-500 shrink-0" /> : <Square className="w-4 h-4 text-slate-400 shrink-0" />}
-                    <span>نوع الحكم</span>
-                  </button>
-                  <input 
-                    type="text" 
-                    
-                    disabled={!fieldsToUpdate.shortJudgment}
-                    value={values.shortJudgment}
-                    onChange={e => { const val = e.target.value; if (!val) { setValues(d => ({ ...d, shortJudgment: '' })); } else { setValues(d => applyDefaultRulesLocal('shortJudgment', val, { ...d, shortJudgment: val })); } }}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
-                  />
-                </div>
-                
-                {/* Final status */}
-                <div>
-                  <button type="button" onClick={() => toggleField('isFinal')} className="flex items-center gap-2 text-xs font-black text-navy-900 select-none cursor-pointer mb-2">
-                    {fieldsToUpdate.isFinal ? <CheckSquare className="w-4 h-4 text-rose-500 shrink-0" /> : <Square className="w-4 h-4 text-slate-400 shrink-0" />}
-                    <span>حالة الحكم</span>
-                  </button>
-                  <label className={`flex items-center gap-2 p-2 rounded-lg border text-xs font-bold transition-all cursor-pointer ${values.isFinal && fieldsToUpdate.isFinal ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-600'} ${!fieldsToUpdate.isFinal && 'opacity-50 pointer-events-none'}`}>
-                    <input type="checkbox" checked={values.isFinal} onChange={e => setValues({...values, isFinal: e.target.checked})} className="rounded text-indigo-600" />
-                    هل هذا الحكم نهائي؟ (مستنفد درجات التقاضي)
-                  </label>
                 </div>
 
                 {/* Verdict */}
