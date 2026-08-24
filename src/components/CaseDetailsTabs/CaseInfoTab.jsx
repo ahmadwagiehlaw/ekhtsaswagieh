@@ -54,7 +54,7 @@ export default function CaseInfoTab({
             },
             {
               title: '🏛️ بيانات الحكم وأخرى',
-              keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي', 'طلبات الطاعن']
+              keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي', 'طلبات الطاعن']
             }
           ].map((group) => (
             <button
@@ -85,7 +85,7 @@ export default function CaseInfoTab({
             },
             {
               title: '🏛️ بيانات الحكم وأخرى',
-              keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي', 'طلبات الطاعن']
+              keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي', 'طلبات الطاعن']
             }
           ].map((group, idx, arr) => {
             if (group.title !== activeDetailTab) return null;
@@ -638,8 +638,6 @@ export default function CaseInfoTab({
                       const isPlaintiffRole = currentRole.includes('طاعن') || currentRole.includes('مستأنف') || currentRole.includes('مدعي');
                       const isDefendantRole = currentRole.includes('مطعون') || currentRole.includes('مدعى عليه');
 
-                      if (field.id === 'المقر المختار' && !isPlaintiffRole) return null;
-                      if (field.id === 'عنوان المدعى عليه' && !isPlaintiffRole) return null;
                       if (field.id === 'عنوان المدعي' && !isDefendantRole) return null;
                     }
 
@@ -697,7 +695,7 @@ export default function CaseInfoTab({
                     return (
                       <div key={field.id} className={`space-y-1.5 ${colSpan}`}>
                         
-  {!( ['الصفة', 'صفة', 'نوع الجلسة', 'القرار', 'مكان الملف', 'تصنيف الدعوى', 'تصنيف الحكم', 'محكمة أول درجة'].includes(field.id) && isEditing ) && (
+  {!( ['الصفة', 'صفة', 'نوع الجلسة', 'القرار', 'مكان الملف', 'تصنيف الدعوى', 'محكمة أول درجة'].includes(field.id) && isEditing ) && (
     <label className="text-[11px] font-black text-slate-500 block">{field.label}</label>
   )}
   {isEditing ? (
@@ -744,15 +742,6 @@ export default function CaseInfoTab({
                               options={settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']}
                               onManage={() => setManagingField('caseClassifications')}
                               placeholder="اختر تصنيف الدعوى..."
-                            />
-                          ) : field.id === 'تصنيف الحكم' ? (
-                            <StrictSelectField
-                              label={field.label}
-                              value={val}
-                              onChange={v => setEditData({ ...editData, [field.id]: v })}
-                              options={settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء']}
-                              onManage={() => setManagingField('judgmentClassifications')}
-                              placeholder="اختر تصنيف الحكم..."
                             />
                           ) : field.id === 'محكمة أول درجة' ? (
                             <SmartAutocomplete
@@ -903,7 +892,7 @@ export default function CaseInfoTab({
           k !== 'plaintiffsList' && 
           k !== 'paperFileContents' && 
           !schema.find(s => s.id === k) && 
-          !['isImportant', 'procedures', 'urgentReminderDate', 'createdAt', 'updatedAt', 'userId', 'المدعي', 'المدعى عليه', 'الصفة', 'المقر المختار', 'رقم الدعوى', 'السنة', 'عنوان المدعى عليه', 'عنوان المدعي', 'الحكم', 'تصنيف الحكم', 'المنطوق', 'منطوق الحكم', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي'].includes(k)
+          !['isImportant', 'procedures', 'urgentReminderDate', 'createdAt', 'updatedAt', 'userId', 'المدعي', 'المدعى عليه', 'الصفة', 'المقر المختار', 'رقم الدعوى', 'السنة', 'عنوان المدعى عليه', 'عنوان المدعي', 'الحكم', 'المنطوق', 'منطوق الحكم', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي'].includes(k)
         );
         if (!isEditing || extraKeys.length === 0) return null;
 

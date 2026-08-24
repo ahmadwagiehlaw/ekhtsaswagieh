@@ -9,9 +9,7 @@ export const DEFAULT_SCHEMA = [
   { id: 'الصفة', label: 'الصفة', type: 'text', visible: true },
   { id: 'تصنيف الدعوى', label: 'تصنيف الدعوى', type: 'text', visible: true },
   { id: 'موضوع الدعوى', label: 'موضوع الدعوى', type: 'textarea', visible: true },
-  { id: 'المقر المختار', label: 'المقر المختار', type: 'textarea', visible: true },
   { id: 'عنوان المدعي', label: 'عنوان المدعي / الطاعن', type: 'text', visible: true },
-  { id: 'عنوان المدعى عليه', label: 'عنوان المدعى عليه / المطعون ضده', type: 'textarea', visible: true },
   { id: 'مكان الملف', label: 'مكان الملف', type: 'text', visible: true },
   { id: 'دعاوى منضمة', label: 'دعاوى منضمة', type: 'text', visible: true },
   { id: 'محكمة أول درجة', label: 'محكمة أول درجة', type: 'text', visible: true },
@@ -23,7 +21,7 @@ export const DEFAULT_SCHEMA = [
   { id: 'نوع الجلسة', label: 'نوع الجلسة', type: 'text', visible: true },
 ];
 
-export const OBSOLETE_FIELDS = ['الحكم', 'المنطوق', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي', 'نوع الحكم', 'تصنيف الحكم', 'حكم محكمة أول درجة'];
+export const OBSOLETE_FIELDS = ['الحكم', 'المنطوق', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي', 'نوع الحكم', 'تصنيف الحكم', 'حكم محكمة أول درجة', 'المقر المختار', 'عنوان المدعى عليه'];
 
 export const cleanSchemaFields = (fields) => {
   if (!fields || !Array.isArray(fields)) return DEFAULT_SCHEMA;
