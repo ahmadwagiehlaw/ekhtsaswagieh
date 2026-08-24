@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Scale } from 'lucide-react';
+import { X, Save, Scale, Settings } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
 import { autoDetermineRole } from '../utils/caseUtils';
 import { applyJudgmentDefaultRules } from '../utils/judgmentRulesEngine';
+import JudgmentRulesModal from './JudgmentRulesModal';
 
 export default function BulkJudgmentRegistrationModal({ isOpen, onClose, sessionDate, selectedCaseIds }) {
   const { cases, settings, saveBatchCasesToFirebase } = useAppContext();
@@ -19,6 +20,7 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
     _role: ''
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isRulesOpen, setIsRulesOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -162,6 +164,7 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" dir="rtl">
+      <JudgmentRulesModal isOpen={isRulesOpen} onClose={() => setIsRulesOpen(false)} />
       <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
         
         {/* Header */}

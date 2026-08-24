@@ -1,7 +1,8 @@
 import React from 'react';
-import { CalendarPlus, Scale, MessageSquare, X, FileText, Paperclip, Loader2, BookOpen, Save, Edit3, Trash2 } from 'lucide-react';
+import { CalendarPlus, Scale, MessageSquare, X, FileText, Paperclip, Loader2, BookOpen, Save, Edit3, Trash2, Settings } from 'lucide-react';
 import { formatDateString } from '../../utils/dateUtils';
 import { applyJudgmentDefaultRules } from '../../utils/judgmentRulesEngine';
+import JudgmentRulesModal from '../JudgmentRulesModal';
 
 export default function SessionsTab({
   caseData,
@@ -30,8 +31,11 @@ export default function SessionsTab({
   toast,
   showPrompt
 }) {
+  const [isRulesOpen, setIsRulesOpen] = React.useState(false);
+
   return (
     <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mx-4 sm:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <JudgmentRulesModal isOpen={isRulesOpen} onClose={() => setIsRulesOpen(false)} />
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
@@ -508,6 +512,9 @@ export default function SessionsTab({
                                 else setActiveJudgmentSessionIdx(null);
                               }} disabled={saving} className="text-[10px] font-bold px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition disabled:opacity-50">
                                 إلغاء
+                              </button>
+                              <button onClick={() => setIsRulesOpen(true)} className="text-[10px] font-bold px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 rounded-lg transition flex items-center gap-1" title="قواعد التعبئة التلقائية">
+                                <Settings className="w-3 h-3" /> قواعد التعبئة
                               </button>
                               <button onClick={handleSave} disabled={saving} className="text-[10px] font-black px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition disabled:opacity-50">
                                 {saving ? '...' : '💾 حفظ الحكم'}

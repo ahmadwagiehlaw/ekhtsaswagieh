@@ -451,6 +451,13 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 flex flex-wrap gap-2 items-center justify-between">
         <div className="flex items-center gap-2">
           <button
+                              onClick={() => setIsRulesOpen(true)}
+                              className="w-full flex items-center justify-center gap-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-[10px] font-black py-1.5 rounded-lg transition"
+                              title="قواعد التعبئة التلقائية"
+                            >
+                              <Settings className="w-3 h-3" /> التعبئة
+                            </button>
+                            <button
             onClick={() => {
               const d = getSafeDateObj(date);
               if (d) { d.setDate(d.getDate() - 1); onDateChange(d.toISOString().split('T')[0]); }

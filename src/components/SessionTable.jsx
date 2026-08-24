@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { applyJudgmentDefaultRules } from '../utils/judgmentRulesEngine';
+import JudgmentRulesModal from './JudgmentRulesModal';
 import { useNavigate } from 'react-router-dom';
 import { Check, X, Upload, Edit3, Gavel, Settings2, Copy, Maximize2, CheckSquare, Square, Save, CopyPlus, RefreshCcw, Search, Settings, Plus, Trash2, FileText, Camera } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
@@ -73,6 +74,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
   // Edit state
   const [editingCaseId, setEditingCaseId] = useState(null);
   const [editData, setEditData] = useState({});
+  const [isRulesOpen, setIsRulesOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
 
