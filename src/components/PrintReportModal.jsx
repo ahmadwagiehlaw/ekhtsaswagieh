@@ -9,25 +9,34 @@ export default function PrintReportModal({ stats, settings, selectedMonthStats, 
   const handlePrint = () => {
     const content = document.getElementById('dash-print-content');
     if (!content) return;
+    
+    // Copy all styles from the parent window so Tailwind works perfectly in the print window
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map(s => s.outerHTML)
+      .join('\n');
+
     const pw = window.open('', '_blank', 'width=820,height=700');
     pw.document.write(`<!DOCTYPE html><html dir="rtl"><head>
       <meta charset="UTF-8"><title>تقرير - ${monthLabel}</title>
       <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-      <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Cairo',sans-serif;direction:rtl;padding:28px;color:#0f172a;background:#fff}
-      h1{font-size:22px;font-weight:900}.lbl{color:#64748b;font-size:10px;font-weight:700}
-      .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
-      .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
-      .grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:14px 0}
-      .card{border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
-      .val{font-size:26px;font-weight:900}.sec{font-size:13px;font-weight:900;margin:18px 0 8px;padding-bottom:6px;border-bottom:2px solid #0f172a}
-      .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f1f5f9}
-      .bar-w{background:#f1f5f9;border-radius:4px;height:5px;margin-top:3px}.bar{height:100%;border-radius:4px}
-      .footer{text-align:center;font-size:9px;color:#94a3b8;margin-top:22px;padding-top:10px;border-top:1px solid #e2e8f0}
-      </style></head><body>${content.innerHTML}
+      ${styles}
+      <style>
+      @media print {
+        body { padding: 20px !important; background: #fff !important; }
+        /* Force browsers to print background colors and shadows */
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      }
+      body { font-family: 'Cairo', sans-serif; background: #fff; padding: 28px; color: #0f172a; }
+      .footer{text-align:center;font-size:10px;font-weight:700;color:#94a3b8;margin-top:30px;padding-top:15px;border-top:1px solid #e2e8f0;page-break-inside:avoid;}
+      </style></head><body>
+      ${content.innerHTML}
       <p class="footer">تم إنشاء هذا التقرير تلقائياً بواسطة منصة اختصاصي — ${new Date().toLocaleString('ar-EG')}</p>
       </body></html>`);
     pw.document.close();
-    setTimeout(() => pw.print(), 600);
+    setTimeout(() => {
+        pw.print();
+        pw.close();
+    }, 800);
   };
 
   return (

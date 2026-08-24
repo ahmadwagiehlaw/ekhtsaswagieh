@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { applyJudgmentDefaultRules } from '../utils/judgmentRulesEngine';
 import JudgmentRulesModal from './JudgmentRulesModal';
 import { useNavigate } from 'react-router-dom';
-import { Check, X, Upload, Edit3, Gavel, Settings2, Copy, Maximize2, CheckSquare, Square, Save, CopyPlus, RefreshCcw, Search, Settings, Plus, Trash2, FileText, Camera } from 'lucide-react';
+import { Check, X, Upload, Edit3, EyeOff, Gavel, Settings2, Copy, Maximize2, CheckSquare, Square, Save, CopyPlus, RefreshCcw, Search, Settings, Plus, Trash2, FileText, Camera } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { uploadToR2 } from '../lib/r2';
@@ -60,6 +60,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
   // View state
   const [filterDecision, setFilterDecision] = useState(null); // 'للحكم' or null
   const [filterType, setFilterType] = useState(null);
+  const [hideIrrelevant, setHideIrrelevant] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('الرول');
   const [sortOrder, setSortOrder] = useState('asc');
@@ -120,6 +121,12 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
     if (filterType) {
       result = result.filter(c => getFieldValueLocal(c, ['نوع الجلسة']) === filterType || getFieldValueLocal(c, ['نوع الدعوى']) === filterType);
     }
+    if (hideIrrelevant) {
+      result = result.filter(c => {
+        const role = String(getFieldValueLocal(c, ['الصفة', 'صفة']) || '').trim();
+        return !role.includes('لا شأن') && !role.includes('خارج الاختصاص');
+      });
+    }
     
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
@@ -146,7 +153,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
     });
     
     return result;
-  }, [dayCases, filterDecision, filterType, sortField, sortOrder, searchQuery, visibleColumns]);
+  }, [dayCases, filterDecision, filterType, sortField, sortOrder, searchQuery, visibleColumns, hideIrrelevant]);
 
   // Expose the filtered array to parent (e.g. for printing)
   useEffect(() => {
@@ -438,6 +445,15 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
             className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition border ${filterType === typeMawdoo ? 'bg-emerald-100 text-emerald-700 border-emerald-200 shadow-inner' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}
           >
             {typeMawdoo}
+          </button>
+          <div className="w-px h-5 bg-slate-200 mx-1"></div>
+          <button 
+            onClick={() => setHideIrrelevant(!hideIrrelevant)}
+            className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition border flex items-center gap-1 ${hideIrrelevant ? 'bg-amber-100 text-amber-700 border-amber-200 shadow-inner' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}
+            title="إخفاء قضايا لا شأن وخارج الاختصاص"
+          >
+            <EyeOff className="w-3 h-3" />
+            إخفاء اللاشأن
           </button>
         </div>
 

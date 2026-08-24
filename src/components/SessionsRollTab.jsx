@@ -9,7 +9,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-  Edit3, Check, X, ChevronRight, ChevronLeft, Search,
+  EyeOff, Edit3, Check, X, ChevronRight, ChevronLeft, Search,
   CheckSquare, Square, ClipboardList, Bell, Eye, CopyPlus,
   Printer, ExternalLink, Save, RefreshCcw, AlertCircle, Plus, Trash2,
   ArrowUpDown, ArrowUp, ArrowDown, Columns, Settings2, FileText, Camera
@@ -89,6 +89,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
 
   const [searchQ, setSearchQ] = useState('');
   const [sessionTypeFilter, setSessionTypeFilter] = useState('الكل'); // الوضع الافتراضي: الكل
+  const [hideIrrelevant, setHideIrrelevant] = useState(false);
   const searchRef = useRef(null);
   const [isBulkProcedureOpen, setIsBulkProcedureOpen] = useState(false);
   const [isBulkViewingOpen, setIsBulkViewingOpen] = useState(false);
@@ -129,6 +130,13 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
       });
     }
 
+    if (hideIrrelevant) {
+      result = result.filter(c => {
+        const role = String(getFieldVal(c, ['الصفة', 'صفة']) || '').trim();
+        return !role.includes('لا شأن') && !role.includes('خارج الاختصاص');
+      });
+    }
+
     if (searchQ.trim()) {
       const q = searchQ.toLowerCase();
       result = result.filter(c =>
@@ -156,7 +164,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
     });
 
     return result;
-  }, [dayCases, searchQ, sessionTypeFilter, sortConfig]);
+  }, [dayCases, searchQ, sessionTypeFilter, sortConfig, hideIrrelevant]);
 
   const toggleSelect = (id) => {
     const n = new Set(selectedIds);
@@ -406,8 +414,16 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                   }`}
                 >
                   {t}
-                </button>
-              ))}
+                </button>              ))}
+              <div className="w-px h-5 bg-slate-300 mx-1 rounded"></div>
+              <button
+                onClick={() => setHideIrrelevant(!hideIrrelevant)}
+                title="إخفاء قضايا لا شأن وخارج الاختصاص"
+                className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-black rounded-lg transition-all ${hideIrrelevant ? 'bg-amber-100 text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
+              >
+                <EyeOff className="w-3 h-3" />
+                إخفاء اللاشأن
+              </button>
             </div>
           );
         })()}

@@ -1,5 +1,5 @@
 import React from 'react';
-import {  Trash2, Calendar, Bell, Files, X, MapPin , Settings2 } from 'lucide-react';
+import { Trash2, Calendar, Bell, Files, X, MapPin, Settings2 } from 'lucide-react';
 import StrictSelectField from '../StrictSelectField';
 import SmartAutocomplete from '../SmartAutocomplete';
 import { formatDateString, getSafeDateObj } from '../../utils/dateUtils';
@@ -53,7 +53,7 @@ export default function CaseInfoTab({
               keys: ['تصنيف الدعوى', 'موضوع الدعوى', 'طلبات المدعي']
             },
             {
-              title: '🏛️ بيانات الحكم وأخرى',
+              title: '🏛️ بيانات أخرى',
               keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي', 'طلبات الطاعن']
             }
           ].map((group) => (
@@ -84,7 +84,7 @@ export default function CaseInfoTab({
               keys: ['تصنيف الدعوى', 'موضوع الدعوى', 'طلبات المدعي']
             },
             {
-              title: '🏛️ بيانات الحكم وأخرى',
+              title: '🏛️ بيانات أخرى',
               keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي', 'طلبات الطاعن']
             }
           ].map((group, idx, arr) => {
@@ -99,21 +99,21 @@ export default function CaseInfoTab({
             return (
               <div key={idx} className="w-full">
                 {/* --- Unified Header injected at top of tab --- */}
-                {group.title === '🏛️ بيانات الحكم وأخرى' && settings?.courtDegree !== 'أول درجة' && (
+                {group.title === '🏛️ بيانات أخرى' && settings?.courtDegree !== 'أول درجة' && (
                   <div className="mb-6 mt-2 pt-2 animate-in fade-in slide-in-from-top-2 duration-200 space-y-5">
-                    
+
                     {/* --- First Instance Unified Group --- */}
                     <div className="relative bg-slate-50/80 p-4 pt-7 rounded-2xl border border-slate-200 shadow-sm">
                       <span className="absolute -top-3 right-4 text-xs font-black text-slate-600 bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm flex items-center gap-1.5">
                         <Files className="w-3.5 h-3.5 text-slate-400" />
                         بيانات حكم أول درجة
                       </span>
-                      
+
                       <div className="grid grid-cols-12 gap-y-7 gap-x-3 w-full">
                         {/* 1. Case No & Year */}
                         <div className="col-span-12 sm:col-span-4 relative bg-white/60 p-2.5 rounded-xl border border-slate-200/60 flex items-center gap-2 min-h-[58px]">
                           <span className="absolute -top-3 right-3 text-[9px] font-black text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200/80">الرقم والسنة</span>
-                          
+
                           {isEditing ? (
                             <>
                               <div className="flex-[2] relative mt-1.5">
@@ -122,8 +122,8 @@ export default function CaseInfoTab({
                                   id="رقم دعوى أول درجة"
                                   value={editData['رقم دعوى أول درجة'] || ''}
                                   onChange={(v) => {
-                                      let finalV = v.replace(/[^\d]/g, '');
-                                      setEditData({...editData, 'رقم دعوى أول درجة': finalV});
+                                    let finalV = v.replace(/[^\d]/g, '');
+                                    setEditData({ ...editData, 'رقم دعوى أول درجة': finalV });
                                   }}
                                   cases={cases}
                                   fieldPaths={['رقم دعوى أول درجة']}
@@ -138,8 +138,8 @@ export default function CaseInfoTab({
                                   id="سنة دعوى أول درجة"
                                   value={editData['سنة دعوى أول درجة'] || ''}
                                   onChange={(v) => {
-                                      let finalV = v.replace(/[^\d]/g, '');
-                                      setEditData({...editData, 'سنة دعوى أول درجة': finalV});
+                                    let finalV = v.replace(/[^\d]/g, '');
+                                    setEditData({ ...editData, 'سنة دعوى أول درجة': finalV });
                                   }}
                                   cases={cases}
                                   fieldPaths={['سنة دعوى أول درجة']}
@@ -162,8 +162,8 @@ export default function CaseInfoTab({
                           <div className="absolute -top-5 right-1 flex items-center gap-1.5">
                             <span className="text-[10px] font-black text-slate-500">محكمة أول درجة</span>
                             {isEditing && (
-                              <button 
-                                type="button" 
+                              <button
+                                type="button"
                                 onClick={() => setManagingField('firstInstanceCourts')}
                                 className="text-slate-400 hover:text-indigo-600 transition"
                                 title="إدارة الخيارات"
@@ -177,7 +177,7 @@ export default function CaseInfoTab({
                               <SmartAutocomplete
                                 id="محكمة أول درجة"
                                 value={editData['محكمة أول درجة'] || ''}
-                                onChange={(v) => setEditData({...editData, 'محكمة أول درجة': v})}
+                                onChange={(v) => setEditData({ ...editData, 'محكمة أول درجة': v })}
                                 cases={cases}
                                 fieldPaths={['محكمة أول درجة']}
                                 className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-slate-400 transition shadow-sm"
@@ -196,11 +196,11 @@ export default function CaseInfoTab({
                           <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">جلسة حكم أول درجة</span>
                           {isEditing ? (
                             <div className="mt-1">
-                              <input 
-                                type="date" 
-                                value={editData['جلسة حكم أول درجة'] && getSafeDateObj(editData['جلسة حكم أول درجة']) ? getSafeDateObj(editData['جلسة حكم أول درجة']).toISOString().split('T')[0] : ''} 
-                                onChange={(e) => setEditData({ ...editData, 'جلسة حكم أول درجة': e.target.value })} 
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-slate-400 transition shadow-sm h-[38px]" 
+                              <input
+                                type="date"
+                                value={editData['جلسة حكم أول درجة'] && getSafeDateObj(editData['جلسة حكم أول درجة']) ? getSafeDateObj(editData['جلسة حكم أول درجة']).toISOString().split('T')[0] : ''}
+                                onChange={(e) => setEditData({ ...editData, 'جلسة حكم أول درجة': e.target.value })}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-slate-400 transition shadow-sm h-[38px]"
                               />
                             </div>
                           ) : (
@@ -215,11 +215,11 @@ export default function CaseInfoTab({
                           <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">منطوق حكم أول درجة</span>
                           {isEditing ? (
                             <div className="mt-1">
-                              <textarea 
-                                value={editData['منطوق حكم أول درجة'] || ''} 
-                                onChange={(e) => setEditData({ ...editData, 'منطوق حكم أول درجة': e.target.value })} 
-                                rows={2} 
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-slate-400 resize-none transition shadow-sm" 
+                              <textarea
+                                value={editData['منطوق حكم أول درجة'] || ''}
+                                onChange={(e) => setEditData({ ...editData, 'منطوق حكم أول درجة': e.target.value })}
+                                rows={2}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-slate-400 resize-none transition shadow-sm"
                               />
                             </div>
                           ) : (
@@ -234,11 +234,11 @@ export default function CaseInfoTab({
                           <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">طلبات دعوى أول درجة</span>
                           {isEditing ? (
                             <div className="mt-1">
-                              <textarea 
-                                value={editData['طلبات الطاعن'] || ''} 
-                                onChange={(e) => setEditData({ ...editData, 'طلبات الطاعن': e.target.value })} 
-                                rows={3} 
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-slate-400 resize-none transition shadow-sm" 
+                              <textarea
+                                value={editData['طلبات الطاعن'] || ''}
+                                onChange={(e) => setEditData({ ...editData, 'طلبات الطاعن': e.target.value })}
+                                rows={3}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-slate-400 resize-none transition shadow-sm"
                               />
                             </div>
                           ) : (
@@ -251,7 +251,7 @@ export default function CaseInfoTab({
                     </div>
                   </div>
                 )}
-                
+
                 {group.title === '📌 بيانات أساسية' && (
                   <div className="mb-6 mt-2 pt-2 animate-in fade-in slide-in-from-top-2 duration-200 space-y-5">
                     {/* 1. Case No & Year */}
@@ -259,7 +259,7 @@ export default function CaseInfoTab({
                       {/* Unified Case No & Year Group */}
                       <div className="col-span-12 sm:col-span-4 relative bg-indigo-50/60 p-2.5 rounded-2xl border border-indigo-100 flex items-center gap-2 shadow-sm min-h-[58px]">
                         <span className="absolute -top-3 right-3 text-[10px] font-black text-indigo-700 bg-white px-2 py-0.5 rounded-full border border-indigo-100 shadow-sm">رقم الدعوى والسنة</span>
-                        
+
                         {isEditing ? (
                           <>
                             <div className="flex-[2] relative mt-1.5">
@@ -268,8 +268,8 @@ export default function CaseInfoTab({
                                 id="رقم الدعوى"
                                 value={editData['رقم الدعوى'] || editData['رقم القضية'] || editData['رقم_الدعوى'] || ''}
                                 onChange={(v) => {
-                                    let finalV = v.replace(/[^\d]/g, '');
-                                    setEditData({...editData, 'رقم الدعوى': finalV});
+                                  let finalV = v.replace(/[^\d]/g, '');
+                                  setEditData({ ...editData, 'رقم الدعوى': finalV });
                                 }}
                                 cases={cases}
                                 fieldPaths={['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى']}
@@ -284,8 +284,8 @@ export default function CaseInfoTab({
                                 id="السنة"
                                 value={editData['السنة'] || editData['سنة'] || editData['year'] || ''}
                                 onChange={(v) => {
-                                    let finalV = v.replace(/[^\d]/g, '');
-                                    setEditData({...editData, 'السنة': finalV});
+                                  let finalV = v.replace(/[^\d]/g, '');
+                                  setEditData({ ...editData, 'السنة': finalV });
                                 }}
                                 cases={cases}
                                 fieldPaths={['السنة', 'سنة', 'year']}
@@ -302,13 +302,13 @@ export default function CaseInfoTab({
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="col-span-6 sm:col-span-4 relative">
                         <div className="absolute -top-5 right-1 flex items-center gap-1.5">
                           <span className="text-[10px] font-black text-slate-500">مكان الملف</span>
                           {isEditing && (
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               onClick={() => setManagingField('fileLocations')}
                               className="text-slate-400 hover:text-indigo-600 transition"
                               title="إدارة الخيارات"
@@ -353,9 +353,9 @@ export default function CaseInfoTab({
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                               <div className="flex-1">
                                 {isEditing ? (
-                                  <input 
-                                    type="text" 
-                                    value={plaint.name} 
+                                  <input
+                                    type="text"
+                                    value={plaint.name}
                                     onChange={e => {
                                       const list = [...editData.plaintiffsList];
                                       list[idx].name = e.target.value;
@@ -370,7 +370,7 @@ export default function CaseInfoTab({
                               </div>
                               <div className="flex items-center gap-1.5">
                                 {isEditing && (
-                                  <button 
+                                  <button
                                     onClick={() => {
                                       const list = [...editData.plaintiffsList];
                                       list.splice(idx, 1);
@@ -385,17 +385,17 @@ export default function CaseInfoTab({
                             </div>
                           </div>
                         ))}
-                        
+
                         {isEditing && (
                           <div className="flex items-center gap-2 mt-2">
-                            <input 
-                              type="text" 
-                              value={newPlaintName} 
-                              onChange={e => setNewPlaintName(e.target.value)} 
-                              placeholder="اسم المدعي الجديد..." 
+                            <input
+                              type="text"
+                              value={newPlaintName}
+                              onChange={e => setNewPlaintName(e.target.value)}
+                              placeholder="اسم المدعي الجديد..."
                               className="flex-1 bg-white border border-indigo-200 shadow-sm rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-400"
                             />
-                            <button 
+                            <button
                               onClick={() => {
                                 if (!newPlaintName.trim()) return;
                                 const newList = [...(editData.plaintiffsList || []), { id: Date.now().toString(), name: newPlaintName }];
@@ -425,9 +425,9 @@ export default function CaseInfoTab({
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                               <div className="flex-1">
                                 {isEditing ? (
-                                  <input 
-                                    type="text" 
-                                    value={def.name} 
+                                  <input
+                                    type="text"
+                                    value={def.name}
                                     onChange={e => {
                                       const list = [...editData.defendantsList];
                                       list[idx].name = e.target.value;
@@ -442,7 +442,7 @@ export default function CaseInfoTab({
                               </div>
                               <div className="flex items-center gap-1.5">
                                 {!isEditing && (def.address || def.chosenAddress) && (
-                                  <button 
+                                  <button
                                     onClick={() => setActiveDefId(activeDefId === def.id ? null : def.id)}
                                     className="text-[10px] bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100 font-bold flex items-center gap-1"
                                   >
@@ -450,7 +450,7 @@ export default function CaseInfoTab({
                                   </button>
                                 )}
                                 {isEditing && (
-                                  <button 
+                                  <button
                                     onClick={() => setActiveDefId(activeDefId === def.id ? null : def.id)}
                                     className="text-[10px] bg-white border border-indigo-200 text-indigo-600 px-2 py-1.5 rounded-lg hover:bg-indigo-50 font-bold flex items-center gap-1"
                                   >
@@ -458,7 +458,7 @@ export default function CaseInfoTab({
                                   </button>
                                 )}
                                 {isEditing && (
-                                  <button 
+                                  <button
                                     onClick={() => {
                                       const list = [...editData.defendantsList];
                                       list.splice(idx, 1);
@@ -471,7 +471,7 @@ export default function CaseInfoTab({
                                 )}
                               </div>
                             </div>
-                            
+
                             {/* Expanded Address Fields */}
                             {(activeDefId === def.id || (!isEditing && activeDefId === def.id)) && (
                               <div className="mt-3 pt-3 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in slide-in-from-top-2">
@@ -518,14 +518,14 @@ export default function CaseInfoTab({
 
                         {isEditing && (
                           <div className="flex items-center gap-2 mt-2">
-                            <input 
-                              type="text" 
-                              value={newDefName} 
-                              onChange={e => setNewDefName(e.target.value)} 
-                              placeholder="اسم المدعى عليه الجديد..." 
+                            <input
+                              type="text"
+                              value={newDefName}
+                              onChange={e => setNewDefName(e.target.value)}
+                              placeholder="اسم المدعى عليه الجديد..."
                               className="flex-1 bg-white border border-indigo-200 shadow-sm rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-400"
                             />
-                            <button 
+                            <button
                               onClick={() => {
                                 if (!newDefName.trim()) return;
                                 const newList = [...(editData.defendantsList || []), { id: Date.now().toString(), name: newDefName, address: '', chosenAddress: '' }];
@@ -543,7 +543,7 @@ export default function CaseInfoTab({
                         )}
                       </div>
                     </div>
-                    
+
                     {/* 4. Joined Cases and Role (الصفة) */}
                     <div className="grid grid-cols-12 gap-2 w-full mt-3">
                       {/* Joined Cases */}
@@ -596,7 +596,7 @@ export default function CaseInfoTab({
                           <StrictSelectField
                             value={editData['الصفة'] || editData['صفة'] || ''}
                             options={['طاعنين أو مدعين', 'مطعون ضدنا أو مدعى علينا', 'لا شأن', 'خارج الاختصاص']}
-                            onChange={(v) => setEditData({...editData, 'الصفة': v})}
+                            onChange={(v) => setEditData({ ...editData, 'الصفة': v })}
                           />
                         ) : (
                           <div className="text-xs font-bold text-navy-900 bg-white border border-slate-200 rounded-lg p-2.5 min-h-[42px] flex items-center">{editData['الصفة'] || editData['صفة'] || '---'}</div>
@@ -694,11 +694,11 @@ export default function CaseInfoTab({
 
                     return (
                       <div key={field.id} className={`space-y-1.5 ${colSpan}`}>
-                        
-  {!( ['الصفة', 'صفة', 'نوع الجلسة', 'القرار', 'مكان الملف', 'تصنيف الدعوى', 'محكمة أول درجة'].includes(field.id) && isEditing ) && (
-    <label className="text-[11px] font-black text-slate-500 block">{field.label}</label>
-  )}
-  {isEditing ? (
+
+                        {!(['الصفة', 'صفة', 'نوع الجلسة', 'القرار', 'مكان الملف', 'تصنيف الدعوى', 'محكمة أول درجة'].includes(field.id) && isEditing) && (
+                          <label className="text-[11px] font-black text-slate-500 block">{field.label}</label>
+                        )}
+                        {isEditing ? (
 
                           field.id === 'الصفة' || field.id === 'صفة' ? (
                             <StrictSelectField
@@ -778,9 +778,9 @@ export default function CaseInfoTab({
                                 <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">السنة</span>
                                 <SmartAutocomplete
                                   maxLength={4}
-                            id="السنة"
-                            value={editData['السنة'] || editData['سنة'] || editData['year'] || ''}
-                            onChange={(v) => {
+                                  id="السنة"
+                                  value={editData['السنة'] || editData['سنة'] || editData['year'] || ''}
+                                  onChange={(v) => {
                                     let finalV = v;
                                     if (schema.find(f => f.id === 'السنة' || f.id === 'سنة' || f.id === 'year')?.type === 'number') finalV = finalV.replace(/[^\d]/g, '');
                                     setEditData({ ...editData, ['السنة']: finalV });
@@ -883,15 +883,15 @@ export default function CaseInfoTab({
 
       {/* Custom fields not in schema (legacy/extra) */}
       {(() => {
-        const extraKeys = Object.keys(editData).filter(k => 
-          k !== 'id' && 
-          k !== 'sessions' && 
-          k !== 'documents' && 
-          k !== 'joinedCasesList' && 
-          k !== 'defendantsList' && 
-          k !== 'plaintiffsList' && 
-          k !== 'paperFileContents' && 
-          !schema.find(s => s.id === k) && 
+        const extraKeys = Object.keys(editData).filter(k =>
+          k !== 'id' &&
+          k !== 'sessions' &&
+          k !== 'documents' &&
+          k !== 'joinedCasesList' &&
+          k !== 'defendantsList' &&
+          k !== 'plaintiffsList' &&
+          k !== 'paperFileContents' &&
+          !schema.find(s => s.id === k) &&
           !['isImportant', 'procedures', 'urgentReminderDate', 'createdAt', 'updatedAt', 'userId', 'المدعي', 'المدعى عليه', 'الصفة', 'المقر المختار', 'رقم الدعوى', 'السنة', 'عنوان المدعى عليه', 'عنوان المدعي', 'الحكم', 'المنطوق', 'منطوق الحكم', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي'].includes(k)
         );
         if (!isEditing || extraKeys.length === 0) return null;
