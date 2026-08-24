@@ -7,8 +7,9 @@ import {
   ChevronRight, Calendar, LogOut, X, Star, Filter
 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
-import { calculateDashboardStats, computeMonthStats } from '../utils/statsUtils';
-import { getActiveMapping, resolveColor } from '../utils/statsMapping';
+import { calculateDashboardStats, computeMonthStats, computeMultiMonthStats } from '../utils/statsUtils';
+import { getActiveMapping, resolveColor, isStopImpact, resolveImpact } from '../utils/statsMapping';
+import { isAppellantRole, isAppelleeRole } from '../constants/roleHelpers';
 import { autoDetermineRole } from '../utils/caseUtils';
 import useDashboardStats from '../hooks/useDashboardStats';
 import { useUI } from '../context/UIContext';
@@ -45,30 +46,7 @@ export default function Dashboard() {
 
   const today = new Date();
 
-  // One-time auto-migration for missing 'الصفة'
-  const [hasMigratedRoles, setHasMigratedRoles] = useState(false);
-  useEffect(() => {
-    if (cases && cases.length > 0 && !hasMigratedRoles && saveBatchCasesToFirebase) {
-      setHasMigratedRoles(true); // Ensure it only runs once per app load
-      const updates = cases.map(c => {
-        if (!c['الصفة'] || String(c['الصفة']).trim() === '') {
-           const auto = autoDetermineRole(c);
-           if (auto !== 'لا شأن') {
-              return { id: c.id, 'الصفة': auto };
-           }
-        }
-        return null;
-      }).filter(Boolean);
-      
-      if (updates.length > 0) {
-        saveBatchCasesToFirebase(updates).then(() => {
-          toast(`تم استكمال حقل "الصفة" تلقائياً لـ ${updates.length} قضية قديمة لتفعيل القواعد.`, 'success');
-        }).catch(err => {
-          console.error("Failed to migrate roles:", err);
-        });
-      }
-    }
-  }, [cases, hasMigratedRoles, saveBatchCasesToFirebase, toast]);
+  // Migration removed — moved to SettingsSystemTab as manual button
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
@@ -86,12 +64,16 @@ export default function Dashboard() {
   // Month selector state
   const [viewMonth, setViewMonth] = useState({ month: today.getMonth(), year: today.getFullYear() });
 
-  // Add the import at the top (manually added via another block later if needed, but I can replace the import here too)
   const { stats } = useDashboardStats({ cases, settings, globalTasks });
 
-  const selectedMonthStats = useMemo(() => computeMonthStats(cases, settings, viewMonth.month, viewMonth.year), [cases, settings, viewMonth]);
   const prevViewMonth = useMemo(() => ({ month: viewMonth.month === 0 ? 11 : viewMonth.month - 1, year: viewMonth.month === 0 ? viewMonth.year - 1 : viewMonth.year }), [viewMonth]);
-  const prevMonthStats = useMemo(() => computeMonthStats(cases, settings, prevViewMonth.month, prevViewMonth.year), [cases, settings, prevViewMonth]);
+  const { selectedMonthStats, prevMonthStats } = useMemo(() => {
+    const multi = computeMultiMonthStats(cases, settings, [viewMonth, prevViewMonth]);
+    return {
+      selectedMonthStats: multi[`${viewMonth.year}-${viewMonth.month}`] || { sessions: 0, casesAdded: 0, memos: 0, judgments: {} },
+      prevMonthStats: multi[`${prevViewMonth.year}-${prevViewMonth.month}`] || { sessions: 0, casesAdded: 0, memos: 0, judgments: {} },
+    };
+  }, [cases, settings, viewMonth, prevViewMonth]);
 
   // Dynamic color resolver: reads from settings.statsMapping, falls back to FALLBACK_COLORS
   const activeMapping = useMemo(() => getActiveMapping(settings), [settings]);
@@ -105,6 +87,16 @@ export default function Dashboard() {
     return '#94a3b8';
   };
 
+
+  const displayedTasks = useMemo(() => {
+    const allTasks = [];
+    cases.forEach(c => { if (c.tasks) c.tasks.forEach(t => allTasks.push({ ...t, caseId: c.id, caseNum: c['رقم الدعوى'] || c.id, year: c['السنة'], type: 'case' })); });
+    globalTasks.forEach(t => allTasks.push({ ...t, type: 'global', caseNum: t.linkedCases?.length ? `مرتبطة بـ ${t.linkedCases.length} ملفات` : 'مهمة عامة' }));
+    return allTasks
+      .filter(t => adminTasksTab === 'completed' ? t.status === 'completed' : t.status !== 'completed')
+      .sort((a, b) => new Date(b.completedAt || b.createdAt) - new Date(a.completedAt || a.createdAt));
+  }, [cases, globalTasks, adminTasksTab]);
+
   // Agenda popup modal state
   const [agendaModal, setAgendaModal] = useState({ isOpen: false, title: '', casesList: [] });
 
@@ -115,7 +107,7 @@ export default function Dashboard() {
     return cases.filter(c => {
       const role = String(c['الصفة'] || c['صفة'] || '').trim();
       if (role === 'لا شأن' || role === 'خارج الاختصاص') return false;
-      const isAppellant = role === 'طاعنين أو مدعين';
+      const isAppellant = isAppellantRole(role, settings);
       const lastSessionStr = c['آخر جلسة'] || c['تاريخ الجلسة'] || '';
       const lastSessionDate = getSafeDateObj(lastSessionStr);
       const hasUpcomingSession = lastSessionDate && lastSessionDate >= todayObj;
@@ -177,7 +169,7 @@ export default function Dashboard() {
         title = 'الوقف (مطعون ضدنا)';
         filteredCases = cases.filter(c => {
           const role = String(c['الصفة'] || c['صفة'] || '').trim();
-          const isAppellee  = role.includes('مطعون ضد') || role.includes('مدعى علي') || role.includes(settings?.roles?.[1] || 'مطعون ضدنا');
+          const isAppellee = isAppelleeRole(role, settings);
           if (!isAppellee) return false;
           const s = Array.isArray(c.sessions) ? c.sessions : Object.values(c.sessions || {});
           s.sort((a,b) => (getSafeDateObj(b.date)?.getTime() || 0) - (getSafeDateObj(a.date)?.getTime() || 0));
@@ -185,10 +177,10 @@ export default function Dashboard() {
           if (!latest) return false;
           if (latest.hasJudgment) {
              const cAs = latest.judgmentClassification || latest.judgment?.result || '';
-             return cAs.includes('وقف');
+             return isStopImpact(cAs, activeMapping);
           }
           const dec = String(latest.decision || '').trim();
-          return dec.includes('وقف');
+          return isStopImpact(dec, activeMapping);
         });
         break;
       case 'consideration':
@@ -781,7 +773,7 @@ export default function Dashboard() {
               </div>
               <div className="flex-1 space-y-1.5 min-w-0 py-1">
                 {donutSegments.slice(0, 7).map(seg => {
-                  const isCritical = (seg.name.includes('وقف') && stats.criticalSuspended.length > 0) || (seg.name.includes('اعتبار') && stats.criticalConsidered.length > 0);
+                  const isCritical = (isStopImpact(seg.name, activeMapping) && stats.criticalSuspended.length > 0) || (resolveImpact(seg.name, activeMapping) === 'consideration' && stats.criticalConsidered.length > 0);
                   return (
                   <div key={seg.name} className="flex items-center justify-between gap-2 relative">
                     <div className="flex items-center gap-1.5 min-w-0">
@@ -916,8 +908,8 @@ export default function Dashboard() {
                       <div className="flex items-center gap-2">
                         <Star className={`w-3.5 h-3.5 shrink-0 ${c.isImportant ? 'text-amber-500 fill-amber-500' : 'text-slate-300'}`} />
                         <span className="text-xs font-black text-[#0f172a] truncate">رقم {c['رقم الدعوى']} لسنة {c['السنة']} ق</span>
-                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${role.includes('طاعن') ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
-                          {role.includes('طاعن') ? 'طاعن' : 'مطعون ضده'}
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${isAppellantRole(role, settings) ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
+                          {isAppellantRole(role, settings) ? 'طاعن' : 'مطعون ضده'}
                         </span>
                       </div>
                       <p className="text-[11px] font-bold text-slate-500 mt-1 truncate">الخصم: {c['المدعى_عليه'] || c['المدعى عليه'] || 'غير محدد'}</p>
@@ -1025,7 +1017,7 @@ export default function Dashboard() {
                       const total = stats.topJudgments.reduce((s, c) => s + c[1], 0);
                       const pct = Math.round((count / total) * 100);
                       const color = getJColor(name);
-                      const isCritical = (name.includes('وقف') && stats.criticalSuspended.length > 0) || (name.includes('اعتبار') && stats.criticalConsidered.length > 0);
+                      const isCritical = (isStopImpact(name, activeMapping) && stats.criticalSuspended.length > 0) || (resolveImpact(name, activeMapping) === 'consideration' && stats.criticalConsidered.length > 0);
                       return (
                         <div key={name} className="space-y-1 relative">
                           <div className="flex items-center justify-between text-[11px] font-bold">

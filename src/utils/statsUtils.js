@@ -158,7 +158,7 @@ export function calculateCaseAlerts(c, settings) {
 // ─────────────────────────────────────────────────────────────
 // calculateDashboardStats: full dashboard aggregation
 // ─────────────────────────────────────────────────────────────
-export function calculateDashboardStats(cases, settings, globalTasks = []) {
+export function calculateDashboardStats(cases, settings) {
   let activeCasesCount    = 0;
   let ongoingCount        = 0;
   let reservedCount       = 0;
@@ -397,6 +397,11 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
 
     // Opponent entity counting
     if (isAppellant) {
+      // We are appellant — opponent is the appellee/defendant
+      const entity = String(c['المطعون ضده'] || c['المدعى_عليه'] || c['المدعى عليه'] || '').trim();
+      if (entity) opponentsCount[entity] = (opponentsCount[entity] || 0) + 1;
+    } else if (isAppellee) {
+      // We are appellee — opponent is the appellant/plaintiff
       const entity = String(c['المدعي'] || c['الطاعن'] || c['المستأنف'] || '').trim();
       if (entity) opponentsCount[entity] = (opponentsCount[entity] || 0) + 1;
     }
@@ -431,4 +436,17 @@ export function calculateDashboardStats(cases, settings, globalTasks = []) {
     criticalAgainst,
     performanceSplit,
   };
+}
+
+// ─────────────────────────────────────────────────────────────
+// computeMultiMonthStats: compute stats for multiple months in one pass
+// monthsList: array of {month, year}
+// Returns object keyed by "year-month"
+// ─────────────────────────────────────────────────────────────
+export function computeMultiMonthStats(cases, settings, monthsList) {
+  const result = {};
+  for (const { month, year } of monthsList) {
+    result[`${year}-${month}`] = computeMonthStats(cases, settings, month, year);
+  }
+  return result;
 }

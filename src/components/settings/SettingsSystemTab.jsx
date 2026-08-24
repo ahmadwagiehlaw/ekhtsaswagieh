@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppState';
 import { useAuth } from '../../context/AuthContext';
 import { useUI } from '../../context/UIContext';
-import { Settings as SettingsIcon, Plus, Trash2, ShieldAlert } from 'lucide-react';
+import { Settings as SettingsIcon, Plus, Trash2, ShieldAlert, RefreshCw } from 'lucide-react';
+import { autoDetermineRole } from '../../utils/caseUtils';
 
 export default function SettingsSystemTab() {
-  const { settings, saveSettingsToFirebase } = useAppContext();
+  const { settings, saveSettingsToFirebase, cases, saveBatchCasesToFirebase } = useAppContext();
   const { currentUser, login, changePassword } = useAuth();
   const { toast, showConfirm, showPrompt } = useUI();
   
@@ -21,6 +22,7 @@ export default function SettingsSystemTab() {
   const [localSearchTabPosition, setLocalSearchTabPosition] = useState(settings?.searchTabPosition || 'right');
   
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -68,6 +70,35 @@ export default function SettingsSystemTab() {
     setLocalScratchpadPosition(settings?.scratchpadPosition || 'right');
     setLocalSearchTabPosition(settings?.searchTabPosition || 'right');
   }, [settings]);
+
+  const handleMigrateRoles = async () => {
+    const confirmed = await showConfirm(
+      'استكمال حقل الصفة',
+      'سيقوم النظام بمسح جميع القضايا التي لا تحتوي على حقل "الصفة" ومحاولة تحديده تلقائياً. هل تريد المتابعة؟'
+    );
+    if (!confirmed) return;
+    setIsMigrating(true);
+    try {
+      const updates = cases.map(c => {
+        if (!c['الصفة'] || String(c['الصفة']).trim() === '') {
+          const auto = autoDetermineRole(c);
+          if (auto && auto !== 'لا شأن') return { id: c.id, 'الصفة': auto };
+        }
+        return null;
+      }).filter(Boolean);
+      if (updates.length > 0) {
+        await saveBatchCasesToFirebase(updates);
+        toast(`تم استكمال حقل "الصفة" لـ ${updates.length} قضية بنجاح.`, 'success');
+      } else {
+        toast('لا توجد قضايا تحتاج إلى استكمال حقل الصفة.', 'info');
+      }
+    } catch (err) {
+      console.error('Migration failed:', err);
+      toast('حدث خطأ أثناء استكمال الصفات.', 'error');
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
   const handleSaveSystemSettings = async () => {
     setIsProcessing(true);
@@ -285,6 +316,18 @@ export default function SettingsSystemTab() {
         </form>
       </div>
       
+      {/* Migration button — Fix 5 */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="text-right">
+          <h3 className="font-bold text-sm text-amber-900">استكمال حقل الصفة تلقائياً للقضايا القديمة</h3>
+          <p className="text-xs text-amber-700 mt-1">يُستخدم مرة واحدة فقط لاستكمال حقل "الصفة" في القضايا التي أُضيفت قبل تفعيل هذه الميزة.</p>
+        </div>
+        <button onClick={handleMigrateRoles} disabled={isMigrating} className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-lg text-xs whitespace-nowrap transition shadow-sm flex items-center gap-2 disabled:opacity-50">
+          <RefreshCw className={`w-3.5 h-3.5 ${isMigrating ? 'animate-spin' : ''}`} />
+          {isMigrating ? 'جاري المعالجة...' : 'استكمال حقل الصفة'}
+        </button>
+      </div>
+
       {/* Save Settings Button */}
       <button onClick={handleSaveSystemSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm hover:bg-navy-800 transition disabled:opacity-50">
         {isProcessing ? 'جاري الحفظ...' : 'حفظ إعدادات النظام'}
