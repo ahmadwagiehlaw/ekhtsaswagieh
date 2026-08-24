@@ -25,7 +25,7 @@ export const DEFAULT_SCHEMA = [
   { id: 'تصنيف الحكم', label: 'تصنيف الحكم', type: 'text', visible: true },
 ];
 
-export const OBSOLETE_FIELDS = ['الحكم', 'تصنيف الحكم', 'المنطوق', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي', 'نوع الحكم'];
+export const OBSOLETE_FIELDS = ['الحكم', 'المنطوق', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي', 'نوع الحكم'];
 
 export const cleanSchemaFields = (fields) => {
   if (!fields || !Array.isArray(fields)) return DEFAULT_SCHEMA;

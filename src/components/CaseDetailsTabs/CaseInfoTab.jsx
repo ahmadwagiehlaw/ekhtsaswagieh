@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Calendar, Bell, Files, X, MapPin } from 'lucide-react';
+import {  Trash2, Calendar, Bell, Files, X, MapPin , Settings2 } from 'lucide-react';
 import StrictSelectField from '../StrictSelectField';
 import SmartAutocomplete from '../SmartAutocomplete';
 import { formatDateString, getSafeDateObj } from '../../utils/dateUtils';
@@ -100,49 +100,51 @@ export default function CaseInfoTab({
               <div key={idx} className="w-full">
                 {/* --- Unified Header injected at top of tab --- */}
                 {group.title === '🏛️ بيانات الحكم وأخرى' && settings?.courtDegree !== 'أول درجة' && (
-                  <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-200 space-y-5">
-                    <div className="grid grid-cols-12 gap-2 w-full">
-                      <div className="col-span-8 sm:col-span-8 relative">
-                        <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">رقم دعوى أول درجة</span>
+                  <div className="mb-6 mt-2 pt-2 animate-in fade-in slide-in-from-top-2 duration-200 space-y-5">
+                    <div className="grid grid-cols-12 gap-y-7 gap-x-2 w-full">
+                      {/* Unified First Instance Case No & Year Group */}
+                      <div className="col-span-12 sm:col-span-5 relative bg-slate-50/80 p-2.5 rounded-2xl border border-slate-200 flex items-center gap-2 shadow-sm min-h-[58px]">
+                        <span className="absolute -top-3 right-3 text-[10px] font-black text-slate-600 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-sm">رقم دعوى أول درجة والسنة</span>
+                        
                         {isEditing ? (
-                          <SmartAutocomplete
-                            maxLength={6}
-                            id="رقم دعوى أول درجة"
-                            value={editData['رقم دعوى أول درجة'] || ''}
-                            onChange={(v) => {
-                                let finalV = v.replace(/[^\d]/g, '');
-                                setEditData({...editData, 'رقم دعوى أول درجة': finalV});
-                            }}
-                            cases={cases}
-                            fieldPaths={['رقم دعوى أول درجة']}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition"
-                          />
+                          <>
+                            <div className="flex-[2] relative mt-1.5">
+                              <SmartAutocomplete
+                                maxLength={6}
+                                id="رقم دعوى أول درجة"
+                                value={editData['رقم دعوى أول درجة'] || ''}
+                                onChange={(v) => {
+                                    let finalV = v.replace(/[^\d]/g, '');
+                                    setEditData({...editData, 'رقم دعوى أول درجة': finalV});
+                                }}
+                                cases={cases}
+                                fieldPaths={['رقم دعوى أول درجة']}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-black text-navy-900 focus:outline-none focus:ring-2 focus:ring-slate-400 transition shadow-sm text-center"
+                                placeholder="الرقم"
+                              />
+                            </div>
+                            <span className="text-slate-300 font-bold mb-0.5">/</span>
+                            <div className="flex-[1.2] relative mt-1.5">
+                              <SmartAutocomplete
+                                maxLength={4}
+                                id="سنة دعوى أول درجة"
+                                value={editData['سنة دعوى أول درجة'] || ''}
+                                onChange={(v) => {
+                                    let finalV = v.replace(/[^\d]/g, '');
+                                    setEditData({...editData, 'سنة دعوى أول درجة': finalV});
+                                }}
+                                cases={cases}
+                                fieldPaths={['سنة دعوى أول درجة']}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-black text-navy-900 focus:outline-none focus:ring-2 focus:ring-slate-400 transition shadow-sm text-center z-0"
+                                placeholder="السنة"
+                              />
+                            </div>
+                          </>
                         ) : (
-                          <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 min-h-[42px] flex items-center justify-center gap-1.5" dir="ltr">
+                          <div className="w-full mt-1.5 bg-white/90 border border-white rounded-xl p-2 text-sm font-black text-slate-700 flex items-center justify-center gap-1.5 shadow-sm" dir="ltr">
                             <span>{localizeNumber(editData['سنة دعوى أول درجة'] || '', settings?.numberFormat)}</span>
-                            <span className="text-slate-400">/</span>
+                            <span className="text-slate-400 font-normal">/</span>
                             <span>{localizeNumber(editData['رقم دعوى أول درجة'] || '', settings?.numberFormat)}</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="col-span-4 sm:col-span-4 relative">
-                        <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">سنة دعوى أول درجة</span>
-                        {isEditing ? (
-                          <SmartAutocomplete
-                            maxLength={4}
-                            id="سنة دعوى أول درجة"
-                            value={editData['سنة دعوى أول درجة'] || ''}
-                            onChange={(v) => {
-                                let finalV = v.replace(/[^\d]/g, '');
-                                setEditData({...editData, 'سنة دعوى أول درجة': finalV});
-                            }}
-                            cases={cases}
-                            fieldPaths={['سنة دعوى أول درجة']}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition z-0"
-                          />
-                        ) : (
-                          <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 min-h-[42px] flex items-center justify-center">
-                            {localizeNumber(editData['سنة دعوى أول درجة'] || '', settings?.numberFormat) || '---'}
                           </div>
                         )}
                       </div>
@@ -151,54 +153,87 @@ export default function CaseInfoTab({
                 )}
                 
                 {group.title === '📌 بيانات أساسية' && (
-                  <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-200 space-y-5">
+                  <div className="mb-6 mt-2 pt-2 animate-in fade-in slide-in-from-top-2 duration-200 space-y-5">
                     {/* 1. Case No & Year */}
-                    <div className="grid grid-cols-12 gap-2 w-full">
-                      <div className="col-span-5 sm:col-span-5 relative">
-                        <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">رقم الدعوى</span>
+                    <div className="grid grid-cols-12 gap-y-7 gap-x-2 w-full">
+                      {/* Unified Case No & Year Group */}
+                      <div className="col-span-12 sm:col-span-5 relative bg-indigo-50/60 p-2.5 rounded-2xl border border-indigo-100 flex items-center gap-2 shadow-sm min-h-[58px]">
+                        <span className="absolute -top-3 right-3 text-[10px] font-black text-indigo-700 bg-white px-2 py-0.5 rounded-full border border-indigo-100 shadow-sm">رقم الدعوى والسنة</span>
+                        
                         {isEditing ? (
-                          <SmartAutocomplete
-                            maxLength={6}
-                            id="رقم الدعوى"
-                            value={editData['رقم الدعوى'] || editData['رقم القضية'] || editData['رقم_الدعوى'] || ''}
-                            onChange={(v) => {
-                                let finalV = v.replace(/[^\d]/g, '');
-                                setEditData({...editData, 'رقم الدعوى': finalV});
-                            }}
-                            cases={cases}
-                            fieldPaths={['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى']}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition"
-                          />
+                          <>
+                            <div className="flex-[2] relative mt-1.5">
+                              <SmartAutocomplete
+                                maxLength={6}
+                                id="رقم الدعوى"
+                                value={editData['رقم الدعوى'] || editData['رقم القضية'] || editData['رقم_الدعوى'] || ''}
+                                onChange={(v) => {
+                                    let finalV = v.replace(/[^\d]/g, '');
+                                    setEditData({...editData, 'رقم الدعوى': finalV});
+                                }}
+                                cases={cases}
+                                fieldPaths={['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى']}
+                                className="w-full bg-white border border-indigo-200/60 rounded-xl px-3 py-1.5 text-xs font-black text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm text-center"
+                                placeholder="الرقم"
+                              />
+                            </div>
+                            <span className="text-slate-300 font-bold mb-0.5">/</span>
+                            <div className="flex-[1.2] relative mt-1.5">
+                              <SmartAutocomplete
+                                maxLength={4}
+                                id="السنة"
+                                value={editData['السنة'] || editData['سنة'] || editData['year'] || ''}
+                                onChange={(v) => {
+                                    let finalV = v.replace(/[^\d]/g, '');
+                                    setEditData({...editData, 'السنة': finalV});
+                                }}
+                                cases={cases}
+                                fieldPaths={['السنة', 'سنة', 'year']}
+                                className="w-full bg-white border border-indigo-200/60 rounded-xl px-3 py-1.5 text-xs font-black text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm text-center z-0"
+                                placeholder="السنة"
+                              />
+                            </div>
+                          </>
                         ) : (
-                          <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 min-h-[42px] flex items-center justify-center gap-1.5" dir="ltr">
+                          <div className="w-full mt-1.5 bg-white/90 border border-white rounded-xl p-2 text-sm font-black text-indigo-900 flex items-center justify-center gap-1.5 shadow-sm" dir="ltr">
                             <span>{localizeNumber(editData['السنة'] || editData['سنة'] || editData['year'] || '', settings?.numberFormat)}</span>
-                            <span className="text-slate-400">/</span>
+                            <span className="text-slate-400 font-normal">/</span>
                             <span>{localizeNumber(editData['رقم الدعوى'] || editData['رقم القضية'] || editData['رقم_الدعوى'] || '', settings?.numberFormat)}</span>
                           </div>
                         )}
                       </div>
-                      <div className="col-span-3 sm:col-span-3 relative">
-                        <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">السنة</span>
+                      
+                      <div className="col-span-6 sm:col-span-3 relative">
+                        <div className="absolute -top-5 right-1 flex items-center gap-1.5">
+                          <span className="text-[10px] font-black text-slate-500">مكان الملف</span>
+                          {isEditing && (
+                            <button 
+                              type="button" 
+                              onClick={() => setManagingField('fileLocations')}
+                              className="text-slate-400 hover:text-indigo-600 transition"
+                              title="إدارة الخيارات"
+                            >
+                              <Settings2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                         {isEditing ? (
-                          <SmartAutocomplete
-                            maxLength={4}
-                            id="السنة"
-                            value={editData['السنة'] || editData['سنة'] || editData['year'] || ''}
-                            onChange={(v) => {
-                                let finalV = v.replace(/[^\d]/g, '');
-                                setEditData({...editData, 'السنة': finalV});
-                            }}
-                            cases={cases}
-                            fieldPaths={['السنة', 'سنة', 'year']}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition z-0"
-                          />
+                          <div className="mt-1">
+                            <StrictSelectField
+                              value={editData['مكان الملف'] || ''}
+                              onChange={v => setEditData({ ...editData, 'مكان الملف': v })}
+                              options={settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']}
+                              placeholder="مكان الملف..."
+                            />
+                          </div>
                         ) : (
                           <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 min-h-[42px] flex items-center justify-center">
-                            {localizeNumber(editData['السنة'] || editData['سنة'] || editData['year'] || '', settings?.numberFormat)}
+                            {editData['مكان الملف'] || '---'}
                           </div>
                         )}
                       </div>
-                    <div className="col-span-4 sm:col-span-4 relative">
+
+                      <div className="col-span-6 sm:col-span-4 relative">
                         <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">تاريخ رفع الدعوى</span>
                         {isEditing ? (
                           <input type="date" value={editData['تاريخ رفع الدعوى'] && getSafeDateObj(editData['تاريخ رفع الدعوى']) ? getSafeDateObj(editData['تاريخ رفع الدعوى']).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({ ...editData, ['تاريخ رفع الدعوى']: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition h-[38px] mt-0.5" />
@@ -517,7 +552,7 @@ export default function CaseInfoTab({
                     if (!isEditing && isEmptyValue(val)) return null;
 
                     // Skip rendering fields that are handled dynamically or separately
-                    if (['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'عناوين المطعون ضدهم الآخرين', 'الصفة', 'صفة', 'السنة', 'سنة', 'year', 'دعاوى منضمة', 'مطعون ضدهم آخرين', 'تاريخ رفع الدعوى', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة'].includes(field.id)) return null;
+                    if (['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'عناوين المطعون ضدهم الآخرين', 'الصفة', 'صفة', 'السنة', 'سنة', 'year', 'دعاوى منضمة', 'مطعون ضدهم آخرين', 'تاريخ رفع الدعوى', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'مكان الملف'].includes(field.id)) return null;
 
                     const isDateField = (field.type === 'date' && field.id !== 'نوع الجلسة') || field.id.includes('تاريخ') || (field.id.includes('جلسة') && field.id !== 'نوع الجلسة');
                     const displayVal = localizeNumber(isDateField ? formatDateString(val) : val, settings?.numberFormat);
@@ -618,6 +653,17 @@ export default function CaseInfoTab({
                               options={settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء']}
                               onManage={() => setManagingField('judgmentClassifications')}
                               placeholder="اختر تصنيف الحكم..."
+                            />
+                          ) : field.id === 'محكمة أول درجة' ? (
+                            <SmartAutocomplete
+                              label={field.label}
+                              onManage={() => setManagingField('firstInstanceCourts')}
+                              id={field.id}
+                              value={val}
+                              onChange={(v) => setEditData({ ...editData, [field.id]: v })}
+                              cases={cases}
+                              fieldPaths={[field.id]}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition"
                             />
                           ) : field.type === 'textarea' ? (
                             <textarea value={val} onChange={(e) => setEditData({ ...editData, [field.id]: e.target.value })} rows={3} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 resize-none transition" />
