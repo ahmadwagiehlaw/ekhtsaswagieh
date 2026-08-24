@@ -6,6 +6,8 @@ import { formatDateString, getSafeDateObj } from '../../utils/dateUtils';
 import { localizeNumber } from '../../utils/numberUtils';
 
 export default function CaseInfoTab({
+  setActiveTab,
+  setActiveJudgmentSessionIdx,
   activeDetailTab,
   setActiveDetailTab,
   schema,
@@ -40,11 +42,11 @@ export default function CaseInfoTab({
           {[
             {
               title: '📌 بيانات أساسية',
-              keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'تاريخ رفع الدعوى', 'دعاوى منضمة', 'المحكمة', 'الدائرة', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'مطعون ضدهم آخرين', 'الصفة', 'صفة']
+              keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'تاريخ رفع الدعوى', 'دعاوى منضمة', 'المحكمة', 'الدائرة', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'مطعون ضدهم آخرين', 'الصفة', 'صفة', 'مكان الملف']
             },
             {
               title: '⚖️ الجلسة والقرار',
-              keys: ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'الرول', 'نوع الجلسة', 'القرار', 'قرار الجلسة', 'مكان الملف', 'ملاحظات']
+              keys: ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'الرول', 'نوع الجلسة', 'القرار', 'قرار الجلسة', 'ملاحظات']
             },
             {
               title: '📑 بيانات فنية',
@@ -52,7 +54,7 @@ export default function CaseInfoTab({
             },
             {
               title: '🏛️ بيانات الحكم وأخرى',
-              keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي']
+              keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي', 'طلبات الطاعن']
             }
           ].map((group) => (
             <button
@@ -71,11 +73,11 @@ export default function CaseInfoTab({
           {[
             {
               title: '📌 بيانات أساسية',
-              keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'تاريخ رفع الدعوى', 'دعاوى منضمة', 'المحكمة', 'الدائرة', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'مطعون ضدهم آخرين', 'الصفة', 'صفة']
+              keys: ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'السنة', 'سنة', 'year', 'تاريخ رفع الدعوى', 'دعاوى منضمة', 'المحكمة', 'الدائرة', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'مطعون ضدهم آخرين', 'الصفة', 'صفة', 'مكان الملف']
             },
             {
               title: '⚖️ الجلسة والقرار',
-              keys: ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'الرول', 'نوع الجلسة', 'القرار', 'قرار الجلسة', 'مكان الملف', 'ملاحظات']
+              keys: ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'الرول', 'نوع الجلسة', 'القرار', 'قرار الجلسة', 'ملاحظات']
             },
             {
               title: '📑 بيانات فنية',
@@ -83,7 +85,7 @@ export default function CaseInfoTab({
             },
             {
               title: '🏛️ بيانات الحكم وأخرى',
-              keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي']
+              keys: ['محكمة أول درجة', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة', 'تاريخ حكم أول درجة', 'جلسة حكم أول درجة', 'منطوق حكم أول درجة', 'الحكم', 'تصنيف الحكم', 'نوع الحكم', 'المنطوق', 'منطوق الحكم', 'ملخص الطعن وتفاصيله', 'ملخص الطعن', 'المقر المختار', 'عنوان المدعى عليه', 'عنوان المدعي', 'طلبات الطاعن']
             }
           ].map((group, idx, arr) => {
             if (group.title !== activeDetailTab) return null;
@@ -97,14 +99,66 @@ export default function CaseInfoTab({
             return (
               <div key={idx} className="w-full">
                 {/* --- Unified Header injected at top of tab --- */}
+                {group.title === '🏛️ بيانات الحكم وأخرى' && settings?.courtDegree !== 'أول درجة' && (
+                  <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-200 space-y-5">
+                    <div className="grid grid-cols-12 gap-2 w-full">
+                      <div className="col-span-8 sm:col-span-8 relative">
+                        <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">رقم دعوى أول درجة</span>
+                        {isEditing ? (
+                          <SmartAutocomplete
+                            maxLength={6}
+                            id="رقم دعوى أول درجة"
+                            value={editData['رقم دعوى أول درجة'] || ''}
+                            onChange={(v) => {
+                                let finalV = v.replace(/[^\d]/g, '');
+                                setEditData({...editData, 'رقم دعوى أول درجة': finalV});
+                            }}
+                            cases={cases}
+                            fieldPaths={['رقم دعوى أول درجة']}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition"
+                          />
+                        ) : (
+                          <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 min-h-[42px] flex items-center justify-center gap-1.5" dir="ltr">
+                            <span>{localizeNumber(editData['سنة دعوى أول درجة'] || '', settings?.numberFormat)}</span>
+                            <span className="text-slate-400">/</span>
+                            <span>{localizeNumber(editData['رقم دعوى أول درجة'] || '', settings?.numberFormat)}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="col-span-4 sm:col-span-4 relative">
+                        <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">سنة دعوى أول درجة</span>
+                        {isEditing ? (
+                          <SmartAutocomplete
+                            maxLength={4}
+                            id="سنة دعوى أول درجة"
+                            value={editData['سنة دعوى أول درجة'] || ''}
+                            onChange={(v) => {
+                                let finalV = v.replace(/[^\d]/g, '');
+                                setEditData({...editData, 'سنة دعوى أول درجة': finalV});
+                            }}
+                            cases={cases}
+                            fieldPaths={['سنة دعوى أول درجة']}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition z-0"
+                          />
+                        ) : (
+                          <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 min-h-[42px] flex items-center justify-center">
+                            {localizeNumber(editData['سنة دعوى أول درجة'] || '', settings?.numberFormat) || '---'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 {group.title === '📌 بيانات أساسية' && (
                   <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-200 space-y-5">
                     {/* 1. Case No & Year */}
                     <div className="grid grid-cols-12 gap-2 w-full">
-                      <div className="col-span-8 sm:col-span-6 relative">
+                      <div className="col-span-5 sm:col-span-5 relative">
                         <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">رقم الدعوى</span>
                         {isEditing ? (
                           <SmartAutocomplete
+                            maxLength={6}
                             id="رقم الدعوى"
                             value={editData['رقم الدعوى'] || editData['رقم القضية'] || editData['رقم_الدعوى'] || ''}
                             onChange={(v) => {
@@ -123,10 +177,11 @@ export default function CaseInfoTab({
                           </div>
                         )}
                       </div>
-                      <div className="col-span-4 sm:col-span-6 relative">
+                      <div className="col-span-3 sm:col-span-3 relative">
                         <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">السنة</span>
                         {isEditing ? (
                           <SmartAutocomplete
+                            maxLength={4}
                             id="السنة"
                             value={editData['السنة'] || editData['سنة'] || editData['year'] || ''}
                             onChange={(v) => {
@@ -143,8 +198,17 @@ export default function CaseInfoTab({
                           </div>
                         )}
                       </div>
+                    <div className="col-span-4 sm:col-span-4 relative">
+                        <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">تاريخ رفع الدعوى</span>
+                        {isEditing ? (
+                          <input type="date" value={editData['تاريخ رفع الدعوى'] && getSafeDateObj(editData['تاريخ رفع الدعوى']) ? getSafeDateObj(editData['تاريخ رفع الدعوى']).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({ ...editData, ['تاريخ رفع الدعوى']: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition h-[38px] mt-0.5" />
+                        ) : (
+                          <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 min-h-[42px] flex items-center justify-center">
+                            {localizeNumber(formatDateString(editData['تاريخ رفع الدعوى']), settings?.numberFormat) || '---'}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    
                     {/* 2. Plaintiffs List */}
                     <div>
                       <label className="text-xs font-black text-slate-500 block mb-3">المدعين / الطاعنين</label>
@@ -407,6 +471,28 @@ export default function CaseInfoTab({
                   </div>
                 )}
 
+                {group.title === '⚖️ الجلسة والقرار' && (
+                  <div className="mb-4 flex justify-between items-center bg-indigo-50/50 p-3 rounded-xl border border-indigo-100/50">
+                    <div>
+                      <h4 className="text-sm font-black text-indigo-900">إضافة أو تعديل حكم</h4>
+                      <p className="text-[10px] text-slate-500 mt-0.5">انتقل إلى سجل الجلسات لتسجيل حكم آخر جلسة</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!caseData?.sessions || caseData.sessions.length === 0}
+                      onClick={() => {
+                        if (caseData?.sessions && caseData.sessions.length > 0) {
+                          setActiveTab('sessions');
+                          setActiveJudgmentSessionIdx(caseData.sessions.length - 1);
+                        }
+                      }}
+                      className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm"
+                      title={!caseData?.sessions || caseData.sessions.length === 0 ? "يجب إضافة جلسة أولاً" : ""}
+                    >
+                      <span>⚖️ إضافة حكم</span>
+                    </button>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 gap-y-5 animate-in fade-in slide-in-from-top-2 duration-200">
                   {groupFields.map(field => {
                     const val = editData[field.id] || '';
@@ -431,7 +517,7 @@ export default function CaseInfoTab({
                     if (!isEditing && isEmptyValue(val)) return null;
 
                     // Skip rendering fields that are handled dynamically or separately
-                    if (['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'عناوين المطعون ضدهم الآخرين', 'الصفة', 'صفة', 'السنة', 'سنة', 'year', 'دعاوى منضمة', 'مطعون ضدهم آخرين'].includes(field.id)) return null;
+                    if (['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى', 'المدعي', 'المدعى_عليه', 'المدعى عليه', 'الخصوم', 'عناوين المطعون ضدهم الآخرين', 'الصفة', 'صفة', 'السنة', 'سنة', 'year', 'دعاوى منضمة', 'مطعون ضدهم آخرين', 'تاريخ رفع الدعوى', 'رقم دعوى أول درجة', 'سنة دعوى أول درجة'].includes(field.id)) return null;
 
                     const isDateField = (field.type === 'date' && field.id !== 'نوع الجلسة') || field.id.includes('تاريخ') || (field.id.includes('جلسة') && field.id !== 'نوع الجلسة');
                     const displayVal = localizeNumber(isDateField ? formatDateString(val) : val, settings?.numberFormat);
@@ -475,10 +561,15 @@ export default function CaseInfoTab({
 
                     return (
                       <div key={field.id} className={`space-y-1.5 ${colSpan}`}>
-                        <label className="text-[11px] font-black text-slate-500 block">{field.label}</label>
-                        {isEditing ? (
+                        
+  {!( ['الصفة', 'صفة', 'نوع الجلسة', 'القرار', 'مكان الملف', 'تصنيف الدعوى', 'تصنيف الحكم', 'محكمة أول درجة'].includes(field.id) && isEditing ) && (
+    <label className="text-[11px] font-black text-slate-500 block">{field.label}</label>
+  )}
+  {isEditing ? (
+
                           field.id === 'الصفة' || field.id === 'صفة' ? (
                             <StrictSelectField
+                              label={field.label}
                               value={val}
                               onChange={v => setEditData({ ...editData, [field.id]: v })}
                               options={['طاعنين أو مدعين', 'مطعون ضدنا أو مدعى علينا', 'لا شأن', 'خارج الاختصاص']}
@@ -486,6 +577,7 @@ export default function CaseInfoTab({
                             />
                           ) : field.id === 'نوع الجلسة' ? (
                             <StrictSelectField
+                              label={field.label}
                               value={val}
                               onChange={v => setEditData({ ...editData, [field.id]: v })}
                               options={settings?.sessionTypes || ['فحص', 'موضوع']}
@@ -502,6 +594,7 @@ export default function CaseInfoTab({
                             />
                           ) : field.id === 'مكان الملف' ? (
                             <StrictSelectField
+                              label={field.label}
                               value={val}
                               onChange={v => setEditData({ ...editData, [field.id]: v })}
                               options={settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']}
@@ -510,11 +603,21 @@ export default function CaseInfoTab({
                             />
                           ) : field.id === 'تصنيف الدعوى' ? (
                             <StrictSelectField
+                              label={field.label}
                               value={val}
                               onChange={v => setEditData({ ...editData, [field.id]: v })}
                               options={settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']}
                               onManage={() => setManagingField('caseClassifications')}
                               placeholder="اختر تصنيف الدعوى..."
+                            />
+                          ) : field.id === 'تصنيف الحكم' ? (
+                            <StrictSelectField
+                              label={field.label}
+                              value={val}
+                              onChange={v => setEditData({ ...editData, [field.id]: v })}
+                              options={settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء']}
+                              onManage={() => setManagingField('judgmentClassifications')}
+                              placeholder="اختر تصنيف الحكم..."
                             />
                           ) : field.type === 'textarea' ? (
                             <textarea value={val} onChange={(e) => setEditData({ ...editData, [field.id]: e.target.value })} rows={3} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 resize-none transition" />
@@ -539,9 +642,10 @@ export default function CaseInfoTab({
                               <div className="flex-[1] relative">
                                 <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">السنة</span>
                                 <SmartAutocomplete
-                                  id="السنة"
-                                  value={editData['السنة'] || editData['سنة'] || editData['year'] || ''}
-                                  onChange={(v) => {
+                                  maxLength={4}
+                            id="السنة"
+                            value={editData['السنة'] || editData['سنة'] || editData['year'] || ''}
+                            onChange={(v) => {
                                     let finalV = v;
                                     if (schema.find(f => f.id === 'السنة' || f.id === 'سنة' || f.id === 'year')?.type === 'number') finalV = finalV.replace(/[^\d]/g, '');
                                     setEditData({ ...editData, ['السنة']: finalV });

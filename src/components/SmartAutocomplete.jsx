@@ -1,14 +1,18 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Settings2 } from 'lucide-react';
 import { getFieldVal } from '../utils/caseUtils';
 
 export default function SmartAutocomplete({ 
+  label,
+  onManage,
   value, 
   onChange, 
   cases = [], 
   fieldPaths = [], 
   placeholder = '', 
   className = '',
-  id = ''
+  id = '',
+  maxLength
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -63,10 +67,27 @@ export default function SmartAutocomplete({
   }, []);
 
   return (
-    <div className="relative w-full" ref={wrapperRef}>
+    <div className="w-full">
+      {(label || onManage) && (
+        <div className="flex items-center gap-2 mb-1.5">
+          {label && <label className="text-[11px] font-black text-slate-500 block">{label}</label>}
+          {onManage && (
+            <button 
+              type="button" 
+              onClick={onManage}
+              className="text-slate-400 hover:text-indigo-600 transition cursor-pointer"
+              title="إدارة الخيارات"
+            >
+              <Settings2 className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      )}
+      <div className="relative w-full" ref={wrapperRef}>
       <input
         id={id}
         type="text"
+        maxLength={maxLength}
         value={value || ''}
         onChange={(e) => {
           onChange(e.target.value);
@@ -107,6 +128,7 @@ export default function SmartAutocomplete({
           </ul>
         </div>
       )}
+      </div>
     </div>
   );
 }

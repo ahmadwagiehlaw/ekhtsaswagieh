@@ -850,6 +850,8 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
       {/* Tab Content: Details */}
       {activeTab === 'details' && (
         <CaseInfoTab
+          setActiveTab={setActiveTab}
+          setActiveJudgmentSessionIdx={setActiveJudgmentSessionIdx}
           activeDetailTab={activeDetailTab}
           setActiveDetailTab={setActiveDetailTab}
           schema={schema}
