@@ -7,7 +7,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import SettingsDataTab from '../components/settings/SettingsDataTab';
 import SettingsUsersTab from '../components/settings/SettingsUsersTab';
 import SettingsSystemTab from '../components/settings/SettingsSystemTab';
-import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList, Scale, Download, FileJson, ArrowUpFromLine, Copy, Clock, Fingerprint, Edit3, Search, Activity, ChevronUp, ChevronDown } from 'lucide-react';
+import { Upload, LogIn, LogOut, Check, ShieldCheck, Database, LayoutTemplate, Plus, Trash2, ArrowDownUp, Users, ShieldAlert, Settings as SettingsIcon, BookOpen, ClipboardList, Scale, Download, FileJson, ArrowUpFromLine, Copy, Clock, Fingerprint, Edit3, Search, Activity, ChevronUp, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useUI } from '../context/UIContext';
 import JudgmentRulesSection from '../components/JudgmentRulesSection';
@@ -238,15 +238,32 @@ export default function Settings() {
     </button>
   );
 
-  const TagList = ({ items, onRemove, onAdd, addLabel, addPromptTitle, addPromptMsg, color = 'indigo' }) => (
+  const TagList = ({ items, onChange, addLabel, addPromptTitle, addPromptMsg, color = 'indigo' }) => (
     <div className="flex flex-wrap gap-2">
       {items.map((item, i) => (
-        <div key={i} className={`flex items-center gap-1 bg-${color}-50 border border-${color}-100 text-${color}-700 px-3 py-1.5 rounded-lg text-xs font-bold`}>
+        <div key={i} className={`flex items-center gap-1 bg-${color}-50 border border-${color}-100 text-${color}-700 px-3 py-1.5 rounded-lg text-xs font-bold group`}>
           <span>{item}</span>
-          <button onClick={() => onRemove(i)} className={`text-${color}-400 hover:text-rose-500 mr-2`}><Trash2 className="w-3 h-3" /></button>
+          <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity mr-2">
+            <button onClick={async () => { const v = await showPrompt('تعديل', 'أدخل المسمى الجديد:', item); if(v && v.trim()) { const n = [...items]; n[i] = v.trim(); onChange(n); } }} className={`text-${color}-400 hover:text-${color}-600`}>
+              <Edit3 className="w-3 h-3" />
+            </button>
+            {i > 0 && (
+              <button onClick={() => { const n = [...items]; [n[i], n[i-1]] = [n[i-1], n[i]]; onChange(n); }} className={`text-${color}-400 hover:text-${color}-600`}>
+                <ChevronRight className="w-3 h-3" />
+              </button>
+            )}
+            {i < items.length - 1 && (
+              <button onClick={() => { const n = [...items]; [n[i], n[i+1]] = [n[i+1], n[i]]; onChange(n); }} className={`text-${color}-400 hover:text-${color}-600`}>
+                <ChevronLeft className="w-3 h-3" />
+              </button>
+            )}
+            <button onClick={() => { const n = [...items]; n.splice(i, 1); onChange(n); }} className={`text-${color}-400 hover:text-rose-500`}>
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
         </div>
       ))}
-      <button onClick={async () => { const v = await showPrompt(addPromptTitle, addPromptMsg); if (v?.trim()) onAdd(v.trim()); }}
+      <button onClick={async () => { const v = await showPrompt(addPromptTitle, addPromptMsg); if (v?.trim()) onChange([...items, v.trim()]); }}
         className="flex items-center gap-1 bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-100 transition shadow-sm">
         <Plus className="w-3 h-3" /> {addLabel}
       </button>
@@ -380,13 +397,13 @@ export default function Settings() {
           {judgmentSub === 'lists' && (
             <div className="space-y-4">
               <SectionCard title="فئات الأحكام" icon={Scale}>
-                <TagList items={localJudgmentCategories} onRemove={i => setLocalJudgmentCategories(localJudgmentCategories.filter((_,idx)=>idx!==i))} onAdd={v => setLocalJudgmentCategories([...localJudgmentCategories,v])} addLabel="إضافة فئة" addPromptTitle="إضافة فئة" addPromptMsg="أدخل اسم فئة الحكم:" />
+                <TagList items={localJudgmentCategories} onChange={setLocalJudgmentCategories} addLabel="إضافة فئة" addPromptTitle="إضافة فئة" addPromptMsg="أدخل اسم فئة الحكم:" />
               </SectionCard>
               <SectionCard title="تصنيفات الأحكام (الإحصائية)" icon={ClipboardList}>
-                <TagList items={localJudgmentClassifications} onRemove={i => setLocalJudgmentClassifications(localJudgmentClassifications.filter((_,idx)=>idx!==i))} onAdd={v => setLocalJudgmentClassifications([...localJudgmentClassifications,v])} addLabel="إضافة تصنيف" addPromptTitle="إضافة تصنيف" addPromptMsg="أدخل تصنيف الحكم (مثال: صالح، ضد):" />
+                <TagList items={localJudgmentClassifications} onChange={setLocalJudgmentClassifications} addLabel="إضافة تصنيف" addPromptTitle="إضافة تصنيف" addPromptMsg="أدخل تصنيف الحكم (مثال: صالح، ضد):" />
               </SectionCard>
               <SectionCard title="أنواع الأحكام (المحفزات)" icon={ClipboardList}>
-                <TagList items={localJudgmentTypes} onRemove={i => setLocalJudgmentTypes(localJudgmentTypes.filter((_,idx)=>idx!==i))} onAdd={v => setLocalJudgmentTypes([...localJudgmentTypes,v])} addLabel="إضافة نوع" addPromptTitle="إضافة نوع" addPromptMsg="أدخل نوع الحكم (مثال: قبول، رفض، إلغاء):" />
+                <TagList items={localJudgmentTypes} onChange={setLocalJudgmentTypes} addLabel="إضافة نوع" addPromptTitle="إضافة نوع" addPromptMsg="أدخل نوع الحكم (مثال: قبول، رفض، إلغاء):" />
               </SectionCard>
               <SaveBtn label="حفظ قوائم الأحكام" />
             </div>
@@ -443,7 +460,7 @@ export default function Settings() {
           {sessionSub === 'roles' && (
             <div className="space-y-4">
               <SectionCard title="صفات الأطراف (طاعن / مطعون ضدنا / إلخ)" icon={SettingsIcon}>
-                <TagList items={localRoles} onRemove={i => setLocalRoles(localRoles.filter((_,idx)=>idx!==i))} onAdd={v => setLocalRoles([...localRoles,v])} addLabel="إضافة صفة" addPromptTitle="إضافة صفة" addPromptMsg="أدخل مسمى الصفة الجديد:" color="rose" />
+                <TagList items={localRoles} onChange={setLocalRoles} addLabel="إضافة صفة" addPromptTitle="إضافة صفة" addPromptMsg="أدخل مسمى الصفة الجديد:" color="rose" />
               </SectionCard>
               <SaveBtn label="حفظ الصفات" />
             </div>
@@ -452,7 +469,7 @@ export default function Settings() {
           {sessionSub === 'types' && (
             <div className="space-y-4">
               <SectionCard title="أنواع الجلسات (فحص / موضوع / مفوضين)" icon={SettingsIcon}>
-                <TagList items={localSessionTypes} onRemove={i => setLocalSessionTypes(localSessionTypes.filter((_,idx)=>idx!==i))} onAdd={v => setLocalSessionTypes([...localSessionTypes,v])} addLabel="إضافة نوع" addPromptTitle="إضافة نوع جلسة" addPromptMsg="أدخل اسم نوع الجلسة الجديد:" color="emerald" />
+                <TagList items={localSessionTypes} onChange={setLocalSessionTypes} addLabel="إضافة نوع" addPromptTitle="إضافة نوع جلسة" addPromptMsg="أدخل اسم نوع الجلسة الجديد:" color="emerald" />
               </SectionCard>
               <SaveBtn label="حفظ أنواع الجلسات" />
             </div>
@@ -461,7 +478,7 @@ export default function Settings() {
           {sessionSub === 'decisions' && (
             <div className="space-y-4">
               <SectionCard title="القرارات الافتراضية" icon={SettingsIcon}>
-                <TagList items={localDecisions} onRemove={i => setLocalDecisions(localDecisions.filter((_,idx)=>idx!==i))} onAdd={v => setLocalDecisions([...localDecisions,v])} addLabel="إضافة قرار" addPromptTitle="إضافة قرار" addPromptMsg="أدخل القرار الجديد:" />
+                <TagList items={localDecisions} onChange={setLocalDecisions} addLabel="إضافة قرار" addPromptTitle="إضافة قرار" addPromptMsg="أدخل القرار الجديد:" />
               </SectionCard>
               <SaveBtn label="حفظ القرارات" />
             </div>
@@ -470,7 +487,7 @@ export default function Settings() {
           {sessionSub === 'rolls' && (
             <div className="space-y-4">
               <SectionCard title="أنواع الرولات (رول جلسة / حصر الفحص)" icon={BookOpen}>
-                <TagList items={localRollTypes} onRemove={i => setLocalRollTypes(localRollTypes.filter((_,idx)=>idx!==i))} onAdd={v => setLocalRollTypes([...localRollTypes,v])} addLabel="إضافة نوع رول" addPromptTitle="إضافة نوع رول" addPromptMsg="أدخل اسم نوع الرول الجديد:" />
+                <TagList items={localRollTypes} onChange={setLocalRollTypes} addLabel="إضافة نوع رول" addPromptTitle="إضافة نوع رول" addPromptMsg="أدخل اسم نوع الرول الجديد:" />
               </SectionCard>
               <SaveBtn label="حفظ الرولات" />
             </div>
@@ -479,7 +496,7 @@ export default function Settings() {
           {sessionSub === 'procedures' && (
             <div className="space-y-4">
               <SectionCard title="الإجراءات الشائعة (سجل الإجراءات)" icon={ClipboardList}>
-                <TagList items={localCommonProcedures} onRemove={i => setLocalCommonProcedures(localCommonProcedures.filter((_,idx)=>idx!==i))} onAdd={v => setLocalCommonProcedures([...localCommonProcedures,v])} addLabel="إضافة إجراء" addPromptTitle="إضافة إجراء شائع" addPromptMsg="أدخل اسم الإجراء الجديد:" />
+                <TagList items={localCommonProcedures} onChange={setLocalCommonProcedures} addLabel="إضافة إجراء" addPromptTitle="إضافة إجراء شائع" addPromptMsg="أدخل اسم الإجراء الجديد:" />
               </SectionCard>
               <SaveBtn label="حفظ الإجراءات" />
             </div>
@@ -488,10 +505,10 @@ export default function Settings() {
           {sessionSub === 'casecls' && (
             <div className="space-y-4">
               <SectionCard title="تصنيفات الدعاوى (تسويات / بدلات / إلخ)" icon={BookOpen}>
-                <TagList items={localCaseClassifications} onRemove={i => setLocalCaseClassifications(localCaseClassifications.filter((_,idx)=>idx!==i))} onAdd={v => setLocalCaseClassifications([...localCaseClassifications,v])} addLabel="إضافة تصنيف" addPromptTitle="إضافة تصنيف" addPromptMsg="أدخل تصنيف الدعوى الجديد:" />
+                <TagList items={localCaseClassifications} onChange={setLocalCaseClassifications} addLabel="إضافة تصنيف" addPromptTitle="إضافة تصنيف" addPromptMsg="أدخل تصنيف الدعوى الجديد:" />
               </SectionCard>
               <SectionCard title="مواقع ملفات القضايا (شعبة الحفظ / أصلي)" icon={SettingsIcon}>
-                <TagList items={localFileLocations} onRemove={i => setLocalFileLocations(localFileLocations.filter((_,idx)=>idx!==i))} onAdd={v => setLocalFileLocations([...localFileLocations,v])} addLabel="إضافة مكان" addPromptTitle="إضافة مكان الملف" addPromptMsg="أدخل مسمى مكان الملف الجديد:" color="amber" />
+                <TagList items={localFileLocations} onChange={setLocalFileLocations} addLabel="إضافة مكان" addPromptTitle="إضافة مكان الملف" addPromptMsg="أدخل مسمى مكان الملف الجديد:" color="amber" />
               </SectionCard>
               <SaveBtn label="حفظ التصنيفات والمواقع" />
             </div>
