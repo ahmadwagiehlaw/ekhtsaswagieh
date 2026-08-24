@@ -79,18 +79,34 @@ export default function SettingsSystemTab() {
     if (!confirmed) return;
     setIsMigrating(true);
     try {
+      let missingCount = 0;
       const updates = cases.map(c => {
-        if (!c['الصفة'] || String(c['الصفة']).trim() === '') {
+        if (!c) return null;
+        const currentRole = String(c['الصفة'] || c['صفة'] || '').trim();
+        const isEmptyRole = !currentRole || currentRole === '' || currentRole === '-' || currentRole === '---' || currentRole === 'غير محدد' || currentRole === 'بدون صفة';
+        
+        if (isEmptyRole) {
+          missingCount++;
           const auto = autoDetermineRole(c);
-          if (auto && auto !== 'لا شأن') return { id: c.id, 'الصفة': auto };
+          if (auto) {
+            return { id: c.id, 'الصفة': auto };
+          }
         }
         return null;
       }).filter(Boolean);
       if (updates.length > 0) {
         await saveBatchCasesToFirebase(updates);
-        toast(`تم استكمال حقل "الصفة" لـ ${updates.length} قضية بنجاح.`, 'success');
+        if (missingCount > updates.length) {
+           toast(`تم استكمال ${updates.length} قضية بنجاح، وتبقى ${missingCount - updates.length} قضية لم يتعرف عليها النظام فتحتاج لاستكمال يدوي.`, 'warning');
+        } else {
+           toast(`تم استكمال حقل "الصفة" لـ ${updates.length} قضية بنجاح.`, 'success');
+        }
       } else {
-        toast('لا توجد قضايا تحتاج إلى استكمال حقل الصفة.', 'info');
+        if (missingCount > 0) {
+           toast(`يوجد ${missingCount} قضية بدون صفة، لكن لم يتعرف النظام على أطرافها برمجياً. يرجى إدخالها يدوياً.`, 'warning');
+        } else {
+           toast('جميع القضايا لديك تحتوي بالفعل على حقل الصفة. لا يوجد شيء لتحديثه!', 'info');
+        }
       }
     } catch (err) {
       console.error('Migration failed:', err);
