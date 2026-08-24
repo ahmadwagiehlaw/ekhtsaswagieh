@@ -14,7 +14,6 @@ export const DEFAULT_SCHEMA = [
   { id: 'عنوان المدعى عليه', label: 'عنوان المدعى عليه / المطعون ضده', type: 'textarea', visible: true },
   { id: 'مكان الملف', label: 'مكان الملف', type: 'text', visible: true },
   { id: 'دعاوى منضمة', label: 'دعاوى منضمة', type: 'text', visible: true },
-  { id: 'حكم محكمة أول درجة', label: 'حكم محكمة أول درجة (الرقم والسنة)', type: 'text', visible: true },
   { id: 'محكمة أول درجة', label: 'محكمة أول درجة', type: 'text', visible: true },
   { id: 'جلسة حكم أول درجة', label: 'جلسة حكم أول درجة', type: 'date', visible: true },
   { id: 'منطوق حكم أول درجة', label: 'منطوق حكم أول درجة', type: 'textarea', visible: true },
@@ -22,10 +21,9 @@ export const DEFAULT_SCHEMA = [
   { id: 'طلبات الطاعن', label: 'طلبات دعوى أول درجة', type: 'textarea', visible: true },
   { id: 'طلبات المدعي', label: 'طلبات المدعي/الطاعن', type: 'textarea', visible: true },
   { id: 'نوع الجلسة', label: 'نوع الجلسة', type: 'text', visible: true },
-  { id: 'تصنيف الحكم', label: 'تصنيف الحكم', type: 'text', visible: true },
 ];
 
-export const OBSOLETE_FIELDS = ['الحكم', 'المنطوق', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي', 'نوع الحكم'];
+export const OBSOLETE_FIELDS = ['الحكم', 'المنطوق', 'الرول', 'جلسة الحكم', 'الإجراءات الهامة والعاجلة', 'مرحلة التقاضي', 'نوع الحكم', 'تصنيف الحكم', 'حكم محكمة أول درجة'];
 
 export const cleanSchemaFields = (fields) => {
   if (!fields || !Array.isArray(fields)) return DEFAULT_SCHEMA;
