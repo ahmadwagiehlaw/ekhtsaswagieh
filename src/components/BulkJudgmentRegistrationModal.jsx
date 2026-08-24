@@ -91,12 +91,32 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
 
       const sessions = caseData.sessions ? [...caseData.sessions] : [];
       const sessionIndex = sessions.findIndex(s => s.date === sessionDate);
+      const sessionObj = sessionIndex >= 0 ? sessions[sessionIndex] : null;
+
+      const caseRole = formData._role || caseData['الصفة'] || caseData['صفة'] || '';
+
+      const engineInput = {
+        role: caseRole,
+        category: formData._category,
+        classification: formData._result,
+        type: formData._type,
+        sessionType: sessionObj?.type || '',
+        decision: sessionObj?.decision || '',
+        text: formData._verdict
+      };
+
+      const engineOutput = applyJudgmentDefaultRules(engineInput, settings?.judgmentDefaults || []);
+
+      const finalCategory = engineOutput.category || formData._category;
+      const finalResult = engineOutput.classification || formData._result;
+      const finalType = engineOutput.type || formData._type;
+      const finalVerdict = engineOutput.text || formData._verdict;
 
       const jData = {
-        category: formData._category,
-        result: formData._result,
-        type: formData._type,
-        fullVerdict: formData._verdict,
+        category: finalCategory,
+        result: finalResult,
+        type: finalType,
+        fullVerdict: finalVerdict,
         isFinal: formData._isFinal,
         recordedAt: new Date().toISOString().split('T')[0],
         timestamp: Date.now()
@@ -106,38 +126,30 @@ export default function BulkJudgmentRegistrationModal({ isOpen, onClose, session
         sessions[sessionIndex] = {
           ...sessions[sessionIndex],
           judgment: jData,
-          shortJudgment: jData.type,
-          judgmentClassification: jData.result,
-          verdict: jData.fullVerdict,
-          hasJudgment: true,
-          hasSession: false,
-          decision: jData.fullVerdict || sessions[sessionIndex].decision
+          judgmentClassification: finalResult,
+          shortJudgment: finalType,
+          verdict: finalVerdict,
+          hasJudgment: true
         };
       } else {
         sessions.push({
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
           date: sessionDate,
-          decision: jData.fullVerdict,
           judgment: jData,
-          shortJudgment: jData.type,
-          judgmentClassification: jData.result,
-          verdict: jData.fullVerdict,
-          hasJudgment: true,
-          hasSession: false,
-          createdAt: new Date().toISOString()
+          judgmentClassification: finalResult,
+          shortJudgment: finalType,
+          verdict: finalVerdict,
+          hasJudgment: true
         });
-        sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
       }
+      sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
       const updateData = { sessions };
-      // Also update latest judgment info on the root level if this is the latest session
       if (sessions[0].date === sessionDate) {
-        updateData['القرار'] = jData._verdict;
+        updateData['القرار'] = finalVerdict;
         updateData['آخر جلسة'] = sessionDate;
-        updateData['المنطوق'] = jData._verdict;
+        updateData['المنطوق'] = finalVerdict;
       }
       
-      // Update role if provided
       if (formData._role) {
         updateData['الصفة'] = formData._role;
       }

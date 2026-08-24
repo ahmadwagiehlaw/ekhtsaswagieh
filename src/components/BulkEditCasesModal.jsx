@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit3, Save, CheckSquare, Square, Gavel } from 'lucide-react';
+import { X, Edit3, Save, CheckSquare, Square, Gavel, Settings } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
+import { applyJudgmentDefaultRules } from '../utils/judgmentRulesEngine';
+import JudgmentRulesModal from './JudgmentRulesModal';
 import { useUI } from '../context/UIContext';
 
 export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onClearSelection }) {
@@ -8,6 +10,7 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
   const { toast } = useUI();
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isRulesOpen, setIsRulesOpen] = useState(false);
   const [fieldsToUpdate, setFieldsToUpdate] = useState({
     fileLocation: false,
     role: false,
@@ -455,7 +458,7 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
                   <select 
                     disabled={!fieldsToUpdate.judgmentCategory}
                     value={values.judgmentCategory}
-                    onChange={e => setValues({ ...values, judgmentCategory: e.target.value })}
+                    onChange={e => { const val = e.target.value; if (!val) { setValues(d => ({ ...d, judgmentCategory: '' })); } else { setValues(d => applyDefaultRulesLocal('judgmentCategory', val, { ...d, judgmentCategory: val })); } }}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
                   >
                     <option value="">-- اختر الفئة --</option>
@@ -472,7 +475,7 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
                   <select 
                     disabled={!fieldsToUpdate.judgmentResult}
                     value={values.judgmentResult}
-                    onChange={e => setValues({ ...values, judgmentResult: e.target.value })}
+                    onChange={e => { const val = e.target.value; if (!val) { setValues(d => ({ ...d, judgmentResult: '' })); } else { setValues(d => applyDefaultRulesLocal('judgmentResult', val, { ...d, judgmentResult: val })); } }}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
                   >
                     <option value="">-- اختر التصنيف --</option>
@@ -488,10 +491,10 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
                   </button>
                   <input 
                     type="text" 
-                    placeholder="مثال: رفض، قبول، شطب..."
+                    
                     disabled={!fieldsToUpdate.shortJudgment}
                     value={values.shortJudgment}
-                    onChange={e => setValues({ ...values, shortJudgment: e.target.value })}
+                    onChange={e => { const val = e.target.value; if (!val) { setValues(d => ({ ...d, shortJudgment: '' })); } else { setValues(d => applyDefaultRulesLocal('shortJudgment', val, { ...d, shortJudgment: val })); } }}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
                   />
                 </div>

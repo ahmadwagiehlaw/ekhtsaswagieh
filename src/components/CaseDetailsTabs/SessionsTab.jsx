@@ -319,7 +319,7 @@ export default function SessionsTab({
                       };
 
                       const applyRules = (changedField, newValue, currentCat, currentRes, currentType) => {
-                        if (!settings?.judgmentDefaults?.length) return;
+                        if (!settings?.judgmentDefaults?.length || !newValue) return;
                         
                         const engineInput = {
                            role: String(caseData['الصفة'] || caseData['صفة'] || '').trim(),

@@ -237,6 +237,31 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
     setIsBulkSaving(false);
   };
 
+
+  const applyDefaultRulesLocal = (field, value, currentData, cObj) => {
+    if (!settings?.judgmentDefaults?.length) return currentData;
+    
+    const engineInput = {
+      role: getFieldValueLocal(cObj, ['الصفة', 'صفة']) || '',
+      category: currentData['_judgmentCategory'],
+      classification: currentData['_judgmentResult'],
+      type: currentData['_judgmentType'],
+      sessionType: currentData['نوع الجلسة'],
+      decision: currentData['القرار'],
+      text: currentData['منطوق الحكم']
+    };
+    
+    const engineOutput = applyJudgmentDefaultRules(engineInput, settings.judgmentDefaults);
+    
+    return {
+      ...currentData,
+      '_judgmentCategory': engineOutput.category || currentData['_judgmentCategory'],
+      '_judgmentResult': engineOutput.classification || currentData['_judgmentResult'],
+      '_judgmentType': engineOutput.type || currentData['_judgmentType'],
+      'منطوق الحكم': engineOutput.text || currentData['منطوق الحكم']
+    };
+  };
+
   const startEditing = (e, cObj) => {
     e.stopPropagation();
     setEditingCaseId(cObj.id);
@@ -728,7 +753,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                           <div className="flex gap-1">
                             <select
                               value={editData['_judgmentCategory'] || ''}
-                              onChange={e => setEditData({...editData, '_judgmentCategory': e.target.value, '_judgmentType': ''})}
+                              onChange={e => { const val = e.target.value; if (!val) { setEditData(d => ({...d, '_judgmentCategory': '', '_judgmentType': ''})); } else { setEditData(d => applyDefaultRulesLocal('_judgmentCategory', val, { ...d, '_judgmentCategory': val, '_judgmentType': '' }, cObj)); } }}
                               className="flex-1 text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
                             >
                               <option value="">-- فئة --</option>
@@ -736,7 +761,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                             </select>
                             <select
                               value={editData['_judgmentResult'] || ''}
-                              onChange={e => setEditData({...editData, '_judgmentResult': e.target.value})}
+                              onChange={e => { const val = e.target.value; if (!val) { setEditData(d => ({...d, '_judgmentResult': ''})); } else { setEditData(d => applyDefaultRulesLocal('_judgmentResult', val, { ...d, '_judgmentResult': val }, cObj)); } }}
                               className="flex-1 text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
                             >
                               <option value="">-- تصنيف الحكم --</option>
@@ -746,7 +771,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                           {/* Row 2: Type */}
                           <select
                             value={editData['_judgmentType'] || ''}
-                            onChange={e => setEditData({...editData, '_judgmentType': e.target.value})}
+                            onChange={e => { const val = e.target.value; if (!val) { setEditData(d => ({...d, '_judgmentType': ''})); } else { setEditData(d => applyDefaultRulesLocal('_judgmentType', val, { ...d, '_judgmentType': val }, cObj)); } }}
                             className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
                           >
                             <option value="">-- مختصر الحكم --</option>
