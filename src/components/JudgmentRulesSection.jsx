@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Plus, Trash2, Search, Folder, FolderOpen, ArrowRight, AlertTriangle, Edit2, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Settings as SettingsIcon, Plus, Trash2, Search, Folder, FolderOpen, ArrowRight, AlertTriangle, Edit2, ChevronRight, ChevronLeft, Copy } from 'lucide-react';
 import { useUI } from '../context/UIContext';
 
 export default function JudgmentRulesSection({
@@ -60,32 +60,11 @@ export default function JudgmentRulesSection({
 
   const allFolders = [...new Set(localJudgmentDefaults.map(r => r.folder || 'قواعد عامة'))];
 
-  const handleGenerateDefaults = async () => {
-    const confirmLoad = await showConfirm('تأكيد التوليد', 'هل أنت متأكد من تحميل القواعد الافتراضية الذكية؟ سيتم إضافتها في مجلدات مخصصة.');
-    if (confirmLoad) {
-      const defaults = [
-        { name: 'استنتاج ذكي: قبول/إلغاء للطاعن', folder: 'قواعد: قبول', conditions: { role: 'طاعن', type: 'قبول' }, actions: { classification: 'صالح' } },
-        { name: 'استنتاج ذكي: قبول/إلغاء للطاعن', folder: 'قواعد: إلغاء', conditions: { role: 'طاعن', type: 'إلغاء' }, actions: { classification: 'صالح' } },
-        { name: 'استنتاج ذكي: قبول/إلغاء للمطعون ضده', folder: 'قواعد: قبول', conditions: { role: 'مطعون ضده', type: 'قبول' }, actions: { classification: 'ضد' } },
-        { name: 'استنتاج ذكي: قبول/إلغاء للمطعون ضده', folder: 'قواعد: إلغاء', conditions: { role: 'مطعون ضده', type: 'إلغاء' }, actions: { classification: 'ضد' } },
-        
-        { name: 'استنتاج ذكي: رفض/عدم قبول للطاعن', folder: 'قواعد: رفض', conditions: { role: 'طاعن', type: 'رفض' }, actions: { classification: 'ضد' } },
-        { name: 'استنتاج ذكي: رفض/عدم قبول للطاعن', folder: 'قواعد: عدم قبول', conditions: { role: 'طاعن', type: 'عدم قبول' }, actions: { classification: 'ضد' } },
-        { name: 'استنتاج ذكي: رفض/عدم قبول للمطعون ضده', folder: 'قواعد: رفض', conditions: { role: 'مطعون ضده', type: 'رفض' }, actions: { classification: 'صالح' } },
-        { name: 'استنتاج ذكي: رفض/عدم قبول للمطعون ضده', folder: 'قواعد: عدم قبول', conditions: { role: 'مطعون ضده', type: 'عدم قبول' }, actions: { classification: 'صالح' } },
-        
-        { name: 'استنتاج ذكي: سقوط/شطب للطاعن', folder: 'قواعد: سقوط الخصومة', conditions: { role: 'طاعن', type: 'سقوط الخصومة' }, actions: { classification: 'ضد' } },
-        { name: 'استنتاج ذكي: سقوط/شطب للطاعن', folder: 'قواعد: شطب', conditions: { role: 'طاعن', type: 'شطب' }, actions: { classification: 'ضد' } },
-        { name: 'استنتاج ذكي: سقوط/شطب للمطعون ضده', folder: 'قواعد: سقوط الخصومة', conditions: { role: 'مطعون ضده', type: 'سقوط الخصومة' }, actions: { classification: 'صالح' } },
-        { name: 'استنتاج ذكي: سقوط/شطب للمطعون ضده', folder: 'قواعد: شطب', conditions: { role: 'مطعون ضده', type: 'شطب' }, actions: { classification: 'صالح' } },
-        
-        { name: 'استنتاج ذكي: اعتبار للطاعن (خطر)', folder: 'قواعد: اعتبار الدعوى كأن لم تكن', conditions: { role: 'طاعن', type: 'اعتبار الدعوى كأن لم تكن' }, actions: { classification: 'ضد' } },
-        { name: 'استنتاج ذكي: اعتبار للمطعون ضده', folder: 'قواعد: اعتبار الدعوى كأن لم تكن', conditions: { role: 'مطعون ضده', type: 'اعتبار الدعوى كأن لم تكن' }, actions: { classification: 'صالح' } },
-        
-        { name: 'استنتاج ذكي: وقف جزائي للطاعن (خطر)', folder: 'قواعد: وقف جزائي', conditions: { role: 'طاعن', type: 'وقف جزائي' }, actions: { classification: 'وقف جزائي' } },
-        { name: 'استنتاج ذكي: وقف جزائي للمطعون ضده', folder: 'قواعد: وقف جزائي', conditions: { role: 'مطعون ضده', type: 'وقف جزائي' }, actions: { classification: 'وقف جزائي' } },
-      ];
-      setLocalJudgmentDefaults([...localJudgmentDefaults, ...defaults]);
+  const handleClearAllRules = async () => {
+    const confirmClear = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف جميع القواعد بشكل نهائي؟ لا يمكن التراجع عن هذه الخطوة إلا إذا لم تقم بحفظ الإعدادات.');
+    if (confirmClear) {
+      setLocalJudgmentDefaults([]);
+      setActiveFolder(null);
     }
   };
 
@@ -162,10 +141,10 @@ export default function JudgmentRulesSection({
         </div>
         <div className="flex gap-2 shrink-0">
           <button
-            onClick={handleGenerateDefaults}
-            className="bg-emerald-50 text-emerald-700 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-emerald-100 transition"
+            onClick={handleClearAllRules}
+            className="bg-rose-50 text-rose-700 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-rose-100 transition"
           >
-            <Plus className="w-4 h-4" /> توليد القواعد الافتراضية
+            <Trash2 className="w-4 h-4" /> حذف جميع القواعد
           </button>
           <button
             onClick={handleAddRule}
@@ -237,6 +216,20 @@ export default function JudgmentRulesSection({
                         </div>
                       </div>
                       <div className="flex items-center gap-4 shrink-0 mr-4">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const duplicatedRule = JSON.parse(JSON.stringify(rule));
+                            duplicatedRule.name = duplicatedRule.name ? duplicatedRule.name + ' (نسخة)' : 'نسخة';
+                            const newRules = [...localJudgmentDefaults];
+                            newRules.splice(idx + 1, 0, duplicatedRule);
+                            setLocalJudgmentDefaults(newRules);
+                          }}
+                          className="text-slate-400 hover:text-indigo-500 transition"
+                          title="تكرار القاعدة"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
