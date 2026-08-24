@@ -80,7 +80,7 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
   const applyDefaultRulesLocal = (field, value, currentValues) => {
     if (!settings?.judgmentDefaults?.length) return currentValues;
     const engineInput = {
-      role: currentValues.role,
+      role: currentValues.role || (cases.find(c => c.id === selectedCases[0]) && (cases.find(c => c.id === selectedCases[0])['الصفة'] || cases.find(c => c.id === selectedCases[0])['صفة'])) || '',
       category: currentValues.judgmentCategory,
       classification: currentValues.judgmentResult,
       type: currentValues.shortJudgment,
@@ -531,7 +531,7 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
                   <select
                     disabled={!fieldsToUpdate.shortJudgment}
                     value={values.shortJudgment}
-                    onChange={e => { const val = e.target.value; if (!val) { setValues(d => ({ ...d, shortJudgment: '' })); } else { setValues(d => applyDefaultRulesLocal('shortJudgment', val, { ...d, shortJudgment: val })); } }}
+                    onChange={e => { const val = e.target.value; let newValues = { ...values, shortJudgment: val }; if (val) newValues = applyDefaultRulesLocal('shortJudgment', val, newValues); setValues(newValues); }}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
                   >
                     <option value="">-- اختر --</option>
@@ -548,7 +548,7 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
                   <select 
                     disabled={!fieldsToUpdate.judgmentResult}
                     value={values.judgmentResult}
-                    onChange={e => { const val = e.target.value; if (!val) { setValues(d => ({ ...d, judgmentResult: '' })); } else { setValues(d => applyDefaultRulesLocal('judgmentResult', val, { ...d, judgmentResult: val })); } }}
+                    onChange={e => { const val = e.target.value; let newValues = { ...values, judgmentResult: val }; if (val) newValues = applyDefaultRulesLocal('judgmentResult', val, newValues); setValues(newValues); }}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
                   >
                     <option value="">-- اختر --</option>
@@ -565,7 +565,7 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
                   <select 
                     disabled={!fieldsToUpdate.judgmentCategory}
                     value={values.judgmentCategory}
-                    onChange={e => { const val = e.target.value; if (!val) { setValues(d => ({ ...d, judgmentCategory: '' })); } else { setValues(d => applyDefaultRulesLocal('judgmentCategory', val, { ...d, judgmentCategory: val })); } }}
+                    onChange={e => { const val = e.target.value; let newValues = { ...values, judgmentCategory: val }; if (val) newValues = applyDefaultRulesLocal('judgmentCategory', val, newValues); setValues(newValues); }}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition disabled:bg-slate-100 disabled:text-slate-400"
                   >
                     <option value="">-- اختر فئة الحكم --</option>
