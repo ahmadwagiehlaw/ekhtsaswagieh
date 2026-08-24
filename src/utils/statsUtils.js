@@ -4,8 +4,13 @@ import { isAppellantRole, isAppelleeRole, isNoInterestRole, isOutOfJurisdictionR
 import { getActiveMapping, resolveImpact, isStopImpact, evaluateSessionRule } from './statsMapping';
 
 function addToJudgments(target, computeAs, mapping, c = null) {
+  const entry = mapping.find(m => m.value === computeAs);
+  if (entry && entry.dashboardVisible === false) {
+    return; // Ignore completely
+  }
+
   target.total++;
-  const impact = resolveImpact(computeAs, mapping);
+  const impact = entry ? entry.impact : resolveImpact(computeAs, mapping);
 
   if (impact === 'good')          { target.good++;          if (c) target.lists.good.push(c); }
   else if (impact === 'bad')      { target.bad++;           if (c) target.lists.bad.push(c); }
@@ -16,7 +21,7 @@ function addToJudgments(target, computeAs, mapping, c = null) {
   }
   else if (impact === 'consideration') { target.consideration++; if (c) target.lists.consideration.push(c); }
   else if (impact === 'mixed')    { target.mixed = (target.mixed || 0) + 1; if (c) target.lists.mixed.push(c); }
-  else if (impact === 'ignore')   { target.total--; } // don't count ignored values at all
+  else if (impact === 'ignore')   { target.total--; }
   else                             target.other++;
 }
 
@@ -27,78 +32,7 @@ const emptyJudgments = () =>
 // computeMonthStats: returns per-month stats for any month/year
 // Used by Dashboard for the interactive month-selector
 // ─────────────────────────────────────────────────────────────
-export function computeMonthStats(cases, settings, targetMonth, targetYear) {
-  let sessions   = 0;
-  let memos      = 0;
-  let casesAdded = 0;
-  let judgments  = emptyJudgments();
-
-  const memoCalcMode = settings?.memoCalculationMode || 'session_date';
-  const mapping = getActiveMapping(settings);
-
-  cases.forEach(c => {
-    const role = getCaseRole(c);
-    
-    if (isNoInterestRole(role) || isOutOfJurisdictionRole(role)) return;
-
-    const isAppellant = isAppellantRole(role, settings);
-    const isAppellee  = isAppelleeRole(role, settings);
-
-    const createdAtDate = getSafeDateObj(c.createdAt || c.timestamp || '');
-    if (createdAtDate && createdAtDate.getMonth() === targetMonth && createdAtDate.getFullYear() === targetYear) {
-      casesAdded++;
-    }
-
-    const rawSessions = Array.isArray(c.sessions) ? c.sessions : Object.values(c.sessions || {});
-    
-    // Calculate sessions
-    rawSessions.forEach(s => {
-      const sDate = getSafeDateObj(s.date);
-      if (!sDate) return;
-      if (sDate.getMonth() !== targetMonth || sDate.getFullYear() !== targetYear) return;
-      sessions++;
-    });
-
-    // Calculate memos from procedures
-    const procedures = Array.isArray(c.procedures) ? c.procedures : Object.values(c.procedures || {});
-    procedures.forEach(p => {
-       if (p.title && (p.title.includes('مذكرة') || p.title.includes('مذكرات'))) {
-          let targetDateStr = memoCalcMode === 'session_date' ? p.date : p.createdAt;
-          if (!targetDateStr) targetDateStr = p.date || p.createdAt;
-          const dObj = getSafeDateObj(targetDateStr);
-          if (dObj && dObj.getMonth() === targetMonth && dObj.getFullYear() === targetYear) {
-             memos++;
-          }
-       }
-    });
-
-    // Calculate judgments
-    rawSessions.forEach(s => {
-      const sDate = getSafeDateObj(s.date);
-      if (!sDate) return;
-      if (sDate.getMonth() !== targetMonth || sDate.getFullYear() !== targetYear) return;
-
-      if (s.hasJudgment) {
-        const computeAs = s.judgmentClassification || s.judgment?.result || 'غير مصنف';
-        addToJudgments(judgments, computeAs, mapping, c);
-      } else {
-        // Implicit examination judgments if not explicitly recorded
-        const dec = String(s.decision || '').trim();
-        const type = String(s.type || '').trim();
-        if (dec.includes('رفض') && type.includes('فحص')) {
-          const computeAs = isAppellant ? 'ضد' : isAppellee ? 'صالح' : 'ضد';
-          addToJudgments(judgments, computeAs, mapping, c);
-        } else if (dec.includes('قبول') && type.includes('فحص')) {
-          const computeAs = isAppellant ? 'صالح' : isAppellee ? 'ضد' : 'صالح';
-          addToJudgments(judgments, computeAs, mapping, c);
-        }
-      }
-    });
-  });
-
-  return { sessions, memos, casesAdded, judgments };
-}
-
+// computeMonthStats moved below
 export function calculateCaseAlerts(c, settings) {
   if (!c || !settings?.deadlineRules) return [];
   const alerts = [];
@@ -161,6 +95,11 @@ export function calculateCaseAlerts(c, settings) {
 export function calculateDashboardStats(cases, settings) {
   let activeCasesCount    = 0;
   let ongoingCount        = 0;
+  let ongoingAppellantCount = 0;
+  let ongoingAppelleeCount = 0;
+  let staleOngoingCases = [];
+  let totalResolutionDays = 0;
+  let resolvedCasesCount = 0;
   let reservedCount       = 0;
   let judgedCount         = 0;
   let appellantCount      = 0;
@@ -195,7 +134,7 @@ export function calculateDashboardStats(cases, settings) {
   const last6Months = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(currentYear, currentMonth - i, 1);
-    last6Months.push({ year: d.getFullYear(), month: d.getMonth(), label: d.toLocaleDateString('ar-EG', { month: 'short' }), count: 0 });
+    last6Months.push({ year: d.getFullYear(), month: d.getMonth(), label: d.toLocaleDateString('ar-EG', { month: 'short' }), count: 0, good: 0, bad: 0 });
   }
 
   cases.forEach(c => {
@@ -219,7 +158,14 @@ export function calculateDashboardStats(cases, settings) {
       if (!sDate) return;
       const sMonth = sDate.getMonth(), sYear = sDate.getFullYear();
       const slot = last6Months.find(m => m.month === sMonth && m.year === sYear);
-      if (slot) slot.count++;
+      if (slot) {
+        slot.count++;
+        const rule = evaluateSessionRule({ ...c, ...s }, mapping);
+        if (rule) {
+          if (rule.impact === 'good') slot.good++;
+          if (rule.impact === 'bad') slot.bad++;
+        }
+      }
     });
 
     sessions.sort((a, b) => {
@@ -252,6 +198,14 @@ export function calculateDashboardStats(cases, settings) {
       const hukmDate = getSafeDateObj(latestJudgmentSession.date);
       judgedCount++;
       judgedCases.push(c);
+      if (sessions.length > 0) {
+        const firstSession = sessions[sessions.length - 1];
+        const firstDate = getSafeDateObj(firstSession.date);
+        if (hukmDate && firstDate && hukmDate >= firstDate) {
+          totalResolutionDays += (hukmDate - firstDate) / (1000 * 60 * 60 * 24);
+          resolvedCasesCount++;
+        }
+      }
 
       // New dynamic rule-based evaluation
       const evalContext = { ...c, ...(latestJudgmentSession || {}) };
@@ -326,6 +280,9 @@ export function calculateDashboardStats(cases, settings) {
     } else {
       ongoingCount++;
       ongoingCases.push(c);
+      if (isAppellant) ongoingAppellantCount++;
+      if (isAppellee) ongoingAppelleeCount++;
+      if (!lastSessionDate || lastSessionDate < today) staleOngoingCases.push(c);
 
       // Deadline alerts (وقف جزائي) — detect any stop-impact value in decision text
       if (lastSessionDate) {
@@ -438,15 +395,73 @@ export function calculateDashboardStats(cases, settings) {
   };
 }
 
+
 // ─────────────────────────────────────────────────────────────
-// computeMultiMonthStats: compute stats for multiple months in one pass
-// monthsList: array of {month, year}
-// Returns object keyed by "year-month"
+// computeMultiMonthStats & computeMonthStats
 // ─────────────────────────────────────────────────────────────
 export function computeMultiMonthStats(cases, settings, monthsList) {
-  const result = {};
-  for (const { month, year } of monthsList) {
-    result[`${year}-${month}`] = computeMonthStats(cases, settings, month, year);
-  }
-  return result;
+  const memoCalcMode = settings?.memoCalculationMode || 'session_date';
+  const mapping = getActiveMapping(settings);
+
+  const buckets = {};
+  monthsList.forEach(({ month, year }) => {
+    buckets[`${year}-${month}`] = { sessions: 0, memos: 0, casesAdded: 0, judgments: emptyJudgments() };
+  });
+
+  const findBucket = (d) => {
+    if (!d) return null;
+    return buckets[`${d.getFullYear()}-${d.getMonth()}`] || null;
+  };
+
+  cases.forEach(c => {
+    const role = getCaseRole(c);
+    if (isNoInterestRole(role) || isOutOfJurisdictionRole(role)) return;
+    const isAppellant = isAppellantRole(role, settings);
+    const isAppellee  = isAppelleeRole(role, settings);
+
+    const createdAtDate = getSafeDateObj(c.createdAt || c.timestamp || '');
+    const createdBucket = findBucket(createdAtDate);
+    if (createdBucket) createdBucket.casesAdded++;
+
+    const rawSessions = Array.isArray(c.sessions) ? c.sessions : Object.values(c.sessions || {});
+
+    rawSessions.forEach(s => {
+      const sDate = getSafeDateObj(s.date);
+      const bucket = findBucket(sDate);
+      if (!bucket) return;
+      bucket.sessions++;
+
+      if (s.hasJudgment) {
+        const computeAs = s.judgmentClassification || s.judgment?.result || 'غير مصنف';
+        addToJudgments(bucket.judgments, computeAs, mapping, c);
+      } else {
+        const dec = String(s.decision || '').trim();
+        const type = String(s.type || '').trim();
+        if (dec.includes('رفض') && type.includes('فحص')) {
+          const computeAs = isAppellant ? 'ضد' : isAppellee ? 'صالح' : 'ضد';
+          addToJudgments(bucket.judgments, computeAs, mapping, c);
+        } else if (dec.includes('قبول') && type.includes('فحص')) {
+          const computeAs = isAppellant ? 'صالح' : isAppellee ? 'ضد' : 'صالح';
+          addToJudgments(bucket.judgments, computeAs, mapping, c);
+        }
+      }
+    });
+
+    const procedures = Array.isArray(c.procedures) ? c.procedures : Object.values(c.procedures || {});
+    procedures.forEach(p => {
+      if (p.title && (p.title.includes('مذكرة') || p.title.includes('مذكرات'))) {
+        let targetDateStr = memoCalcMode === 'session_date' ? p.date : p.createdAt;
+        if (!targetDateStr) targetDateStr = p.date || p.createdAt;
+        const bucket = findBucket(getSafeDateObj(targetDateStr));
+        if (bucket) bucket.memos++;
+      }
+    });
+  });
+
+  return buckets;
+}
+
+export function computeMonthStats(cases, settings, targetMonth, targetYear) {
+  const buckets = computeMultiMonthStats(cases, settings, [{ month: targetMonth, year: targetYear }]);
+  return buckets[`${targetYear}-${targetMonth}`];
 }

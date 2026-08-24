@@ -551,6 +551,20 @@ export default function Dashboard() {
       </div>
 
       {/* ── Alerts ─────────────────────────────────────────── */}
+            {/* ── B4: Stale Ongoing Alert ── */}
+      {stats.staleOngoingCases?.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm mb-4 cursor-pointer hover:bg-amber-100 transition"
+             onClick={() => setAgendaModal({ isOpen: true, title: 'قضايا بدون جلسة قادمة محددة', casesList: stats.staleOngoingCases })}>
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div>
+              <h3 className="font-black text-amber-900 text-sm">تنبيه: قضايا متداولة بدون تاريخ جلسة قادمة</h3>
+              <p className="text-xs font-bold text-amber-700 mt-0.5">يوجد {stats.staleOngoingCases.length} قضية متداولة لا تحتوي على جلسة مستقبلية محددة. اضغط للمراجعة.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {stats.alerts.length > 0 && (
         <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 shadow-sm">
           <div className="flex items-start gap-3">
@@ -693,7 +707,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── KPI Cards (4 main judicial metrics) ──────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <KPICard
           icon={Calendar}
           label="القضايا النشطة"
@@ -722,6 +736,7 @@ export default function Dashboard() {
           iconBg="bg-amber-100"
           border="border-amber-200"
           onClick={() => setAgendaModal({ isOpen: true, title: 'إجمالي المتداول', casesList: stats.ongoingCases })}
+        extra={<p className="text-[9px] font-bold text-slate-400 mt-1">طاعن: {stats.ongoingAppellantCount || 0} · مطعون ضدنا: {stats.ongoingAppelleeCount || 0}</p>}
         />
         <KPICard
           icon={Clock}
@@ -751,6 +766,16 @@ export default function Dashboard() {
               </p>
             )
           }
+        />
+        <KPICard
+          icon={Activity}
+          label="متوسط مدة الفصل"
+          sublabel="معدل أيام تداول الدعوى"
+          value={Math.round(stats.avgResolutionDays || 0) + " يوم"}
+          accentColor="#059669"
+          bgFrom="from-emerald-50" bgTo="to-teal-50/40"
+          iconBg="bg-emerald-100"
+          border="border-emerald-200"
         />
       </div>
 
@@ -843,6 +868,29 @@ export default function Dashboard() {
                     </div>
                     <div style={{ width: `${(stats.performanceSplit.appellee.bad / stats.performanceSplit.appellee.total) * 100}%` }} className="bg-rose-500 hover:opacity-90 transition-opacity relative group cursor-pointer">
                        <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">ضد: {stats.performanceSplit.appellee.bad}</div>
+          {/* ── B2: Win/Loss Trend ── */}
+          <div className="mt-6 pt-4 border-t border-slate-100">
+            <h4 className="font-black text-slate-600 text-[11px] mb-3">اتجاه كسب/خسارة القضايا (6 شهور)</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-emerald-50/50 rounded-xl p-2 border border-emerald-100/50">
+                <p className="text-[9px] font-bold text-emerald-600 mb-1">الأحكام الصالحة</p>
+                <div className="h-8">
+                  <TrendLine data={(stats.last6Months || []).map(d => ({ count: d.good }))} color="#10b981" />
+                </div>
+              </div>
+              <div className="bg-rose-50/50 rounded-xl p-2 border border-rose-100/50">
+                <p className="text-[9px] font-bold text-rose-600 mb-1">الأحكام الضد</p>
+                <div className="h-8">
+                  <TrendLine data={(stats.last6Months || []).map(d => ({ count: d.bad }))} color="#f43f5e" />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-between mt-2 px-2">
+              {(stats.last6Months || []).map(m => (
+                <span key={m.label} className="text-[8px] font-bold text-slate-400">{m.label}</span>
+              ))}
+            </div>
+          </div>
                     </div>
                     <div style={{ width: `${(stats.performanceSplit.appellee.mixed / stats.performanceSplit.appellee.total) * 100}%` }} className="bg-blue-500 hover:opacity-90 transition-opacity relative group cursor-pointer">
                        <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">مختلط: {stats.performanceSplit.appellee.mixed}</div>
