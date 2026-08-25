@@ -571,8 +571,8 @@ export default function Dashboard() {
               <Filter className="w-5 h-5" />
             </button>
               {/* Alerts Button */}
-              <button type="button" onClick={() => setShowAlertsPanel(!showAlertsPanel)} className={`relative w-12 h-[46px] rounded-xl flex items-center justify-center transition border shadow-sm shrink-0 ${showAlertsPanel ? 'bg-rose-500 text-white border-rose-500' : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700'}`} title="التنبيهات">
-                <AlertCircle className="w-5 h-5" />
+              <button type="button" onClick={() => setShowAlertsPanel(!showAlertsPanel)} className={`relative w-12 h-[46px] rounded-xl flex items-center justify-center transition border shadow-sm shrink-0 ${showAlertsPanel ? 'bg-rose-500 text-white border-rose-500' : 'bg-slate-800/80 hover:bg-slate-700 text-amber-400 border-slate-700'}`} title="التنبيهات">
+                <AlertTriangle className="w-5 h-5" />
                 {totalAlertsCount > 0 && (
                   <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
