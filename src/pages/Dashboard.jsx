@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, TrendingUp, CalendarDays, AlertTriangle, Building2, Scale,
+  Search, Award, Layers, TrendingUp, CalendarDays, AlertTriangle, Building2, Scale,
   PieChart, ClipboardList, CheckCircle2, ChevronLeft, Activity, Sparkles,
   Printer, Settings2, Eye, EyeOff, BarChart3, FileText, Clock, Gavel,
   ChevronRight, Calendar, LogOut, X, Star, Filter
@@ -121,6 +121,30 @@ export default function Dashboard() {
       return false;
     }).slice(0, 10);
   }, [cases]);
+
+  const weekAgenda = useMemo(() => {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startOfToday);
+      d.setDate(d.getDate() + i);
+      days.push({ date: d, label: d.toLocaleDateString('ar-EG', { weekday: 'short' }), dayNum: d.getDate(), cases: [] });
+    }
+    cases.forEach(c => {
+      const role = String(c['الصفة'] || c['صفة'] || '').trim();
+      if (role === 'لا شأن' || role === 'خارج الاختصاص') return;
+      const sList = Array.isArray(c.sessions) ? c.sessions : Object.values(c.sessions || {});
+      sList.forEach(s => {
+        const d = getSafeDateObj(s.date);
+        if (!d) return;
+        const slot = days.find(day => day.date.toDateString() === d.toDateString());
+        if (slot && !slot.cases.includes(c)) slot.cases.push(c);
+      });
+    });
+    return days;
+  }, [cases]);
+
 
   const monthTabs = useMemo(() => {
     const tabs = [];
@@ -706,8 +730,31 @@ export default function Dashboard() {
         )}
       </div>
 
+
+        {/* ── Week Agenda Strip ── */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <CalendarDays className="w-4 h-4 text-slate-400" />
+            <h3 className="font-black text-xs text-slate-600">أجندة الأسبوع القادم</h3>
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {weekAgenda.map((day, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => day.cases.length > 0 && setAgendaModal({ isOpen: true, title: `جلسات يوم ${day.date.toLocaleDateString('ar-EG')}`, casesList: day.cases })}
+                className={`flex flex-col items-center gap-1 rounded-xl p-2.5 border transition ${i === 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'} ${day.cases.length > 0 ? 'hover:border-indigo-300 hover:bg-indigo-50 cursor-pointer' : 'cursor-default opacity-60'}`}
+              >
+                <span className="text-[9px] font-bold text-slate-400">{day.label}</span>
+                <span className={`text-sm font-black ${i === 0 ? 'text-amber-700' : 'text-navy-900'}`}>{day.dayNum}</span>
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${day.cases.length > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400'}`}>{day.cases.length}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
       {/* ── KPI Cards (4 main judicial metrics) ──────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <KPICard
           icon={Calendar}
           label="القضايا النشطة"
@@ -776,6 +823,18 @@ export default function Dashboard() {
           bgFrom="from-emerald-50" bgTo="to-teal-50/40"
           iconBg="bg-emerald-100"
           border="border-emerald-200"
+        />
+
+        <KPICard
+          icon={Award}
+          label="نسبة النجاح"
+          sublabel="من إجمالي الأحكام الحاسمة"
+          value={stats.winRate !== null && stats.winRate !== undefined ? `${stats.winRate}%` : '—'}
+          accentColor={stats.winRate === null || stats.winRate === undefined ? '#94a3b8' : stats.winRate >= 50 ? '#059669' : '#dc2626'}
+          bgFrom={stats.winRate === null || stats.winRate === undefined ? 'from-slate-50' : stats.winRate >= 50 ? 'from-emerald-50' : 'from-rose-50'}
+          bgTo={stats.winRate === null || stats.winRate === undefined ? 'to-slate-50/40' : stats.winRate >= 50 ? 'to-green-50/40' : 'to-red-50/40'}
+          iconBg={stats.winRate === null || stats.winRate === undefined ? 'bg-slate-100' : stats.winRate >= 50 ? 'bg-emerald-100' : 'bg-rose-100'}
+          border={stats.winRate === null || stats.winRate === undefined ? 'border-slate-200' : stats.winRate >= 50 ? 'border-emerald-200' : 'border-rose-200'}
         />
       </div>
 
@@ -991,6 +1050,7 @@ export default function Dashboard() {
                 { id: 'entities', label: 'الجهات رافعة الدعوى' },
                 { id: 'years', label: 'توزيع الملفات بالسنة' },
                 { id: 'judgment-list', label: 'قائمة تصنيف الأحكام' },
+                  { id: 'classifications', label: 'تصنيف الدعاوى' },
               ].map(w => (
                 <button key={w.id} onClick={() => toggleWidget(w.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition border ${isVisible(w.id) ? 'bg-white border-slate-200 text-navy-900 shadow-sm' : 'bg-slate-100 border-transparent text-slate-400'}`}>
@@ -1000,7 +1060,7 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-          <div className={`grid gap-3 ${[isVisible('entities'), isVisible('years'), isVisible('judgment-list')].filter(Boolean).length >= 2 ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'}`}>
+          <div className={`grid gap-3 ${[isVisible('entities'), isVisible('years'), isVisible('judgment-list'), isVisible('classifications')].filter(Boolean).length >= 2 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1'}`}>
             {isVisible('entities') && (
               <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
                 <div className="flex items-center gap-2">

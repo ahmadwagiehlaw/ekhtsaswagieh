@@ -125,6 +125,7 @@ export function calculateDashboardStats(cases, settings) {
   const judgedCases       = [];
 
   const opponentsCount = {};
+  const classificationCount = {};
   const yearCount      = {};
   const judgmentsCount = {};
   const performanceSplit = { appellant: { good: 0, bad: 0, mixed: 0, procedural: 0, total: 0 }, appellee: { good: 0, bad: 0, mixed: 0, procedural: 0, total: 0 } };
@@ -161,6 +162,8 @@ export function calculateDashboardStats(cases, settings) {
 
     const year = c['السنة'] || c['سنة'] || c['year'] || 'غير محدد';
     yearCount[year] = (yearCount[year] || 0) + 1;
+    const classification = String(c['تصنيف الدعوى'] || '').trim() || 'غير مصنف';
+    classificationCount[classification] = (classificationCount[classification] || 0) + 1;
 
     const sessions = Array.isArray(c.sessions) ? c.sessions : Object.values(c.sessions || {});
 
@@ -377,11 +380,17 @@ export function calculateDashboardStats(cases, settings) {
     }
   });
 
+  const totalGoodJ = performanceSplit.appellant.good + performanceSplit.appellee.good;
+  const totalBadJ  = performanceSplit.appellant.bad  + performanceSplit.appellee.bad;
+  const winRate = (totalGoodJ + totalBadJ) > 0 ? Math.round((totalGoodJ / (totalGoodJ + totalBadJ)) * 100) : null;
   const topYears     = Object.entries(yearCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const topOpponents = Object.entries(opponentsCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const topJudgments = Object.entries(judgmentsCount).sort((a, b) => b[1] - a[1]);
+  const topClassifications = Object.entries(classificationCount).sort((a, b) => b[1] - a[1]).slice(0, 6);
 
   return {
+    winRate,
+    topClassifications,
     netTotal: cases.length,
     activeCasesCount,
     ongoingCount,
