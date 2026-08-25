@@ -132,6 +132,7 @@ export function calculateDashboardStats(cases, settings) {
   const criticalSuspended = [];
   const criticalConsidered = [];
   const criticalAgainst = [];
+  const unclassifiedJudgedCases = [];
 
   const mapping = getActiveMapping(settings);
 
@@ -252,9 +253,12 @@ export function calculateDashboardStats(cases, settings) {
         return; // skip the rest of the loop for this case
       }
       
-      const dashboardVisible = rule ? (rule.dashboardVisible !== false) : true;
-      if (dashboardVisible) {
-        judgmentsCount[computeAs] = (judgmentsCount[computeAs] || 0) + 1;
+      if (rule) {
+        if (rule.dashboardVisible !== false) {
+          judgmentsCount[computeAs] = (judgmentsCount[computeAs] || 0) + 1;
+        }
+      } else {
+        unclassifiedJudgedCases.push(c);
       }
       
       const countInPerf = rule ? rule.countsInPerformance : false;
@@ -391,6 +395,7 @@ export function calculateDashboardStats(cases, settings) {
   return {
     winRate,
     totalGoodJ,
+    unclassifiedJudgedCases,
     totalBadJ,
     topClassifications,
     netTotal: cases.length,

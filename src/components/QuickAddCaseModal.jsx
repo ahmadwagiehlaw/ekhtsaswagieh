@@ -117,10 +117,10 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
               </div>
               <h2 className="text-xl font-black text-navy-900">تم الحفظ بنجاح!</h2>
               <p className="text-slate-500 font-bold text-sm">{settings?.userTitle === 'المستشارة' ? 'أين الملف الآن معاليكي؟' : 'أين الملف الآن معاليك؟'}</p>
-              
+
               <div className="flex flex-wrap justify-center gap-2 mt-2">
-                {Array.from(new Set([...(settings?.fileLocations || []), 'في المكتب', 'بالمحكمة', 'غير موجود', 'مؤقت', 'خارج الاختصاص'])).map(loc => (
-                  <button 
+                {Array.from(new Set([...(settings?.fileLocations || []), 'في القسم', 'بالمحكمة', 'غير موجود', 'مؤقت', 'خارج الاختصاص'])).map(loc => (
+                  <button
                     key={loc}
                     onClick={async () => {
                       setIsSaving(true);
@@ -141,8 +141,8 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
               </div>
 
               <div className="flex items-center gap-2 mt-2 w-full max-w-sm">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={customLocation}
                   onChange={(e) => setCustomLocation(e.target.value)}
                   placeholder="مكان آخر..."
@@ -168,8 +168,8 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
                   حفظ
                 </button>
               </div>
-              
-              <button 
+
+              <button
                 onClick={() => {
                   setFormData({
                     'رقم الدعوى': '', 'السنة': '', 'المدعي': '', 'المدعى_عليه': '', 'الصفة': '', 'القرار': '', 'آخر جلسة': prefillDate || '',
@@ -183,149 +183,149 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
               </button>
             </div>
           ) : (
-          <form id="quick-add-form" onSubmit={handleSave} className="space-y-4">
+            <form id="quick-add-form" onSubmit={handleSave} className="space-y-4">
 
-          {duplicateWarning && (
-            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-              <p className="text-xs font-bold text-amber-700">هذه الدعوى موجودة بالفعل! راجع رقم الدعوى والسنة.</p>
-            </div>
-          )}
+              {duplicateWarning && (
+                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <p className="text-xs font-bold text-amber-700">هذه الدعوى موجودة بالفعل! راجع رقم الدعوى والسنة.</p>
+                </div>
+              )}
 
-          {/* Case number + year */}
-          <div className="grid grid-cols-3 gap-2">
-            <div className="col-span-2 space-y-1">
-              <label className="text-[10px] font-black text-slate-500 block">رقم الدعوى *</label>
-              <input
-                type="text"
-                value={formData['رقم الدعوى']}
-                onChange={e => handleChange('رقم الدعوى', e.target.value)}
-                placeholder="رقم الدعوى"
-                className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
-                required
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 block">السنة *</label>
-              <input
-                type="text"
-                value={formData['السنة']}
-                onChange={e => handleChange('السنة', e.target.value)}
-                placeholder={String(currentYear)}
-                className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none text-center"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Plaintiff + Defendant */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 block">المدعي / الطاعن</label>
-              <input
-                type="text"
-                list="plaintiffs-list"
-                value={formData['المدعي'] || formData['الطاعن'] || ''}
-                onChange={e => handleChange('المدعي', e.target.value)}
-                placeholder="اسم المدعي"
-                className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
-              />
-              <datalist id="plaintiffs-list">
-                {plaintiffsList.map(name => <option key={name} value={name} />)}
-              </datalist>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 block">المدعى عليه / المطعون ضده</label>
-              <input
-                type="text"
-                list="defendants-list"
-                value={formData['المدعى_عليه']}
-                onChange={e => handleChange('المدعى_عليه', e.target.value)}
-                placeholder="اسم المدعى عليه"
-                className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
-              />
-              <datalist id="defendants-list">
-                {defendantsList.map(name => <option key={name} value={name} />)}
-              </datalist>
-            </div>
-          </div>
-
-          {/* Role + Session Type + Decision */}
-          <div className="grid grid-cols-3 gap-2">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 block">الصفة</label>
-              <select
-                value={formData['الصفة']}
-                onChange={e => handleChange('الصفة', e.target.value)}
-                className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
-              >
-                <option value="">-- اختر --</option>
-                <option value="طاعنين أو مدعين">طاعنين أو مدعين</option>
-                <option value="مطعون ضدنا أو مدعى علينا">مطعون ضدنا أو مدعى علينا</option>
-                <option value="لا شأن">لا شأن</option>
-                <option value="خارج الاختصاص">خارج الاختصاص</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 block">نوع الجلسة</label>
-              <div className="flex bg-slate-100 p-1 rounded-xl w-full">
-                {(settings?.courtDegree === 'إدارية عليا' || settings?.courtDegree === 'عليا' || settings?.courtDegree === 'ثان درجة' ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة']).map((t, i) => (
-                  <button
-                    key={t} type="button" onClick={() => handleChange('نوع الجلسة', t)}
-                    className={`flex-1 py-1.5 px-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${formData['نوع الجلسة'] === t ? (i === 0 ? 'bg-amber-500 text-white' : i === 1 ? 'bg-emerald-500 text-white' : 'bg-navy-900 text-white') : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
-                  >{t}</button>
-                ))}
+              {/* Case number + year */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2 space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">رقم الدعوى *</label>
+                  <input
+                    type="text"
+                    value={formData['رقم الدعوى']}
+                    onChange={e => handleChange('رقم الدعوى', e.target.value)}
+                    placeholder="رقم الدعوى"
+                    className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">السنة *</label>
+                  <input
+                    type="text"
+                    value={formData['السنة']}
+                    onChange={e => handleChange('السنة', e.target.value)}
+                    placeholder={String(currentYear)}
+                    className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none text-center"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 block">قرار الجلسة</label>
-              <select
-                value={formData['القرار']}
-                onChange={e => handleChange('القرار', e.target.value)}
-                className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
-              >
-                <option value="">-- اختر --</option>
-                {decisions.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-          </div>
 
-          {/* Session date */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-500 block">تاريخ الجلسة</label>
-            <input
-              type="date"
-              value={formData['آخر جلسة']}
-              onChange={e => handleChange('آخر جلسة', e.target.value)}
-              className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
-            />
-          </div>
-        </form>
+              {/* Plaintiff + Defendant */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">المدعي / الطاعن</label>
+                  <input
+                    type="text"
+                    list="plaintiffs-list"
+                    value={formData['المدعي'] || formData['الطاعن'] || ''}
+                    onChange={e => handleChange('المدعي', e.target.value)}
+                    placeholder="اسم المدعي"
+                    className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
+                  />
+                  <datalist id="plaintiffs-list">
+                    {plaintiffsList.map(name => <option key={name} value={name} />)}
+                  </datalist>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">المدعى عليه / المطعون ضده</label>
+                  <input
+                    type="text"
+                    list="defendants-list"
+                    value={formData['المدعى_عليه']}
+                    onChange={e => handleChange('المدعى_عليه', e.target.value)}
+                    placeholder="اسم المدعى عليه"
+                    className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
+                  />
+                  <datalist id="defendants-list">
+                    {defendantsList.map(name => <option key={name} value={name} />)}
+                  </datalist>
+                </div>
+              </div>
+
+              {/* Role + Session Type + Decision */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">الصفة</label>
+                  <select
+                    value={formData['الصفة']}
+                    onChange={e => handleChange('الصفة', e.target.value)}
+                    className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
+                  >
+                    <option value="">-- اختر --</option>
+                    <option value="طاعنين أو مدعين">طاعنين أو مدعين</option>
+                    <option value="مطعون ضدنا أو مدعى علينا">مطعون ضدنا أو مدعى علينا</option>
+                    <option value="لا شأن">لا شأن</option>
+                    <option value="خارج الاختصاص">خارج الاختصاص</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">نوع الجلسة</label>
+                  <div className="flex bg-slate-100 p-1 rounded-xl w-full">
+                    {(settings?.courtDegree === 'إدارية عليا' || settings?.courtDegree === 'عليا' || settings?.courtDegree === 'ثان درجة' ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة']).map((t, i) => (
+                      <button
+                        key={t} type="button" onClick={() => handleChange('نوع الجلسة', t)}
+                        className={`flex-1 py-1.5 px-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-sm ${formData['نوع الجلسة'] === t ? (i === 0 ? 'bg-amber-500 text-white' : i === 1 ? 'bg-emerald-500 text-white' : 'bg-navy-900 text-white') : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
+                      >{t}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">قرار الجلسة</label>
+                  <select
+                    value={formData['القرار']}
+                    onChange={e => handleChange('القرار', e.target.value)}
+                    className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
+                  >
+                    <option value="">-- اختر --</option>
+                    {decisions.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Session date */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 block">تاريخ الجلسة</label>
+                <input
+                  type="date"
+                  value={formData['آخر جلسة']}
+                  onChange={e => handleChange('آخر جلسة', e.target.value)}
+                  className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"
+                />
+              </div>
+            </form>
           )}
         </div>
 
         {/* Footer */}
         {!showLocationPrompt && (
-        <div className="bg-slate-50 p-4 border-t border-slate-100 shrink-0 flex gap-2">
-          <button
-            onClick={onClose}
-            type="button"
-            className="flex-1 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-100 transition"
-          >
-            إلغاء
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex-[2] px-4 py-2.5 bg-emerald-600 text-white text-sm font-black rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {isSaving ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <><Plus className="w-4 h-4" /> إضافة الدعوى</>
-            )}
-          </button>
-        </div>
+          <div className="bg-slate-50 p-4 border-t border-slate-100 shrink-0 flex gap-2">
+            <button
+              onClick={onClose}
+              type="button"
+              className="flex-1 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-100 transition"
+            >
+              إلغاء
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex-[2] px-4 py-2.5 bg-emerald-600 text-white text-sm font-black rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isSaving ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <><Plus className="w-4 h-4" /> إضافة الدعوى</>
+              )}
+            </button>
+          </div>
         )}
       </div>
     </div>

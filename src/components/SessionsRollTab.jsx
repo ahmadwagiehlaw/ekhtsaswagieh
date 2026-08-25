@@ -35,7 +35,7 @@ const PREDEFINED_DECISIONS = [
 // Editable cell fields in order (for Tab navigation)
 const CELL_FIELDS = ['الرول', 'نوع الجلسة', 'القرار', 'آخر جلسة', 'مكان الملف', 'الملاحظات'];
 
-const FILE_LOCATION_OPTIONS = ['في المكتب', 'شعبة المحكمة', 'غير موجود', 'مؤقت', 'خارج الاختصاص'];
+const FILE_LOCATION_OPTIONS = ['في القسم', 'شعبة المحكمة', 'غير موجود', 'مؤقت', 'خارج الاختصاص'];
 
 const getFieldVal = (obj, keys) => {
   for (const k of keys) {
@@ -761,9 +761,9 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                       <td className="px-2 py-2 w-20">
                         {role ? (
                           <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${role.includes('طاعن') ? 'bg-rose-100 text-rose-700' :
-                              role.includes('مطعون') ? 'bg-emerald-100 text-emerald-700' :
-                                role === 'لا شأن' ? 'bg-slate-100 text-slate-400' :
-                                  'bg-indigo-100 text-indigo-700'
+                            role.includes('مطعون') ? 'bg-emerald-100 text-emerald-700' :
+                              role === 'لا شأن' ? 'bg-slate-100 text-slate-400' :
+                                'bg-indigo-100 text-indigo-700'
                             }`}>{role}</span>
                         ) : <span className="text-slate-300 text-[9px]">-</span>}
                       </td>
@@ -882,9 +882,9 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                           </select>
                         ) : (
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full cursor-pointer ${fileLocation === 'غير موجود' ? 'bg-rose-100 text-rose-700' :
-                              fileLocation === 'مؤقت' ? 'bg-amber-100 text-amber-700' :
-                                fileLocation === 'خارج الاختصاص' ? 'bg-indigo-100 text-indigo-700' :
-                                  fileLocation ? 'bg-emerald-100 text-emerald-700' : 'text-slate-300 font-normal'
+                            fileLocation === 'مؤقت' ? 'bg-amber-100 text-amber-700' :
+                              fileLocation === 'خارج الاختصاص' ? 'bg-indigo-100 text-indigo-700' :
+                                fileLocation ? 'bg-emerald-100 text-emerald-700' : 'text-slate-300 font-normal'
                             }`}>{fileLocation || 'انقر'}</span>
                         )}
                       </td>

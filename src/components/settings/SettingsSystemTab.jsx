@@ -9,7 +9,7 @@ export default function SettingsSystemTab() {
   const { settings, saveSettingsToFirebase, cases, saveBatchCasesToFirebase } = useAppContext();
   const { currentUser, login, changePassword } = useAuth();
   const { toast, showConfirm, showPrompt } = useUI();
-  
+
   const [localNumberFormat, setLocalNumberFormat] = useState('en');
   const [localDateFormat, setLocalDateFormat] = useState('dd/MM/yyyy');
   const [localConsultantName, setLocalConsultantName] = useState('');
@@ -20,7 +20,7 @@ export default function SettingsSystemTab() {
   const [localMemoCalculationMode, setLocalMemoCalculationMode] = useState(settings?.memoCalculationMode || 'session_date');
   const [localScratchpadPosition, setLocalScratchpadPosition] = useState(settings?.scratchpadPosition || 'right');
   const [localSearchTabPosition, setLocalSearchTabPosition] = useState(settings?.searchTabPosition || 'right');
-  
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
 
@@ -35,14 +35,14 @@ export default function SettingsSystemTab() {
       toast('يرجى إدخال كلمة المرور الحالية والجديدة', 'error');
       return;
     }
-    
+
     setIsChangingPassword(true);
     try {
       // Re-authenticate first
       if (currentUser?.email) {
         await login(currentUser.email, currentPassword);
       }
-      
+
       await changePassword(newPassword);
       toast('تم تغيير كلمة المرور بنجاح', 'success');
       setCurrentPassword('');
@@ -84,7 +84,7 @@ export default function SettingsSystemTab() {
         if (!c) return null;
         const currentRole = String(c['الصفة'] || c['صفة'] || '').trim();
         const isEmptyRole = !currentRole || currentRole === '' || currentRole === '-' || currentRole === '---' || currentRole === 'غير محدد' || currentRole === 'بدون صفة';
-        
+
         if (isEmptyRole) {
           missingCount++;
           const auto = autoDetermineRole(c);
@@ -97,15 +97,15 @@ export default function SettingsSystemTab() {
       if (updates.length > 0) {
         await saveBatchCasesToFirebase(updates);
         if (missingCount > updates.length) {
-           toast(`تم استكمال ${updates.length} قضية بنجاح، وتبقى ${missingCount - updates.length} قضية لم يتعرف عليها النظام فتحتاج لاستكمال يدوي.`, 'warning');
+          toast(`تم استكمال ${updates.length} قضية بنجاح، وتبقى ${missingCount - updates.length} قضية لم يتعرف عليها النظام فتحتاج لاستكمال يدوي.`, 'warning');
         } else {
-           toast(`تم استكمال حقل "الصفة" لـ ${updates.length} قضية بنجاح.`, 'success');
+          toast(`تم استكمال حقل "الصفة" لـ ${updates.length} قضية بنجاح.`, 'success');
         }
       } else {
         if (missingCount > 0) {
-           toast(`يوجد ${missingCount} قضية بدون صفة، لكن لم يتعرف النظام على أطرافها برمجياً. يرجى إدخالها يدوياً.`, 'warning');
+          toast(`يوجد ${missingCount} قضية بدون صفة، لكن لم يتعرف النظام على أطرافها برمجياً. يرجى إدخالها يدوياً.`, 'warning');
         } else {
-           toast('جميع القضايا لديك تحتوي بالفعل على حقل الصفة. لا يوجد شيء لتحديثه!', 'info');
+          toast('جميع القضايا لديك تحتوي بالفعل على حقل الصفة. لا يوجد شيء لتحديثه!', 'info');
         }
       }
     } catch (err) {
@@ -184,7 +184,7 @@ export default function SettingsSystemTab() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-700">اسم المستشار / اسم المكتب المطبوع:</label>
+              <label className="text-xs font-bold text-slate-700">اسم المستشار / اسم القسم المطبوع:</label>
               <input
                 type="text"
                 value={localConsultantName}
@@ -214,7 +214,7 @@ export default function SettingsSystemTab() {
               />
             </div>
           </div>
-          
+
           <div className="border-t border-slate-100 pt-4 mt-2">
             <h4 className="text-xs font-black text-navy-900 mb-3">تفضيلات الواجهة والمواعيد</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -298,7 +298,7 @@ export default function SettingsSystemTab() {
           <ShieldAlert className="w-5 h-5 text-indigo-600" />
           <h3 className="font-black text-sm text-navy-900">تغيير كلمة المرور</h3>
         </div>
-        
+
         <form onSubmit={handleChangePassword} className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
           <div>
             <label className="text-[11px] font-black text-slate-500 block mb-1">كلمة المرور الحالية</label>
@@ -321,8 +321,8 @@ export default function SettingsSystemTab() {
             />
           </div>
           <div className="sm:col-span-2">
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={isChangingPassword || !currentPassword || !newPassword}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-xs shadow-sm disabled:opacity-50 transition"
             >
@@ -331,7 +331,7 @@ export default function SettingsSystemTab() {
           </div>
         </form>
       </div>
-      
+
       {/* Migration button — Fix 5 */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="text-right">

@@ -9,7 +9,7 @@ export default function PrintReportModal({ stats, settings, selectedMonthStats, 
   const handlePrint = () => {
     const content = document.getElementById('dash-print-content');
     if (!content) return;
-    
+
     // Copy all styles from the parent window so Tailwind works perfectly in the print window
     const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
       .map(s => s.outerHTML)
@@ -34,8 +34,8 @@ export default function PrintReportModal({ stats, settings, selectedMonthStats, 
       </body></html>`);
     pw.document.close();
     setTimeout(() => {
-        pw.print();
-        pw.close();
+      pw.print();
+      pw.close();
     }, 800);
   };
 
@@ -57,7 +57,7 @@ export default function PrintReportModal({ stats, settings, selectedMonthStats, 
         </div>
         <div className="overflow-y-auto flex-1 p-6" id="dash-print-content">
           <div className="text-center mb-5 pb-4 border-b-2 border-slate-900">
-            <h1 className="text-2xl font-black text-slate-900">تقرير إحصائيات المكتب</h1>
+            <h1 className="text-2xl font-black text-slate-900">تقرير إحصائيات القسم</h1>
             <p className="text-sm font-bold text-slate-500 mt-1">شهر {monthLabel}</p>
             <p className="text-xs font-black text-amber-600 mt-1">مكتب / {consultantName}</p>
           </div>
@@ -100,7 +100,7 @@ export default function PrintReportModal({ stats, settings, selectedMonthStats, 
                   { l: 'مختلط', v: selectedMonthStats.judgments.mixed, c: '#6366f1', bg: '#e0e7ff' },
                   { l: 'وقف', v: selectedMonthStats.judgments.stop, c: '#f97316', bg: '#ffedd5' },
                   { l: 'اعتبار', v: selectedMonthStats.judgments.consideration, c: '#eab308', bg: '#fef9c3' },
-                  
+
                 ].map((j, i) => (
                   <div key={i} className="rounded-xl p-3 text-center" style={{ backgroundColor: j.bg }}>
                     <p className="text-xl font-black" style={{ color: j.c }}>{j.v}</p>

@@ -128,7 +128,7 @@ export default function AddCaseModal({ isOpen, onClose }) {
               <p className="text-slate-500 font-bold text-lg">{settings?.userTitle === 'المستشارة' ? 'أين الملف الآن معاليكي؟' : 'أين الملف الآن معاليك؟'}</p>
 
               <div className="flex flex-wrap justify-center gap-3 mt-4">
-                {Array.from(new Set([...(settings?.fileLocations || []), 'في المكتب', 'بالمحكمة', 'غير موجود', 'مؤقت', 'خارج الاختصاص'])).map(loc => (
+                {Array.from(new Set([...(settings?.fileLocations || []), 'في القسم', 'بالمحكمة', 'غير موجود', 'مؤقت', 'خارج الاختصاص'])).map(loc => (
                   <button
                     key={loc}
                     onClick={async () => {
@@ -216,8 +216,8 @@ export default function AddCaseModal({ isOpen, onClose }) {
                     type="button"
                     onClick={() => setActiveTab(group.title)}
                     className={`whitespace-nowrap px-4 py-2.5 rounded-xl font-black text-xs transition-all border ${activeTab === group.title
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-md scale-[1.02]'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-md scale-[1.02]'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                       }`}
                   >
                     {group.title}

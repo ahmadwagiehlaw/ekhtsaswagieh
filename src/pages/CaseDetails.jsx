@@ -107,12 +107,12 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
         }
         return '';
       };
-      
+
       const lastSessionRaw = getFieldValue(caseData, ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة']);
       const decision = getFieldValue(caseData, ['القرار', 'قرار الجلسة', 'المنطوق']);
       const caseRoll = getFieldValue(caseData, ['الرول']);
       const sessionType = getFieldValue(caseData, ['نوع الجلسة', 'نوع_الجلسة']);
-      
+
       if (lastSessionRaw || decision) {
         // We have legacy flat fields but no sessions array, perform migration
         const migratedSession = {
@@ -275,17 +275,17 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
   const year = getFieldValue(caseData, CASE_FIELDS.YEAR_KEYS);
 
   const appellant = getFieldValue(caseData, ['المدعي', 'الطاعن', 'المستأنف']);
-  
+
   const legacyAppellee = getFieldValue(caseData, ['المدعى_عليه', 'المدعى عليه', 'المطعون ضده', 'المطعون']);
   const legacyAddress = getFieldValue(caseData, ['عنوان المدعى عليه', 'عنوان المطعون ضده']);
   const legacyChosenAddress = getFieldValue(caseData, ['المقر المختار']);
-  
-  const effectiveDefendants = (caseData.defendantsList && caseData.defendantsList.length > 0) 
-    ? caseData.defendantsList 
-    : ((legacyAppellee || legacyAddress || legacyChosenAddress) 
-        ? [{ id: 'legacy', name: legacyAppellee || '', address: legacyAddress || '', chosenAddress: legacyChosenAddress || '' }] 
-        : []);
-        
+
+  const effectiveDefendants = (caseData.defendantsList && caseData.defendantsList.length > 0)
+    ? caseData.defendantsList
+    : ((legacyAppellee || legacyAddress || legacyChosenAddress)
+      ? [{ id: 'legacy', name: legacyAppellee || '', address: legacyAddress || '', chosenAddress: legacyChosenAddress || '' }]
+      : []);
+
   const appellee = effectiveDefendants.length > 0 ? effectiveDefendants.map(d => d.name).join(' وآخرين') : '';
   const lastSessionRaw = getFieldValue(caseData, ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة']);
   const lastSession = formatDateString(lastSessionRaw);
@@ -364,14 +364,14 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
       const dataToSave = { ...editData };
       dataToSave.defendantsList = (dataToSave.defendantsList || []).filter(d => d.name.trim());
       dataToSave.plaintiffsList = (dataToSave.plaintiffsList || []).filter(d => d.name.trim());
-      
+
       if (dataToSave.plaintiffsList && dataToSave.plaintiffsList.length > 0) {
         const names = dataToSave.plaintiffsList.map(p => p.name).filter(Boolean);
         const combined = names.length > 1 ? `${names[0]} وآخرين` : names[0] || '';
         dataToSave['المدعي'] = combined;
         dataToSave['الطاعن'] = combined;
       }
-      
+
       if (dataToSave.defendantsList && dataToSave.defendantsList.length > 0) {
         const names = dataToSave.defendantsList.map(p => p.name).filter(Boolean);
         const combined = names.length > 1 ? `${names[0]} وآخرين` : names[0] || '';
@@ -572,13 +572,12 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
         )}
 
         {/* File Location Ribbon (Top Right physically) */}
-        {fileLocation && fileLocation !== 'في المكتب' && (
-          <div className={`absolute top-5 -right-9 w-36 rotate-45 text-center py-1.5 shadow-md z-40 ${
-            fileLocation === 'غير موجود' ? 'bg-rose-600 text-white' :
-            fileLocation === 'مؤقت' ? 'bg-amber-500 text-white' :
-            fileLocation === 'خارج الاختصاص' ? 'bg-indigo-600 text-white' :
-            'bg-slate-700 text-white'
-          }`}>
+        {fileLocation && fileLocation !== 'في القسم' && (
+          <div className={`absolute top-5 -right-9 w-36 rotate-45 text-center py-1.5 shadow-md z-40 ${fileLocation === 'غير موجود' ? 'bg-rose-600 text-white' :
+              fileLocation === 'مؤقت' ? 'bg-amber-500 text-white' :
+                fileLocation === 'خارج الاختصاص' ? 'bg-indigo-600 text-white' :
+                  'bg-slate-700 text-white'
+            }`}>
             <div className="text-[11px] font-black leading-none">{fileLocation}</div>
           </div>
         )}
@@ -603,9 +602,9 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
               </button>
             )}
             <div className={`px-2.5 py-1 rounded-lg text-[10px] font-black border shadow-sm flex items-center gap-1 ${litigationStage === 'استعلام' ? 'bg-amber-100 text-amber-800 border-amber-300' :
-                litigationStage.includes('موقوف جزائياً') ? 'bg-rose-100 text-rose-800 border-rose-300 animate-pulse' :
-                  litigationStage === 'شعبة المحال' || litigationStage === 'شعبة الأحكام' || litigationStage === 'الشعبة' ? 'bg-slate-100 text-slate-700 border-slate-300' :
-                    'bg-blue-50 text-blue-700 border-blue-200'
+              litigationStage.includes('موقوف جزائياً') ? 'bg-rose-100 text-rose-800 border-rose-300 animate-pulse' :
+                litigationStage === 'شعبة المحال' || litigationStage === 'شعبة الأحكام' || litigationStage === 'الشعبة' ? 'bg-slate-100 text-slate-700 border-slate-300' :
+                  'bg-blue-50 text-blue-700 border-blue-200'
               }`}>
               <CheckCircle2 className="w-3 h-3" />
               {litigationStage}
@@ -614,20 +613,19 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
             {fileLocation ? (
               <button
                 onClick={() => { setNewLocation(fileLocation); setIsChangeLocationModalOpen(true); }}
-                className={`w-7 h-7 flex items-center justify-center rounded-lg border shadow-sm transition ${
-                  fileLocation === 'غير موجود' ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100 animate-pulse' :
-                  fileLocation === 'مؤقت' ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100' :
-                  fileLocation === 'في المكتب' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' :
-                  fileLocation.includes('شعبة') ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' :
-                  'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'
-                }`}
+                className={`w-7 h-7 flex items-center justify-center rounded-lg border shadow-sm transition ${fileLocation === 'غير موجود' ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100 animate-pulse' :
+                    fileLocation === 'مؤقت' ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100' :
+                      fileLocation === 'في القسم' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' :
+                        fileLocation.includes('شعبة') ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' :
+                          'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'
+                  }`}
                 title={`مكان الملف: ${fileLocation} (انقر للتغيير)`}
               >
                 {fileLocation === 'غير موجود' ? <AlertTriangle className="w-3.5 h-3.5" /> :
-                 fileLocation === 'مؤقت' ? <Files className="w-3.5 h-3.5" /> :
-                 fileLocation === 'في المكتب' ? <CheckCircle2 className="w-3.5 h-3.5" /> :
-                 fileLocation.includes('شعبة') ? <FolderOpen className="w-3.5 h-3.5" /> :
-                 <MapPin className="w-3.5 h-3.5" />}
+                  fileLocation === 'مؤقت' ? <Files className="w-3.5 h-3.5" /> :
+                    fileLocation === 'في القسم' ? <CheckCircle2 className="w-3.5 h-3.5" /> :
+                      fileLocation.includes('شعبة') ? <FolderOpen className="w-3.5 h-3.5" /> :
+                        <MapPin className="w-3.5 h-3.5" />}
               </button>
             ) : (
               <button
@@ -728,8 +726,8 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
             <button
               onClick={() => setIsAlertsOpen(true)}
               className={`relative p-2 rounded-xl transition ${caseData.alerts && caseData.alerts.some(a => !a.isDone)
-                  ? 'bg-rose-100 text-rose-600 hover:bg-rose-200'
-                  : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'
+                ? 'bg-rose-100 text-rose-600 hover:bg-rose-200'
+                : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'
                 }`}
               title="مواعيد وتنبيهات الملف"
             >
@@ -875,7 +873,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
           isEmptyValue={isEmptyValue}
           legacyJoinedStr={legacyJoinedStr}
         />
-)}
+      )}
 
       {/* Tab Content: Sessions */}
       {activeTab === 'sessions' && (
@@ -916,12 +914,12 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
 
       {/* Tab Content: Notes */}
       {activeTab === 'notes' && (
-        <NotesTab 
-          caseData={caseData} 
-          saveCaseToFirebase={saveCaseToFirebase} 
-          showConfirm={showConfirm} 
-          showPrompt={showPrompt} 
-          toast={toast} 
+        <NotesTab
+          caseData={caseData}
+          saveCaseToFirebase={saveCaseToFirebase}
+          showConfirm={showConfirm}
+          showPrompt={showPrompt}
+          toast={toast}
         />
       )}
 
@@ -1019,7 +1017,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
             </div>
             <div className="p-5 space-y-3">
               <div className="flex flex-wrap gap-2">
-                {['في المكتب', 'أصلي', 'مؤقت', 'شعبة الشغل', 'شعبة تحت التحديد', 'شعبة الحفظ', 'الأحكام', 'غير موجود'].map(loc => (
+                {['في القسم', 'أصلي', 'مؤقت', 'شعبة الشغل', 'شعبة تحت التحديد', 'شعبة الحفظ', 'الأحكام', 'غير موجود'].map(loc => (
                   <button
                     key={loc}
                     onClick={() => setNewLocation(loc)}
@@ -1031,7 +1029,7 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
               </div>
               <input
                 type="text"
-                value={!['في المكتب', 'أصلي', 'مؤقت', 'شعبة الشغل', 'شعبة تحت التحديد', 'شعبة الحفظ', 'الأحكام', 'غير موجود'].includes(newLocation) ? newLocation : ''}
+                value={!['في القسم', 'أصلي', 'مؤقت', 'شعبة الشغل', 'شعبة تحت التحديد', 'شعبة الحفظ', 'الأحكام', 'غير موجود'].includes(newLocation) ? newLocation : ''}
                 onChange={(e) => setNewLocation(e.target.value)}
                 placeholder="أو اكتب مكان آخر..."
                 className="w-full mt-2 bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -1134,11 +1132,11 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
         <div className="bg-slate-50 rounded-3xl w-full max-w-5xl h-[96vh] flex flex-col shadow-2xl border border-slate-200 overflow-y-auto custom-scrollbar relative">
-           {content}
+          {content}
         </div>
       </div>
     );
   }
 
   return content;
-}
+}

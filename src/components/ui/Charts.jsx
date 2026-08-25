@@ -56,6 +56,36 @@ export const TrendLine = ({ data, color = '#f59e0b' }) => {
 };
 
 // ─────────────────────────────────────────────────────────────
+// SVG Multi-series trend line (shared Y-scale for real comparison)
+// ─────────────────────────────────────────────────────────────
+export const MultiTrendLine = ({ series }) => {
+  if (!series || series.length === 0 || !series[0].data || series[0].data.length < 2) return null;
+  const n = series[0].data.length;
+  const allValues = series.flatMap(s => s.data);
+  const max = Math.max(...allValues, 1);
+  const W = 300, H = 100, P = 10;
+  const toPoints = (data) => data.map((v, i) => ({
+    x: P + (i / (n - 1)) * (W - 2 * P),
+    y: H - P - ((v / max) * (H - 2 * P))
+  }));
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none">
+      {series.map((s, si) => {
+        const pts = toPoints(s.data);
+        const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+        return (
+          <g key={si}>
+            <path d={line} fill="none" stroke={s.color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="white" stroke={s.color} strokeWidth="2" />)}
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
+
+// ─────────────────────────────────────────────────────────────
 // Trend comparison badge
 // ─────────────────────────────────────────────────────────────
 export const TrendBadge = ({ current, prev, positiveIsGood = true, className = "mt-0.5" }) => {

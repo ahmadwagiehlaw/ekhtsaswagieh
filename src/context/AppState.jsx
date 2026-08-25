@@ -10,29 +10,29 @@ const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
   const { userData, currentUser, logout } = useAuth();
-  
+
   const [rawCases, setRawCases] = useState([]);
   const [deletedCases, setDeletedCases] = useState([]);
   const [rolls, setRolls] = useState([]);
   const [globalTasks, setGlobalTasks] = useState([]);
   const [viewingTasks, setViewingTasks] = useState([]);
   const [schema, setSchema] = useState([]);
-  
-  const defaultSettings = { 
-    consultantName: "أحمد وجيه", 
+
+  const defaultSettings = {
+    consultantName: "أحمد وجيه",
     courtDegree: "ثان درجة",
     courtSpecialization: "الإدارية العليا",
     decisions: ['للحكم', 'تصريح', 'للإطلاع', 'للإعلان', 'آخر أجل', 'للمستندات', 'للمذكرات', 'لورود التقرير', 'استبعاد', 'لتنفيذ قرار الإعادة', 'إحالة للموضوع'],
     judgmentCategories: ['نهائي وبات (عليا)', 'قرار فحص', 'حكم أول درجة', 'حكم منه للخصومة', 'حكم غير منه للخصومة', 'تمهيدي'],
     judgmentClassifications: ['صالح', 'ضد', 'مختلط', 'اعتبار', 'وقف جزائي', 'وقف تعليقي', 'خبراء'],
     roles: ['طاعن', 'مطعون ضده', 'مدعي', 'مدعى عليه', 'خصم مدخل', 'خصم متدخل', 'لا شأن'],
-    fileLocations: ['في المكتب', 'بالمحكمة', 'غير موجود', 'مؤقت', 'خارج الاختصاص'],
+    fileLocations: ['في القسم', 'بالمحكمة', 'غير موجود', 'مؤقت', 'خارج الاختصاص'],
     sessionTypes: ['فحص', 'موضوع', 'حكم', 'مفوضين', 'مرافعة']
   };
-  
+
   const [settings, setSettings] = useState(defaultSettings);
   const [loading, setLoading] = useState(true);
-  
+
   const [globalHideNoInterest, setGlobalHideNoInterest] = useState(() => {
     const saved = localStorage.getItem('globalHideNoInterest');
     if (saved === 'true') return 1;
@@ -47,14 +47,14 @@ export const AppProvider = ({ children }) => {
   const cases = useMemo(() => {
     if (globalHideNoInterest === 1) {
       return rawCases.filter(c => {
-         const role = getCaseRole(c);
-         return !isNoInterestRole(role);
+        const role = getCaseRole(c);
+        return !isNoInterestRole(role);
       });
     }
     if (globalHideNoInterest === 2) {
       return rawCases.filter(c => {
-         const role = getCaseRole(c);
-         return !isNoInterestRole(role) && !isOutOfJurisdictionRole(role);
+        const role = getCaseRole(c);
+        return !isNoInterestRole(role) && !isOutOfJurisdictionRole(role);
       });
     }
     return rawCases;
@@ -81,7 +81,7 @@ export const AppProvider = ({ children }) => {
   const tenantId = userData?.tenantId;
   const isAdmin = userData?.role === 'super_admin' || userData?.role === 'consultant';
   const isEmployee = userData?.role === 'employee';
-  
+
   const currentUserPermissions = useMemo(() => {
     let empPermissions = null;
     if (isEmployee && settings?.employees) {
@@ -206,7 +206,7 @@ export const AppProvider = ({ children }) => {
         const emp = settings.employees.find(e => e.username === uName);
         if (emp && emp.name) displayName = emp.name;
       }
-      
+
       const logData = {
         action,
         entity,
@@ -217,7 +217,7 @@ export const AppProvider = ({ children }) => {
         timestamp: new Date().toISOString()
       };
       await addDoc(getActivityLogsRef(tenantId), logData);
-    } catch(e) {
+    } catch (e) {
       console.warn('Failed to log activity', e);
     }
   };
@@ -241,7 +241,7 @@ export const AppProvider = ({ children }) => {
     try {
       const safeId = sanitizeId(caseId);
       const caseRef = doc(getCasesRef(tenantId), safeId);
-      
+
       // Get the existing case data to check transitions correctly if needed
       const existingCase = cases.find(c => c.id === caseId) || {};
       let payload = { ...existingCase, ...caseData };
@@ -249,10 +249,10 @@ export const AppProvider = ({ children }) => {
       // Apply Court Degree State Machine Logic
       const currentCourtDegree = settings?.courtDegree || 'أول درجة';
       const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا';
-      
+
       const newSessionType = payload['نوع الجلسة'];
       const newDecision = payload['القرار'];
-      
+
       if (isSupreme) {
         // Supreme Court Transitions
         if (newSessionType === 'فحص' && newDecision === 'إحالة للموضوع') {
@@ -265,9 +265,9 @@ export const AppProvider = ({ children }) => {
 
       const isNew = !cases.some(c => c.id === caseId);
       const dataToSave = cleanUndefined({ ...payload, updatedAt: new Date().toISOString() });
-      delete dataToSave.id; 
+      delete dataToSave.id;
       await setDoc(caseRef, dataToSave, { merge: true });
-      
+
       if (isNew) {
         await logActivity(
           'إضافة',
@@ -278,7 +278,7 @@ export const AppProvider = ({ children }) => {
       } else {
         const caseNum = existingCase['رقم الدعوى'] || payload['رقم الدعوى'] || caseId;
         const changes = [];
-        
+
         if (payload.documents && Array.isArray(payload.documents)) {
           const oldDocs = existingCase.documents || [];
           if (payload.documents.length > oldDocs.length) {
@@ -333,7 +333,7 @@ export const AppProvider = ({ children }) => {
     return rawCases.some(c => {
       const cNo = c['رقم الدعوى'] || c['رقم القضية'] || c['رقم_الدعوى'];
       const cYear = c['السنة'] || c['سنة'] || c['year'];
-      
+
       if (String(cNo).trim() === String(caseNo).trim() && String(cYear).trim() === String(year).trim()) {
         if (excludeId && c.id === excludeId) return false;
         return true;
@@ -346,9 +346,9 @@ export const AppProvider = ({ children }) => {
     try {
       const caseNo = caseData['رقم الدعوى'] || caseData['رقم القضية'] || 'جديد';
       const year = caseData['السنة'] || caseData['سنة'] || new Date().getFullYear();
-      
+
       if (checkDuplicateCase(caseNo, year)) {
-         throw new Error('DUPLICATE_CASE');
+        throw new Error('DUPLICATE_CASE');
       }
 
       let payload = { ...caseData };
@@ -384,9 +384,9 @@ export const AppProvider = ({ children }) => {
         await deleteDoc(doc(getCasesRef(tenantId), safeId));
         await logActivity('حذف نهائي', 'ملف', safeId, `حذف نهائي للملف ${c?.['رقم الدعوى'] || ''}`);
       } else {
-        await setDoc(doc(getCasesRef(tenantId), safeId), { 
-          isDeleted: true, 
-          deletedAt: new Date().toISOString() 
+        await setDoc(doc(getCasesRef(tenantId), safeId), {
+          isDeleted: true,
+          deletedAt: new Date().toISOString()
         }, { merge: true });
         await logActivity('حذف إلى الأرشيف', 'ملف', safeId, `تم نقل الملف ${c?.['رقم الدعوى'] || ''} إلى الأرشيف`);
       }
@@ -401,7 +401,7 @@ export const AppProvider = ({ children }) => {
     if (!tenantId) return false;
     try {
       const safeId = sanitizeId(caseId);
-      await setDoc(doc(getCasesRef(tenantId), safeId), { 
+      await setDoc(doc(getCasesRef(tenantId), safeId), {
         isDeleted: false,
         deletedAt: null
       }, { merge: true });
@@ -417,7 +417,7 @@ export const AppProvider = ({ children }) => {
     try {
       const chunkArray = (arr, size) => arr.length ? [arr.slice(0, size), ...chunkArray(arr.slice(size), size)] : [];
       const batches = chunkArray(casesArray, 490);
-      
+
       for (const batchCases of batches) {
         const batch = writeBatch(db);
         batchCases.forEach(c => {
@@ -464,11 +464,11 @@ export const AppProvider = ({ children }) => {
     try {
       const snapshot = await getDocs(getCasesRef(tenantId));
       const batch = writeBatch(db);
-      
+
       snapshot.docs.forEach((docSnap) => {
         batch.delete(docSnap.ref);
       });
-      
+
       await batch.commit();
       return true;
     } catch (e) {
@@ -507,7 +507,7 @@ export const AppProvider = ({ children }) => {
       id = idOrData || crypto.randomUUID();
       data = dataObj || {};
     }
-    
+
     // Ensure the data has the generated ID
     data.id = id;
     const isNew = !globalTasks.some(t => t.id === id);
@@ -550,7 +550,7 @@ export const AppProvider = ({ children }) => {
     const now = new Date().toISOString();
     const updatedTask = { ...t, status: 'completed', notes: notes || '', completedAt: now };
     await saveGlobalTask(updatedTask);
-    
+
     await logActivity('إنجاز', 'مهمة', taskId, `تم إنجاز المهمة: ${t.title}`);
 
     if (t.linkedCases && t.linkedCases.length > 0) {
@@ -565,14 +565,14 @@ export const AppProvider = ({ children }) => {
             notes: notes || '',
             createdAt: now
           };
-          
+
           let updateObj = { procedures: [...proceduresList, newProc] };
-          
+
           // إحالة الملف -> شعبة المحال
           if (t.title === 'إحالة الملف') {
-             updateObj['مكان الملف'] = 'شعبة المحال';
+            updateObj['مكان الملف'] = 'شعبة المحال';
           }
-          
+
           await saveCaseToFirebase(caseId, updateObj);
         }
       }
@@ -654,7 +654,7 @@ export const AppProvider = ({ children }) => {
 
   const userEmail = currentUser?.email || '';
   const username = userEmail.split('@')[0];
-    
+
   let currentUserName = username;
   if (isAdmin) {
     currentUserName = settings?.consultantName || 'المستشار';
@@ -668,47 +668,47 @@ export const AppProvider = ({ children }) => {
 
 
   const contextValue = useMemo(() => ({
-      cases,
-      rawCases,
-      deletedCases,
-      plaintiffsList,
-      defendantsList,
-      rolls,
-      schema,
-      settings,
-      isAdmin,
-      isEmployee,
-      currentUser: userEmail,
-      currentUserName,
-      currentUserPermissions,
-      loading,
-      globalHideNoInterest,
-      setGlobalHideNoInterest,
-      logoutAdmin: logout,
-      saveCaseToFirebase,
-      createNewCase,
-      checkDuplicateCase,
-      saveBatchCasesToFirebase,
-      saveSchemaToFirebase,
-      saveSettingsToFirebase,
-      deleteAllCases,
-      deleteCaseFromFirebase,
-      restoreCaseFromFirebase,
-      saveRollToFirebase,
-      deleteRollFromFirebase,
-      // ─── المهام العادية ───
-      globalTasks,
-      saveGlobalTask,
-      deleteGlobalTask,
-      PREDEFINED_TASKS,
-      completeGlobalTask,
-      // ─── مهام الإطلاع (منفصلة تماماً) ───
-      viewingTasks,
-      saveViewingTask,
-      deleteViewingTask,
-      completeViewingTask,
+    cases,
+    rawCases,
+    deletedCases,
+    plaintiffsList,
+    defendantsList,
+    rolls,
+    schema,
+    settings,
+    isAdmin,
+    isEmployee,
+    currentUser: userEmail,
+    currentUserName,
+    currentUserPermissions,
+    loading,
+    globalHideNoInterest,
+    setGlobalHideNoInterest,
+    logoutAdmin: logout,
+    saveCaseToFirebase,
+    createNewCase,
+    checkDuplicateCase,
+    saveBatchCasesToFirebase,
+    saveSchemaToFirebase,
+    saveSettingsToFirebase,
+    deleteAllCases,
+    deleteCaseFromFirebase,
+    restoreCaseFromFirebase,
+    saveRollToFirebase,
+    deleteRollFromFirebase,
+    // ─── المهام العادية ───
+    globalTasks,
+    saveGlobalTask,
+    deleteGlobalTask,
+    PREDEFINED_TASKS,
+    completeGlobalTask,
+    // ─── مهام الإطلاع (منفصلة تماماً) ───
+    viewingTasks,
+    saveViewingTask,
+    deleteViewingTask,
+    completeViewingTask,
   }), [
-    cases, rawCases, deletedCases, plaintiffsList, defendantsList, rolls, schema, settings, isAdmin, isEmployee, 
+    cases, rawCases, deletedCases, plaintiffsList, defendantsList, rolls, schema, settings, isAdmin, isEmployee,
     userEmail, currentUserName, currentUserPermissions, loading, globalHideNoInterest,
     globalTasks, viewingTasks, logout
   ]);

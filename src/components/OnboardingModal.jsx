@@ -94,7 +94,7 @@ export default function OnboardingModal() {
                 <FileText className="w-6 h-6 text-blue-600 shrink-0" />
                 <div className="text-right">
                   <p className="font-bold text-sm text-navy-900">صفحة الملفات</p>
-                  <p className="text-[11px] font-semibold text-slate-500 leading-relaxed mt-1">الوصول السريع والبحث الذكي في جميع قضايا المكتب وتعديلها.</p>
+                  <p className="text-[11px] font-semibold text-slate-500 leading-relaxed mt-1">الوصول السريع والبحث الذكي في جميع قضايا القسم وتعديلها.</p>
                 </div>
               </div>
               <div className="flex gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 items-start">
@@ -118,7 +118,7 @@ export default function OnboardingModal() {
                 <FileText className="w-6 h-6 text-blue-600 shrink-0" />
                 <div className="text-right">
                   <p className="font-bold text-sm text-navy-900">صفحة الملفات</p>
-                  <p className="text-[11px] font-semibold text-slate-500 leading-relaxed mt-1">الوصول السريع والبحث في جميع قضايا المكتب حسب الصلاحيات الممنوحة لك.</p>
+                  <p className="text-[11px] font-semibold text-slate-500 leading-relaxed mt-1">الوصول السريع والبحث في جميع قضايا القسم حسب الصلاحيات الممنوحة لك.</p>
                 </div>
               </div>
               <div className="flex gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 items-start">

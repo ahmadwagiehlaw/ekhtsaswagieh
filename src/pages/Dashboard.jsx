@@ -28,7 +28,7 @@ const FALLBACK_COLORS = {
 // ─────────────────────────────────────────────────────────────
 // SVG Donut Chart
 // ─────────────────────────────────────────────────────────────
-import { DonutChart, TrendLine, TrendBadge } from '../components/ui/Charts';
+import { DonutChart, TrendLine, TrendBadge, MultiTrendLine } from '../components/ui/Charts';
 import KPICard from '../components/ui/KPICard';
 
 // ─────────────────────────────────────────────────────────────
@@ -600,6 +600,21 @@ export default function Dashboard() {
         </div>
       )}
 
+
+{/* ── Unclassified Judged Cases Alert ── */}
+{stats.unclassifiedJudgedCases?.length > 0 && (
+  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm mb-4 cursor-pointer hover:bg-amber-100 transition"
+    onClick={() => setAgendaModal({ isOpen: true, title: 'أحكام بدون تصنيف محدد', casesList: stats.unclassifiedJudgedCases })}>
+    <div className="flex items-center gap-3">
+      <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+      <div>
+        <h3 className="font-black text-amber-900 text-sm">تنبيه: أحكام مسجّلة بدون "تصنيف الحكم"</h3>
+        <p className="text-xs font-bold text-amber-700 mt-0.5">يوجد {stats.unclassifiedJudgedCases.length} حكم مسجّل بدون تحديد التصنيف (صالح/ضد/مختلط...)، فمش ظاهر في إحصائيات الأحكام. اضغط للمراجعة.</p>
+      </div>
+    </div>
+  </div>
+)}
+
       {stats.alerts.length > 0 && (
         <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 shadow-sm">
           <div className="flex items-start gap-3">
@@ -956,56 +971,49 @@ export default function Dashboard() {
 
 {/* ── Judgments Trend & Win Rate Row ── */}
 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-  {/* Win/Loss Trend */}
+  {/* Win/Loss Trend — single combined chart, shared scale */}
   <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
     <div className="flex items-center gap-2 mb-4">
       <BarChart3 className="w-4 h-4 text-slate-400" />
       <h3 className="font-black text-xs text-slate-600">اتجاه كسب/خسارة القضايا (6 شهور)</h3>
     </div>
-    <div className="grid grid-cols-2 gap-4">
-      <div className="bg-emerald-50/50 rounded-xl p-3 border border-emerald-100/50">
-        <p className="text-[10px] font-bold text-emerald-600 mb-2">الأحكام الصالحة</p>
-        <div className="h-14">
-          <TrendLine data={(stats.last6Months || []).map(d => ({ count: d.good }))} color="#10b981" />
-        </div>
-      </div>
-      <div className="bg-rose-50/50 rounded-xl p-3 border border-rose-100/50">
-        <p className="text-[10px] font-bold text-rose-600 mb-2">الأحكام الضد</p>
-        <div className="h-14">
-          <TrendLine data={(stats.last6Months || []).map(d => ({ count: d.bad }))} color="#f43f5e" />
-        </div>
-      </div>
+    <div className="h-24">
+      <MultiTrendLine series={[
+        { data: (stats.last6Months || []).map(d => d.good), color: '#10b981' },
+        { data: (stats.last6Months || []).map(d => d.bad), color: '#f43f5e' },
+      ]} />
     </div>
-    <div className="flex justify-between mt-3 px-1">
+    <div className="flex justify-between mt-2 px-1">
       {(stats.last6Months || []).map(m => (
         <span key={m.label} className="text-[9px] font-bold text-slate-400">{m.label}</span>
       ))}
     </div>
+    <div className="flex items-center justify-center gap-4 pt-3 mt-2 border-t border-slate-100">
+      <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500"><span className="w-2 h-2 rounded-full bg-emerald-500"></span>الأحكام الصالحة</span>
+      <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500"><span className="w-2 h-2 rounded-full bg-rose-500"></span>الأحكام الضد</span>
+    </div>
   </div>
 
-  {/* Win Rate */}
-  <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+  {/* Win Rate — bar-based gauge, distinct from the donut above */}
+  <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-center">
     <div className="flex items-center gap-2 mb-4">
       <Award className="w-4 h-4 text-slate-400" />
       <h3 className="font-black text-xs text-slate-600">نسبة النجاح</h3>
     </div>
     {(stats.totalGoodJ || 0) + (stats.totalBadJ || 0) > 0 ? (
-      <div className="flex items-center justify-between gap-8 sm:gap-12">
-        <div className="relative shrink-0">
-          <DonutChart segments={[{ name: 'صالح', value: stats.totalGoodJ, color: '#10b981' }, { name: 'ضد', value: stats.totalBadJ, color: '#ef4444' }]} size={130} thickness={22} />
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <span className="text-2xl font-black" style={{ color: stats.winRate >= 50 ? '#059669' : '#dc2626' }}>{stats.winRate}%</span>
-            <span className="text-[9px] font-bold text-slate-400">نسبة النجاح</span>
-          </div>
+      <div className="flex flex-col items-center justify-center gap-4 py-2">
+        <div className="text-center">
+          <span className="text-5xl font-black leading-none" style={{ color: stats.winRate >= 50 ? '#059669' : '#dc2626' }}>{stats.winRate}%</span>
+          <p className="text-[10px] font-bold text-slate-400 mt-1.5">من إجمالي الأحكام الحاسمة</p>
         </div>
-        <div className="flex-1 space-y-3 min-w-0 py-1">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>أحكام لصالحنا</span>
-            <span className="text-xs font-black text-slate-600">{stats.totalGoodJ}</span>
+        <div className="w-full space-y-2">
+          <div className="h-3 flex rounded-full overflow-hidden bg-slate-100 w-full">
+            <div style={{ width: `${(stats.totalGoodJ / (stats.totalGoodJ + stats.totalBadJ)) * 100}%` }} className="bg-emerald-500" />
+            <div style={{ width: `${(stats.totalBadJ / (stats.totalGoodJ + stats.totalBadJ)) * 100}%` }} className="bg-rose-500" />
           </div>
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0"></span>أحكام ضدنا</span>
-            <span className="text-xs font-black text-slate-600">{stats.totalBadJ}</span>
+          <div className="flex items-center justify-center gap-4">
+            <span className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600"><span className="w-2 h-2 rounded-full bg-emerald-500"></span>لصالحنا: {stats.totalGoodJ}</span>
+            <span className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600"><span className="w-2 h-2 rounded-full bg-rose-500"></span>ضدنا: {stats.totalBadJ}</span>
           </div>
         </div>
       </div>

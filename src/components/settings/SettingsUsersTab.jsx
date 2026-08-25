@@ -10,7 +10,7 @@ export default function SettingsUsersTab() {
   const { settings, saveSettingsToFirebase } = useAppContext();
   const { userData } = useAuth();
   const { toast } = useUI();
-  
+
   const [localEmployees, setLocalEmployees] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -112,12 +112,12 @@ export default function SettingsUsersTab() {
           {userData?.tenantId && (
             <div className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-2">
               <Fingerprint className="w-4 h-4" />
-              <span className="text-[10px] font-black">رقم اشتراك المكتب:</span>
+              <span className="text-[10px] font-black">رقم اشتراك القسم:</span>
               <span className="text-sm font-mono font-black tracking-wider">{userData.tenantId}</span>
             </div>
           )}
         </div>
-        
+
         <div className="pt-2 space-y-4">
           <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
             يستخدم الموظف اسم المستخدم وكلمة المرور لتسجيل الدخول (Username). يفضل أن يكون اسم المستخدم "بدون مسافات" و "بالحروف الإنجليزية" لتسهيل الدخول.
@@ -206,18 +206,18 @@ export default function SettingsUsersTab() {
                         newEmp[index].permissions = { ...empPerms, canManageTasks: e.target.checked };
                         setLocalEmployees(newEmp);
                       }} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                      إدارة المهام المكتبية
+                      إدارة المهام القسمية
                     </label>
                   </div>
                 </div>
               );
             })}
-            
+
             <button onClick={() => setLocalEmployees([...localEmployees, { name: '', username: '', password: '', permissions: { canEditData: true, canDeleteData: true, canManageRolls: true, canManageTasks: true } }])} className="w-full bg-slate-50 border border-slate-200 text-slate-600 font-bold py-3 rounded-xl shadow-sm text-sm hover:bg-slate-100 transition">
               + إضافة موظف جديد
             </button>
           </div>
-          
+
           <div className="pt-4 border-t border-slate-100">
             <button onClick={handleSaveUsers} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm hover:bg-navy-800 transition disabled:opacity-50">
               {isProcessing ? 'جاري الحفظ...' : 'حفظ إعدادات المستخدمين'}
