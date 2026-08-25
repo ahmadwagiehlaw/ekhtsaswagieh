@@ -63,20 +63,36 @@ export const MultiTrendLine = ({ series }) => {
   const n = series[0].data.length;
   const allValues = series.flatMap(s => s.data);
   const max = Math.max(...allValues, 1);
-  const W = 300, H = 100, P = 10;
+  const W = 300, H = 110, P = 16;
   const toPoints = (data) => data.map((v, i) => ({
     x: P + (i / (n - 1)) * (W - 2 * P),
-    y: H - P - ((v / max) * (H - 2 * P))
+    y: H - P - ((v / max) * (H - 2 * P)),
+    v
   }));
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none">
+      <line x1={P} y1={H - P} x2={W - P} y2={H - P} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="3 3" />
       {series.map((s, si) => {
         const pts = toPoints(s.data);
+        const gradId = `mtl${si}${s.color.replace('#', '')}`;
         const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+        const area = `${line} L ${pts.at(-1).x.toFixed(1)} ${H - P} L ${pts[0].x.toFixed(1)} ${H - P} Z`;
         return (
           <g key={si}>
+            <defs>
+              <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={s.color} stopOpacity="0.15" />
+                <stop offset="100%" stopColor={s.color} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d={area} fill={`url(#${gradId})`} />
             <path d={line} fill="none" stroke={s.color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="white" stroke={s.color} strokeWidth="2" />)}
+            {pts.map((p, i) => (
+              <g key={i}>
+                <circle cx={p.x} cy={p.y} r="3.5" fill="white" stroke={s.color} strokeWidth="2" />
+                <text x={p.x} y={p.y - 8} textAnchor="middle" fontSize="9" fontWeight="700" fill={s.color}>{p.v}</text>
+              </g>
+            ))}
           </g>
         );
       })}

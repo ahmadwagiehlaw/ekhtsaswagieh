@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, Award, Layers, TrendingUp, CalendarDays, AlertTriangle, Building2, Scale,
   PieChart, ClipboardList, CheckCircle2, ChevronLeft, Activity, Sparkles,
-  Printer, Settings2, Eye, EyeOff, BarChart3, FileText, Clock, Gavel,
+  Printer, Settings2, Bell, Eye, EyeOff, BarChart3, FileText, Clock, Gavel,
   ChevronRight, Calendar, LogOut, X, Star, Filter
 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
@@ -57,6 +57,7 @@ export default function Dashboard() {
   const [showCustomize, setShowCustomize] = useState(false);
 
   const [showQuickFilters, setShowQuickFilters] = useState(false);
+  const [showAlertsPanel, setShowAlertsPanel] = useState(false);
   const [hiddenWidgets, setHiddenWidgets] = useState(() => {
     try { return JSON.parse(localStorage.getItem('dash-hidden-v3') || '["entities","years"]'); } catch { return ['entities', 'years']; }
   });
@@ -534,6 +535,7 @@ export default function Dashboard() {
     );
   }
 
+  const totalAlertsCount = (stats.alerts?.length || 0) + (stats.staleOngoingCases?.length || 0) + (stats.unclassifiedJudgedCases?.length || 0);
   const donutSegments = stats.topJudgments.map(([name, value]) => ({ name, value, color: getJColor(name) }));
   const donutTotal = donutSegments.reduce((s, d) => s + d.value, 0);
   const viewMonthLabel = new Date(viewMonth.year, viewMonth.month, 1).toLocaleDateString('ar-EG', { month: 'long' });
@@ -568,6 +570,16 @@ export default function Dashboard() {
             <button type="button" onClick={() => setShowQuickFilters(!showQuickFilters)} className={`w-12 h-[46px] rounded-xl flex items-center justify-center transition border shadow-sm shrink-0 ${showQuickFilters ? 'bg-amber-500 text-white border-amber-500' : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700'}`} title="الفلاتر السريعة">
               <Filter className="w-5 h-5" />
             </button>
+              {/* Alerts Bell Button */}
+              <button type="button" onClick={() => setShowAlertsPanel(!showAlertsPanel)} className={`relative w-12 h-[46px] rounded-xl flex items-center justify-center transition border shadow-sm shrink-0 ${showAlertsPanel ? 'bg-rose-500 text-white border-rose-500' : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700'}`} title="التنبيهات">
+                <Bell className="w-5 h-5" />
+                {totalAlertsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-500 border-2 border-[#0a131c] items-center justify-center text-[8px] font-black text-white">{totalAlertsCount > 9 ? '9+' : totalAlertsCount}</span>
+                  </span>
+                )}
+              </button>
           </form>
 
           {/* Quick Filters Row */}
@@ -586,6 +598,8 @@ export default function Dashboard() {
       </div>
 
       {/* ── Alerts ─────────────────────────────────────────── */}
+        {showAlertsPanel && (
+          <>
       {/* ── B4: Stale Ongoing Alert ── */}
       {stats.staleOngoingCases?.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm mb-4 cursor-pointer hover:bg-amber-100 transition"
@@ -668,6 +682,8 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+          </>
+        )}
 
       {/* ── Monthly Matrix (مقارنة الأداء الشهري) ────────────── */}
       <div className="bg-[#1e293b] rounded-2xl p-4 shadow-sm border border-slate-700/50">
@@ -977,7 +993,7 @@ export default function Dashboard() {
       <BarChart3 className="w-4 h-4 text-slate-400" />
       <h3 className="font-black text-xs text-slate-600">اتجاه كسب/خسارة القضايا (6 شهور)</h3>
     </div>
-    <div className="h-24">
+    <div className="h-28">
       <MultiTrendLine series={[
         { data: (stats.last6Months || []).map(d => d.good), color: '#10b981' },
         { data: (stats.last6Months || []).map(d => d.bad), color: '#f43f5e' },
