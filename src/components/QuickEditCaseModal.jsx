@@ -16,7 +16,7 @@ export default function QuickEditCaseModal({ isOpen, onClose, caseData }) {
 
   const currentCourtDegree = settings?.courtDegree || 'أول درجة';
   const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
-  const sessionTypeOptions = isSupreme ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة'];
+  const sessionTypeOptions = settings?.sessionTypes || (isSupreme ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة']);
 
   const getAutocompleteOptions = (fieldId) => {
     if (!cases) return [];

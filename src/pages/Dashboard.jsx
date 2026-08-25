@@ -868,6 +868,25 @@ export default function Dashboard() {
                     </div>
                     <div style={{ width: `${(stats.performanceSplit.appellee.bad / stats.performanceSplit.appellee.total) * 100}%` }} className="bg-rose-500 hover:opacity-90 transition-opacity relative group cursor-pointer">
                        <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">ضد: {stats.performanceSplit.appellee.bad}</div>
+                    </div>
+                    <div style={{ width: `${(stats.performanceSplit.appellee.mixed / stats.performanceSplit.appellee.total) * 100}%` }} className="bg-blue-500 hover:opacity-90 transition-opacity relative group cursor-pointer">
+                       <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">مختلط: {stats.performanceSplit.appellee.mixed}</div>
+                    </div>
+                    <div style={{ width: `${(stats.performanceSplit.appellee.procedural / stats.performanceSplit.appellee.total) * 100}%` }} className="bg-slate-300 hover:opacity-90 transition-opacity relative group cursor-pointer">
+                       <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">إجرائي: {stats.performanceSplit.appellee.procedural}</div>
+                    </div>
+                  </>
+                ) : <div className="w-full bg-slate-100"></div>}
+              </div>
+            </div>
+            
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-3 pt-3">
+              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500"></div><span className="text-[9px] font-bold text-slate-500">صالح</span></div>
+              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-rose-500"></div><span className="text-[9px] font-bold text-slate-500">ضد</span></div>
+              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-500"></div><span className="text-[9px] font-bold text-slate-500">مختلط</span></div>
+              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-300"></div><span className="text-[9px] font-bold text-slate-500">إجرائي/أخرى</span></div>
+            </div>
           {/* ── B2: Win/Loss Trend ── */}
           <div className="mt-6 pt-4 border-t border-slate-100">
             <h4 className="font-black text-slate-600 text-[11px] mb-3">اتجاه كسب/خسارة القضايا (6 شهور)</h4>
@@ -891,25 +910,6 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-                    </div>
-                    <div style={{ width: `${(stats.performanceSplit.appellee.mixed / stats.performanceSplit.appellee.total) * 100}%` }} className="bg-blue-500 hover:opacity-90 transition-opacity relative group cursor-pointer">
-                       <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">مختلط: {stats.performanceSplit.appellee.mixed}</div>
-                    </div>
-                    <div style={{ width: `${(stats.performanceSplit.appellee.procedural / stats.performanceSplit.appellee.total) * 100}%` }} className="bg-slate-300 hover:opacity-90 transition-opacity relative group cursor-pointer">
-                       <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded font-bold whitespace-nowrap z-10 transition-opacity">إجرائي: {stats.performanceSplit.appellee.procedural}</div>
-                    </div>
-                  </>
-                ) : <div className="w-full bg-slate-100"></div>}
-              </div>
-            </div>
-            
-            {/* Legend */}
-            <div className="flex items-center justify-center gap-3 pt-3">
-              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500"></div><span className="text-[9px] font-bold text-slate-500">صالح</span></div>
-              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-rose-500"></div><span className="text-[9px] font-bold text-slate-500">ضد</span></div>
-              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-500"></div><span className="text-[9px] font-bold text-slate-500">مختلط</span></div>
-              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-300"></div><span className="text-[9px] font-bold text-slate-500">إجرائي/أخرى</span></div>
-            </div>
           </div>
         </div>
       </div>

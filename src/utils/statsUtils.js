@@ -190,7 +190,7 @@ export function calculateDashboardStats(cases, settings) {
       if (s.hasJudgment) return true;
       const dec = String(s.decision || '').trim();
       const type = String(s.type || '').trim();
-      if ((dec.includes('رفض') || dec.includes('قبول')) && type.includes('فحص')) return true;
+      if ((dec.includes('رفض') || dec.includes('قبول')) && type.includes(settings?.sessionTypes?.[0] || 'فحص')) return true;
       return false;
     });
     const hasHukm = !!latestJudgmentSession;
@@ -454,10 +454,10 @@ export function computeMultiMonthStats(cases, settings, monthsList) {
       } else {
         const dec = String(s.decision || '').trim();
         const type = String(s.type || '').trim();
-        if (dec.includes('رفض') && type.includes('فحص')) {
+        if (dec.includes('رفض') && type.includes(settings?.sessionTypes?.[0] || 'فحص')) {
           const computeAs = isAppellant ? 'ضد' : isAppellee ? 'صالح' : 'ضد';
           addToJudgments(bucket.judgments, computeAs, mapping, c, settings);
-        } else if (dec.includes('قبول') && type.includes('فحص')) {
+        } else if (dec.includes('قبول') && type.includes(settings?.sessionTypes?.[0] || 'فحص')) {
           const computeAs = isAppellant ? 'صالح' : isAppellee ? 'ضد' : 'صالح';
           addToJudgments(bucket.judgments, computeAs, mapping, c, settings);
         }

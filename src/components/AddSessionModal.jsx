@@ -11,11 +11,14 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
   const { saveCaseToFirebase, saveViewingTask, settings, isAdmin, currentUserPermissions, currentUser } = useAppContext();
   const canEditData = isAdmin || currentUserPermissions?.canEditData;
   const { toast, showPrompt } = useUI();
+  const currentCourtDegree = settings?.courtDegree || 'أول درجة';
+  const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
+  const sessionTypeOptions = settings?.sessionTypes || (isSupreme ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة']);
   const [sessionDate, setSessionDate] = useState('');
   const [decision, setDecision] = useState('');
   const [notes, setNotes] = useState('');
   const [roll, setRoll] = useState('');
-  const [sessionType, setSessionType] = useState('فحص');
+  const [sessionType, setSessionType] = useState(sessionTypeOptions[0] || 'فحص');
   
   // Viewing Task State
   const [createViewingTask, setCreateViewingTask] = useState(false);
@@ -122,7 +125,7 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
       setSessionDate('');
       setDecision('');
       setRoll('');
-      setSessionType('فحص');
+      setSessionType(sessionTypeOptions[0] || 'فحص');
       setNotes('');
       setProcedureTitle('');
       setProcedureNotes('');
@@ -197,10 +200,7 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
                   onChange={(e) => setSessionType(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
                 >
-                  <option value="فحص">فحص</option>
-                  <option value="موضوع">موضوع</option>
-                  <option value="تحقيق">تحقيق</option>
-                  <option value="خبراء">خبراء</option>
+                  {sessionTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
             </div>

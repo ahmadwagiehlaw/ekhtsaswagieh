@@ -106,8 +106,7 @@ export default function SessionsTab({
                             onChange={(e) => setEditSessionData({ ...editSessionData, type: e.target.value })}
                             className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 focus:outline-none focus:border-emerald-400"
                           >
-                            <option value="فحص">فحص</option>
-                            <option value="موضوع">موضوع</option>
+                    {sessionTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
 
                           {/* Decision Edit */}

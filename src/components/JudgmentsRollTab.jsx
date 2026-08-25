@@ -201,6 +201,8 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
   const roles = settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص'];
 
   const [searchQ, setSearchQ] = useState('');
+  const currentCourtDegree = settings?.courtDegree || 'أول درجة';
+  const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
   const [sessionTypeFilter, setSessionTypeFilter] = useState('الكل');
   const [hideIrrelevant, setHideIrrelevant] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -489,7 +491,7 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
 
         <div className="flex items-center gap-2">
           <div className="flex bg-slate-100 p-1 rounded-xl">
-            {['الكل', 'موضوع', 'فحص'].map(t => (
+            {['الكل', ...(settings?.sessionTypes || (isSupreme ? ['موضوع', 'فحص'] : ['مرافعة', 'مفوضين']))].map(t => (
               <button
                 key={t}
                 onClick={() => setSessionTypeFilter(t)}
