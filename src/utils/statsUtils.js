@@ -295,7 +295,7 @@ export function calculateDashboardStats(cases, settings) {
     } else if (isDecidedForJudgment) {
       if (lastSessionDate && lastSessionDate < today) {
         unclassifiedJudgedCases.push(c);
-        judgmentsCount['غير مصنف'] = (judgmentsCount['غير مصنف'] || 0) + 1;
+        judgmentsCount['غير مقيد'] = (judgmentsCount['غير مقيد'] || 0) + 1;
         judgedCount++;
         judgedCases.push(c);
       } else {
@@ -396,8 +396,16 @@ export function calculateDashboardStats(cases, settings) {
   const winRate = (totalGoodJ + totalBadJ) > 0 ? Math.round((totalGoodJ / (totalGoodJ + totalBadJ)) * 100) : null;
   const topYears     = Object.entries(yearCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const topOpponents = Object.entries(opponentsCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const topJudgments = Object.entries(judgmentsCount).sort((a, b) => b[1] - a[1]);
-  const topClassifications = Object.entries(classificationCount).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const topJudgments = Object.entries(judgmentsCount).sort((a, b) => {
+    if (a[0] === 'غير مقيد') return 1;
+    if (b[0] === 'غير مقيد') return -1;
+    return b[1] - a[1];
+  });
+  const topClassifications = Object.entries(classificationCount).sort((a, b) => {
+    if (a[0] === 'غير مصنف') return 1;
+    if (b[0] === 'غير مصنف') return -1;
+    return b[1] - a[1];
+  }).slice(0, 6);
 
   return {
     winRate,

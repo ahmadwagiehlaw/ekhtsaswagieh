@@ -21,6 +21,7 @@ export default function SettingsSystemTab() {
   const [localMemoCalculationMode, setLocalMemoCalculationMode] = useState(settings?.memoCalculationMode || 'session_date');
   const [localScratchpadPosition, setLocalScratchpadPosition] = useState(settings?.scratchpadPosition || 'right');
   const [localSearchTabPosition, setLocalSearchTabPosition] = useState(settings?.searchTabPosition || 'right');
+  const [localEnableEmployeeReports, setLocalEnableEmployeeReports] = useState(settings?.enableEmployeeReports || false);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
@@ -67,6 +68,7 @@ export default function SettingsSystemTab() {
     setLocalMemoCalculationMode(settings?.memoCalculationMode || 'session_date');
     setLocalScratchpadPosition(settings?.scratchpadPosition || 'right');
     setLocalSearchTabPosition(settings?.searchTabPosition || 'right');
+    setLocalEnableEmployeeReports(settings?.enableEmployeeReports || false);
 
     setLocalMemoCalculationMode(settings?.memoCalculationMode || 'session_date');
     setLocalScratchpadPosition(settings?.scratchpadPosition || 'right');
@@ -132,6 +134,7 @@ export default function SettingsSystemTab() {
       memoCalculationMode: localMemoCalculationMode,
       scratchpadPosition: localScratchpadPosition,
       searchTabPosition: localSearchTabPosition,
+      enableEmployeeReports: localEnableEmployeeReports,
     });
     setIsProcessing(false);
     toast('تم حفظ إعدادات النظام بنجاح', 'success');

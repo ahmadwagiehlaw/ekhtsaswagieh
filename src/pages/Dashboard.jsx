@@ -21,7 +21,7 @@ import BulkAssignTaskModal from '../components/BulkAssignTaskModal';
 const FALLBACK_COLORS = {
   'صالح': '#10b981', 'ضد': '#ef4444', 'وقف جزائي': '#f97316', 'وقف والدولة مدعية': '#f97316',
   'اعتبار كأن لم تكن': '#8b5cf6', 'اعتبار': '#eab308',
-  'تمهيدي': '#06b6d4', 'لا شأن بالحكم': '#94a3b8', 'لا شأن لنا بالحكم': '#94a3b8', 'غير مصنف': '#cbd5e1',
+  'تمهيدي': '#06b6d4', 'لا شأن بالحكم': '#94a3b8', 'لا شأن لنا بالحكم': '#94a3b8', 'غير مصنف': '#cbd5e1', 'غير مقيد': '#cbd5e1',
   'غير منه للخصومة': '#64748b', 'حكم غير منه للخصومة': '#64748b', 'حكم منه للخصومة': '#22c55e',
 };
 
@@ -785,7 +785,13 @@ export default function Dashboard() {
             <button
               key={i}
               type="button"
-              onClick={() => day.cases.length > 0 && setAgendaModal({ isOpen: true, title: `جلسات يوم ${day.date.toLocaleDateString('ar-EG')}`, casesList: day.cases })}
+                onClick={() => {
+                  if (day.cases.length > 0) {
+                    const dTime = day.date.getTime();
+                    window.sessionStorage.setItem('agenda_selectedDateKey', JSON.stringify(dTime));
+                    navigate('/agenda');
+                  }
+                }}
               className={`flex flex-col items-center gap-1 rounded-xl p-2.5 border transition ${i === 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'} ${day.cases.length > 0 ? 'hover:border-indigo-300 hover:bg-indigo-50 cursor-pointer' : 'cursor-default opacity-60'}`}
             >
               <span className="text-[9px] font-bold text-slate-400">{day.label}</span>
@@ -797,78 +803,75 @@ export default function Dashboard() {
       </div>
 
       {/* ── KPI Cards (4 main judicial metrics) ──────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <KPICard
-          icon={Calendar}
-          label="القضايا النشطة"
-          sublabel="جلسات قادمة (بعد اليوم)"
-          value={stats.activeCasesCount}
-          accentColor="#0ea5e9"
-          bgFrom="from-sky-50" bgTo="to-blue-50/40"
-          iconBg="bg-sky-100"
-          border="border-sky-200"
-          onClick={() => setAgendaModal({ isOpen: true, title: 'القضايا النشطة', casesList: stats.activeCases })}
-          extra={
-            stats.netTotal > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <KPICard
+            icon={Calendar}
+            label="القضايا النشطة"
+            sublabel="جلسات قادمة (بعد اليوم)"
+            value={stats.activeCasesCount}
+            accentColor="#0ea5e9"
+            bgFrom="from-sky-50" bgTo="to-blue-50/40"
+            iconBg="bg-sky-100"
+            border="border-sky-200"
+            onClick={() => setAgendaModal({ isOpen: true, title: 'القضايا النشطة', casesList: stats.activeCases })}
+            extra={
+              stats.netTotal > 0 && (
+                <p className="text-[9px] font-bold text-slate-400">
+                  {Math.round((stats.activeCasesCount / stats.netTotal) * 100)}% من إجمالي {stats.netTotal} ملف
+                </p>
+              )
+            }
+          />
+          <KPICard
+            icon={TrendingUp}
+            label="إجمالي المتداول"
+            sublabel="نشط · غير محجوز للحكم"
+            value={stats.ongoingCount}
+            accentColor="#d97706"
+            bgFrom="from-amber-50" bgTo="to-orange-50/40"
+            iconBg="bg-amber-100"
+            border="border-amber-200"
+            onClick={() => setAgendaModal({ isOpen: true, title: 'إجمالي المتداول', casesList: stats.ongoingCases })}
+            extra={
               <p className="text-[9px] font-bold text-slate-400">
-                {Math.round((stats.activeCasesCount / stats.netTotal) * 100)}% من إجمالي {stats.netTotal} ملف
+                طاعن: {stats.ongoingAppellantCount} · مطعون ضدنا: {stats.ongoingAppelleeCount}
               </p>
-            )
-          }
-        />
-        <KPICard
-          icon={TrendingUp}
-          label="إجمالي المتداول"
-          sublabel="نشط · غير محجوز للحكم"
-          value={stats.ongoingCount}
-          accentColor="#d97706"
-          bgFrom="from-amber-50" bgTo="to-orange-50/40"
-          iconBg="bg-amber-100"
-          border="border-amber-200"
-          onClick={() => setAgendaModal({ isOpen: true, title: 'إجمالي المتداول', casesList: stats.ongoingCases })}
-          extra={<p className="text-[9px] font-bold text-slate-400 mt-1">طاعن: {stats.ongoingAppellantCount || 0} · مطعون ضدنا: {stats.ongoingAppelleeCount || 0}</p>}
-        />
-        <KPICard
-          icon={Clock}
-          label="محجوز للحكم"
-          sublabel="قرار الجلسة: للحكم"
-          value={stats.reservedCount}
-          accentColor="#7c3aed"
-          bgFrom="from-violet-50" bgTo="to-purple-50/40"
-          iconBg="bg-violet-100"
-          border="border-violet-200"
-          onClick={() => setAgendaModal({ isOpen: true, title: 'محجوز للحكم', casesList: stats.reservedCases })}
-        />
-        <KPICard
-          icon={Scale}
-          label="المحكوم فيها"
-          sublabel="حكم مسجل"
-          value={stats.judgedCount}
-          accentColor="#059669"
-          bgFrom="from-emerald-50" bgTo="to-green-50/40"
-          iconBg="bg-emerald-100"
-          border="border-emerald-200"
-          onClick={() => setAgendaModal({ isOpen: true, title: 'المحكوم فيها', casesList: stats.judgedCases })}
-          extra={
-            stats.judgedCount > 0 && (
-              <p className="text-[9px] font-bold text-slate-400">
-                {Math.round((stats.judgedCount / (stats.netTotal || 1)) * 100)}% من الإجمالي
-              </p>
-            )
-          }
-        />
-        <KPICard
-          icon={Activity}
-          label="متوسط مدة الفصل"
-          sublabel="معدل أيام تداول الدعوى"
-          value={Math.round(stats.avgResolutionDays || 0) + " يوم"}
-          accentColor="#059669"
-          bgFrom="from-emerald-50" bgTo="to-teal-50/40"
-          iconBg="bg-emerald-100"
-          border="border-emerald-200"
-        />
-
-      </div>
+            }
+          />
+          <KPICard
+            icon={Scale}
+            label="الأحكام"
+            sublabel="محكوم فيها ومحجوزة للحكم"
+            value={stats.judgedCount + stats.reservedCount}
+            accentColor="#10b981"
+            bgFrom="from-emerald-50" bgTo="to-green-50/40"
+            iconBg="bg-emerald-100"
+            border="border-emerald-200"
+            onClick={() => setAgendaModal({ isOpen: true, title: 'الأحكام', casesList: [...stats.judgedCases, ...stats.reservedCases] })}
+            extra={
+              <div className="mt-1.5 space-y-1">
+                <div className="flex justify-between text-[10px] font-bold">
+                  <span className="text-emerald-700">محكوم: {stats.judgedCount}</span>
+                  <span className="text-emerald-900/60">محجوز: {stats.reservedCount}</span>
+                </div>
+                <div className="h-1 flex rounded-full overflow-hidden bg-emerald-900/10 w-full" dir="ltr">
+                  <div style={{ width: `${(stats.reservedCount / (stats.judgedCount + stats.reservedCount || 1)) * 100}%` }} className="bg-emerald-900/30" />
+                  <div style={{ width: `${(stats.judgedCount / (stats.judgedCount + stats.reservedCount || 1)) * 100}%` }} className="bg-emerald-500" />
+                </div>
+              </div>
+            }
+          />
+          <KPICard
+            icon={Activity}
+            label="متوسط مدة الفصل"
+            sublabel="معدل أيام تداول الدعوى"
+            value={`${stats.resolvedCasesCount > 0 ? Math.round(stats.totalResolutionDays / stats.resolvedCasesCount) : 0} يوم`}
+            accentColor="#14b8a6"
+            bgFrom="from-teal-50" bgTo="to-emerald-50/40"
+            iconBg="bg-teal-100"
+            border="border-teal-200"
+          />
+        </div>
 
       {/* ── Charts Row ────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -989,11 +992,15 @@ export default function Dashboard() {
 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
   {/* Win/Loss Trend — single combined chart, shared scale */}
   <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-    <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center justify-between gap-2 mb-4">
       <BarChart3 className="w-4 h-4 text-slate-400" />
       <h3 className="font-black text-xs text-slate-600">اتجاه كسب/خسارة القضايا (6 شهور)</h3>
     </div>
-    <div className="h-28">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>صالح</span>
+                <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500"><span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>ضد</span>
+              </div>
+    <div className="h-32 pt-2">
       <MultiTrendLine series={[
         { data: (stats.last6Months || []).map(d => d.good), color: '#10b981', strokeWidth: 1.5, fillOpacity: 0.1 },
         { data: (stats.last6Months || []).map(d => d.bad), color: '#f43f5e', strokeWidth: 2.5, fillOpacity: 0.2 },
@@ -1003,10 +1010,6 @@ export default function Dashboard() {
       {(stats.last6Months || []).map(m => (
         <span key={m.label} className="text-[9px] font-bold text-slate-400">{m.label}</span>
       ))}
-    </div>
-    <div className="flex items-center justify-center gap-4 pt-3 mt-2 border-t border-slate-100">
-      <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500"><span className="w-2 h-2 rounded-full bg-emerald-500"></span>الأحكام الصالحة</span>
-      <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500"><span className="w-2 h-2 rounded-full bg-rose-500"></span>الأحكام الضد</span>
     </div>
   </div>
 
@@ -1043,7 +1046,7 @@ export default function Dashboard() {
           { id: 'priority', icon: Star, label: 'أولوية المستشار' },
 
           { id: 'details', icon: PieChart, label: 'إحصائيات تفصيلية' },
-          { id: 'tasks', icon: ClipboardList, label: 'تقارير الموظفين' }
+          ...(settings?.enableEmployeeReports ? [{ id: 'tasks', icon: ClipboardList, label: 'تقارير الموظفين' }] : [])
         ].map(tab => (
           <button key={tab.id} onClick={() => setBottomTab(tab.id)}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all ${bottomTab === tab.id ? 'bg-white shadow-sm text-navy-900' : 'text-slate-500 hover:text-navy-900'}`}>
@@ -1213,7 +1216,7 @@ export default function Dashboard() {
                 <thead>
                   <tr className="border-b border-slate-100">
                     <th className="text-right py-2 font-black text-slate-500">الشهر</th>
-                    <th className="text-center py-2 font-black text-slate-500">جلسات</th>
+                    <th className="text-center py-2 font-black text-slate-500">المتداول</th>
                     <th className="text-center py-2 font-black text-slate-500">محكوم فيه</th>
                     <th className="text-center py-2 font-black text-emerald-600">صالح</th>
                     <th className="text-center py-2 font-black text-rose-600">ضد</th>
