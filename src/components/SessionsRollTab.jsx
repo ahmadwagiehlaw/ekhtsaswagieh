@@ -186,7 +186,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   // '/' keyboard shortcut → focus search
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === '/' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
+      if ((e.key === '/' || e.key === '\\') && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
         e.preventDefault();
         searchRef.current?.focus();
         searchRef.current?.select();

@@ -121,7 +121,7 @@ export default function Files() {
   // "/" keyboard shortcut — focus & select-all on the search input
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key !== '/') return;
+      if (e.key !== '/' && e.key !== '\\') return;
       const tag = document.activeElement?.tagName?.toLowerCase();
       const isEditable = tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable;
       if (isEditable) return;
