@@ -145,6 +145,17 @@ export default function Dashboard() {
     return days;
   }, [cases]);
 
+  const monthlyPerfMonths = useMemo(() => {
+    const arr = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      arr.push({ month: d.getMonth(), year: d.getFullYear(), label: d.toLocaleDateString('ar-EG', { month: 'long' }) });
+    }
+    return arr;
+  }, []);
+  const monthlyPerfBuckets = useMemo(() => computeMultiMonthStats(cases, settings, monthlyPerfMonths), [cases, settings, monthlyPerfMonths]);
+
+
 
   const monthTabs = useMemo(() => {
     const tabs = [];
@@ -755,7 +766,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── KPI Cards (4 main judicial metrics) ──────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <KPICard
           icon={Calendar}
           label="القضايا النشطة"
@@ -826,17 +837,6 @@ export default function Dashboard() {
           border="border-emerald-200"
         />
 
-        <KPICard
-          icon={Award}
-          label="نسبة النجاح"
-          sublabel="من إجمالي الأحكام الحاسمة"
-          value={stats.winRate !== null && stats.winRate !== undefined ? `${stats.winRate}%` : '—'}
-          accentColor={stats.winRate === null || stats.winRate === undefined ? '#94a3b8' : stats.winRate >= 50 ? '#059669' : '#dc2626'}
-          bgFrom={stats.winRate === null || stats.winRate === undefined ? 'from-slate-50' : stats.winRate >= 50 ? 'from-emerald-50' : 'from-rose-50'}
-          bgTo={stats.winRate === null || stats.winRate === undefined ? 'to-slate-50/40' : stats.winRate >= 50 ? 'to-green-50/40' : 'to-red-50/40'}
-          iconBg={stats.winRate === null || stats.winRate === undefined ? 'bg-slate-100' : stats.winRate >= 50 ? 'bg-emerald-100' : 'bg-rose-100'}
-          border={stats.winRate === null || stats.winRate === undefined ? 'border-slate-200' : stats.winRate >= 50 ? 'border-emerald-200' : 'border-rose-200'}
-        />
       </div>
 
       {/* ── Charts Row ────────────────────────────────────── */}
@@ -948,33 +948,70 @@ export default function Dashboard() {
               <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-500"></div><span className="text-[9px] font-bold text-slate-500">مختلط</span></div>
               <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-300"></div><span className="text-[9px] font-bold text-slate-500">إجرائي/أخرى</span></div>
             </div>
-            {/* ── B2: Win/Loss Trend ── */}
-            <div className="mt-6 pt-4 border-t border-slate-100">
-              <h4 className="font-black text-slate-600 text-[11px] mb-3">اتجاه كسب/خسارة القضايا (6 شهور)</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-emerald-50/50 rounded-xl p-2 border border-emerald-100/50">
-                  <p className="text-[9px] font-bold text-emerald-600 mb-1">الأحكام الصالحة</p>
-                  <div className="h-8">
-                    <TrendLine data={(stats.last6Months || []).map(d => ({ count: d.good }))} color="#10b981" />
-                  </div>
-                </div>
-                <div className="bg-rose-50/50 rounded-xl p-2 border border-rose-100/50">
-                  <p className="text-[9px] font-bold text-rose-600 mb-1">الأحكام الضد</p>
-                  <div className="h-8">
-                    <TrendLine data={(stats.last6Months || []).map(d => ({ count: d.bad }))} color="#f43f5e" />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-between mt-2 px-2">
-                {(stats.last6Months || []).map(m => (
-                  <span key={m.label} className="text-[8px] font-bold text-slate-400">{m.label}</span>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       </div>
 
+
+
+{/* ── Judgments Trend & Win Rate Row ── */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+  {/* Win/Loss Trend */}
+  <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+    <div className="flex items-center gap-2 mb-4">
+      <BarChart3 className="w-4 h-4 text-slate-400" />
+      <h3 className="font-black text-xs text-slate-600">اتجاه كسب/خسارة القضايا (6 شهور)</h3>
+    </div>
+    <div className="grid grid-cols-2 gap-4">
+      <div className="bg-emerald-50/50 rounded-xl p-3 border border-emerald-100/50">
+        <p className="text-[10px] font-bold text-emerald-600 mb-2">الأحكام الصالحة</p>
+        <div className="h-14">
+          <TrendLine data={(stats.last6Months || []).map(d => ({ count: d.good }))} color="#10b981" />
+        </div>
+      </div>
+      <div className="bg-rose-50/50 rounded-xl p-3 border border-rose-100/50">
+        <p className="text-[10px] font-bold text-rose-600 mb-2">الأحكام الضد</p>
+        <div className="h-14">
+          <TrendLine data={(stats.last6Months || []).map(d => ({ count: d.bad }))} color="#f43f5e" />
+        </div>
+      </div>
+    </div>
+    <div className="flex justify-between mt-3 px-1">
+      {(stats.last6Months || []).map(m => (
+        <span key={m.label} className="text-[9px] font-bold text-slate-400">{m.label}</span>
+      ))}
+    </div>
+  </div>
+
+  {/* Win Rate */}
+  <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+    <div className="flex items-center gap-2 mb-4">
+      <Award className="w-4 h-4 text-slate-400" />
+      <h3 className="font-black text-xs text-slate-600">نسبة النجاح</h3>
+    </div>
+    {(stats.totalGoodJ || 0) + (stats.totalBadJ || 0) > 0 ? (
+      <div className="flex items-center justify-between gap-8 sm:gap-12">
+        <div className="relative shrink-0">
+          <DonutChart segments={[{ name: 'صالح', value: stats.totalGoodJ, color: '#10b981' }, { name: 'ضد', value: stats.totalBadJ, color: '#ef4444' }]} size={130} thickness={22} />
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <span className="text-2xl font-black" style={{ color: stats.winRate >= 50 ? '#059669' : '#dc2626' }}>{stats.winRate}%</span>
+            <span className="text-[9px] font-bold text-slate-400">نسبة النجاح</span>
+          </div>
+        </div>
+        <div className="flex-1 space-y-3 min-w-0 py-1">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>أحكام لصالحنا</span>
+            <span className="text-xs font-black text-slate-600">{stats.totalGoodJ}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0"></span>أحكام ضدنا</span>
+            <span className="text-xs font-black text-slate-600">{stats.totalBadJ}</span>
+          </div>
+        </div>
+      </div>
+    ) : <p className="text-xs text-slate-400 font-bold text-center py-8">لا توجد أحكام حاسمة بعد</p>}
+  </div>
+</div>
 
       {/* ── Tabs Navigation ── */}
       <div className="flex flex-wrap gap-2 mb-4 bg-slate-100 p-1.5 rounded-2xl w-fit">
@@ -1141,6 +1178,41 @@ export default function Dashboard() {
           </div>
         )}
           </div>
+
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3 mt-3">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-slate-400" />
+              <h3 className="font-black text-xs text-slate-600">الأداء الشهري (آخر 6 شهور)</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs min-w-[420px]">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="text-right py-2 font-black text-slate-500">الشهر</th>
+                    <th className="text-center py-2 font-black text-slate-500">جلسات</th>
+                    <th className="text-center py-2 font-black text-slate-500">محكوم فيه</th>
+                    <th className="text-center py-2 font-black text-emerald-600">صالح</th>
+                    <th className="text-center py-2 font-black text-rose-600">ضد</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyPerfMonths.map(m => {
+                    const row = monthlyPerfBuckets[`${m.year}-${m.month}`] || { sessions: 0, judgments: { total: 0, good: 0, bad: 0 } };
+                    return (
+                      <tr key={`${m.year}-${m.month}`} className="border-b border-slate-50 last:border-0">
+                        <td className="py-2 font-bold text-navy-900">{m.label}</td>
+                        <td className="py-2 text-center font-bold text-slate-600">{row.sessions}</td>
+                        <td className="py-2 text-center font-bold text-slate-600">{row.judgments.total}</td>
+                        <td className="py-2 text-center font-black text-emerald-600">{row.judgments.good}</td>
+                        <td className="py-2 text-center font-black text-rose-600">{row.judgments.bad}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       )}
 

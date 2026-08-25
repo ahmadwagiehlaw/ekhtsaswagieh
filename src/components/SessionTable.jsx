@@ -28,10 +28,10 @@ const ALL_COLUMNS = [
 
 
 const JUDGMENT_RESULTS = [
-  { value: 'صالح',  label: 'صالح',  color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-  { value: 'ضد',    label: 'ضد',    color: 'text-rose-700 bg-rose-50 border-rose-200' },
-  { value: 'حكم منه للخصومة',   label: 'حكم منه للخصومة',   color: 'text-amber-700 bg-amber-50 border-amber-200' },
-  { value: 'غير منه للخصومة',   label: 'غير منه للخصومة',   color: 'text-orange-700 bg-orange-50 border-orange-200' },
+  { value: 'صالح', label: 'صالح', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+  { value: 'ضد', label: 'ضد', color: 'text-rose-700 bg-rose-50 border-rose-200' },
+  { value: 'حكم منه للخصومة', label: 'حكم منه للخصومة', color: 'text-amber-700 bg-amber-50 border-amber-200' },
+  { value: 'غير منه للخصومة', label: 'غير منه للخصومة', color: 'text-orange-700 bg-orange-50 border-orange-200' },
   { value: 'تمهيدي', label: 'تمهيدي', color: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
 ];
 
@@ -46,7 +46,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
   const { saveCaseToFirebase, settings, currentUser, cases, globalTasks, viewingTasks } = useAppContext();
   const { showPrompt, toast } = useUI();
   const navigate = useNavigate();
-  
+
   const typeFahs = settings?.sessionTypes?.[0] || 'فحص';
   const typeMawdoo = settings?.sessionTypes?.[1] || 'موضوع';
   const JUDGMENT_CATEGORIES = settings?.judgmentCategories || ['نهائي', 'حكم أول درجة', 'شق عاجل', 'فحص'];
@@ -64,7 +64,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('الرول');
   const [sortOrder, setSortOrder] = useState('asc');
-  
+
   // Column visibility
   const [visibleColumns, setVisibleColumns] = useState(
     ALL_COLUMNS.reduce((acc, col) => ({ ...acc, [col.id]: col.defaultVisible }), {})
@@ -127,7 +127,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
         return !role.includes('لا شأن') && !role.includes('خارج الاختصاص');
       });
     }
-    
+
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
       result = result.filter(c => {
@@ -138,7 +138,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
         });
       });
     }
-    
+
     result.sort((a, b) => {
       let valA = getFieldValueLocal(a, [sortField]);
       let valB = getFieldValueLocal(b, [sortField]);
@@ -151,7 +151,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
       valB = String(valB || '');
       return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
     });
-    
+
     return result;
   }, [dayCases, filterDecision, filterType, sortField, sortOrder, searchQuery, visibleColumns, hideIrrelevant]);
 
@@ -176,13 +176,13 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
     if (newSel.has(id)) newSel.delete(id);
     else newSel.add(id);
     setSelectedCaseIds(newSel);
-    
+
     // Set default session type for bulk actions to match the first selected case
     if (!newSel.has(id) && newSel.size === 0) return;
     const firstSelectedId = Array.from(newSel)[0];
     const firstCase = dayCases.find(c => c.id === firstSelectedId);
     if (firstCase) {
-        setBulkData(prev => ({...prev, 'نوع الجلسة': getFieldValueLocal(firstCase, ['نوع الجلسة']) || typeFahs}));
+      setBulkData(prev => ({ ...prev, 'نوع الجلسة': getFieldValueLocal(firstCase, ['نوع الجلسة']) || typeFahs }));
     }
   };
 
@@ -193,7 +193,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
       const allIds = new Set(filteredCases.map(c => c.id));
       setSelectedCaseIds(allIds);
       if (filteredCases.length > 0) {
-        setBulkData(prev => ({...prev, 'نوع الجلسة': getFieldValueLocal(filteredCases[0], ['نوع الجلسة']) || typeFahs}));
+        setBulkData(prev => ({ ...prev, 'نوع الجلسة': getFieldValueLocal(filteredCases[0], ['نوع الجلسة']) || typeFahs }));
       }
     }
   };
@@ -206,28 +206,28 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
       for (let id of selectedCaseIds) {
         const cObj = dayCases.find(c => c.id === id);
         if (!cObj) continue;
-        
+
         const payload = {};
         if (bulkData['تاريخ الجلسة']) payload['آخر جلسة'] = bulkData['تاريخ الجلسة'];
         if (bulkData['القرار']) payload['القرار'] = bulkData['القرار'];
         if (bulkData['نوع الجلسة']) payload['نوع الجلسة'] = bulkData['نوع الجلسة'];
-        
+
         const oldDate = getFieldValueLocal(cObj, ['آخر جلسة', 'تاريخ الجلسة']);
-        
+
         // Snapshot logic for Forwarding
         if (payload['آخر جلسة'] && oldDate && payload['آخر جلسة'] !== oldDate) {
           const snapshot = {
-             id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-             date: oldDate,
-             decision: payload['القرار'] || getFieldValueLocal(cObj, ['القرار']) || 'بدون قرار',
-             type: getFieldValueLocal(cObj, ['نوع الجلسة']) || typeFahs,
-             roll: getFieldValueLocal(cObj, ['الرول']) || '',
-             notes: getFieldValueLocal(cObj, ['الملاحظات']) || ''
+            id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+            date: oldDate,
+            decision: payload['القرار'] || getFieldValueLocal(cObj, ['القرار']) || 'بدون قرار',
+            type: getFieldValueLocal(cObj, ['نوع الجلسة']) || typeFahs,
+            roll: getFieldValueLocal(cObj, ['الرول']) || '',
+            notes: getFieldValueLocal(cObj, ['الملاحظات']) || ''
           };
           payload.sessions = [...(cObj.sessions || []), snapshot];
           payload['الرول'] = '';
         }
-        
+
         if (Object.keys(payload).length > 0) {
           updates.push(saveCaseToFirebase(id, payload));
         }
@@ -247,7 +247,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
 
   const applyDefaultRulesLocal = (field, value, currentData, cObj) => {
     if (!settings?.judgmentDefaults?.length) return currentData;
-    
+
     const engineInput = {
       role: getFieldValueLocal(cObj, ['الصفة', 'صفة']) || '',
       category: currentData['_judgmentCategory'],
@@ -257,9 +257,9 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
       decision: currentData['القرار'],
       text: currentData['منطوق الحكم']
     };
-    
+
     const engineOutput = applyJudgmentDefaultRules(engineInput, settings.judgmentDefaults);
-    
+
     return {
       ...currentData,
       '_judgmentCategory': engineOutput.category || currentData['_judgmentCategory'],
@@ -299,10 +299,10 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
   const saveEditing = async (e, cObj) => {
     e?.stopPropagation();
     const newData = { ...editData };
-    
+
     const oldDate = getFieldValueLocal(cObj, ['آخر جلسة', 'تاريخ الجلسة']);
     const newDate = newData['آخر جلسة'];
-    
+
     // Snapshot logic for Forwarding
     if (newDate && oldDate && newDate !== oldDate) {
       const snapshot = {
@@ -314,30 +314,30 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
         notes: newData['الملاحظات'] || getFieldValueLocal(cObj, ['الملاحظات']) || ''
       };
       newData.sessions = [...(cObj.sessions || []), snapshot];
-      newData['الرول'] = ''; 
+      newData['الرول'] = '';
     }
 
     // Judgment saving logic for current session (new structured format)
     const hasJudgmentData = !!(newData['_judgmentCategory'] || newData['_judgmentType'] || newData['_judgmentResult'] || newData['منطوق الحكم']);
-    
+
     // Apply Dynamic Rules if missing result or type
     if (hasJudgmentData && settings?.judgmentDefaults?.length > 0) {
-       const currentRole = getFieldValueLocal(cObj, ['الصفة', 'صفة']) || '';
-       const engineInput = {
-         role: currentRole,
-         category: newData['_judgmentCategory'],
-         classification: newData['_judgmentResult'],
-         type: newData['_judgmentType'],
-         sessionType: newData['نوع الجلسة'],
-         decision: newData['القرار'],
-         text: newData['منطوق الحكم']
-       };
-       const engineOutput = applyJudgmentDefaultRules(engineInput, settings.judgmentDefaults);
-       
-       newData['_judgmentCategory'] = engineOutput.category;
-       newData['_judgmentResult'] = engineOutput.classification;
-       newData['_judgmentType'] = engineOutput.type;
-       newData['منطوق الحكم'] = engineOutput.text;
+      const currentRole = getFieldValueLocal(cObj, ['الصفة', 'صفة']) || '';
+      const engineInput = {
+        role: currentRole,
+        category: newData['_judgmentCategory'],
+        classification: newData['_judgmentResult'],
+        type: newData['_judgmentType'],
+        sessionType: newData['نوع الجلسة'],
+        decision: newData['القرار'],
+        text: newData['منطوق الحكم']
+      };
+      const engineOutput = applyJudgmentDefaultRules(engineInput, settings.judgmentDefaults);
+
+      newData['_judgmentCategory'] = engineOutput.category;
+      newData['_judgmentResult'] = engineOutput.classification;
+      newData['_judgmentType'] = engineOutput.type;
+      newData['منطوق الحكم'] = engineOutput.text;
     }
 
     if (hasJudgmentData) {
@@ -363,7 +363,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
       // Also write legacy fields for backward compatibility with Reports
       const sessionIndex = (newData.sessions || cObj.sessions || []).findIndex(s => s.date === date);
       let updatedSessions = [...(newData.sessions || cObj.sessions || [])];
-      
+
       if (sessionIndex >= 0) {
         updatedSessions[sessionIndex] = {
           ...updatedSessions[sessionIndex],
@@ -386,14 +386,14 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
       }
       newData.sessions = updatedSessions;
     }
-    
+
     // Clean up internal edit state keys before saving
     delete newData['_judgmentCategory'];
     delete newData['_judgmentType'];
     delete newData['_judgmentResult'];
     delete newData['_isFinalJudgment'];
     delete newData['منطوق الحكم'];
-    
+
     await saveCaseToFirebase(cObj.id, newData);
     setEditingCaseId(null);
     setEditData({});
@@ -404,8 +404,8 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
     e.stopPropagation();
     if (idx > 0) {
       const prevCase = filteredCases[idx - 1];
-      setEditData(prev => ({ 
-        ...prev, 
+      setEditData(prev => ({
+        ...prev,
         'نوع الجلسة': getFieldValueLocal(prevCase, ['نوع الجلسة']) || typeFahs,
         'آخر جلسة': getFieldValueLocal(prevCase, ['آخر جلسة', 'تاريخ الجلسة']) || '',
         'القرار': getFieldValueLocal(prevCase, ['القرار']) || '',
@@ -418,7 +418,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
       {/* Filters and Settings */}
       <div className="flex flex-wrap gap-2 items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-200 no-print">
         <div className="flex flex-wrap gap-2 items-center">
-          <button 
+          <button
             onClick={() => {
               const newFilter = filterDecision === 'للحكم' ? null : 'للحكم';
               setFilterDecision(newFilter);
@@ -434,26 +434,26 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
             قضايا للحكم
           </button>
           <div className="w-px h-5 bg-slate-200 mx-1"></div>
-          <button 
+          <button
             onClick={() => setFilterType(filterType === typeFahs ? null : typeFahs)}
             className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition border ${filterType === typeFahs ? 'bg-indigo-100 text-indigo-700 border-indigo-200 shadow-inner' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}
           >
             {typeFahs}
           </button>
-          <button 
+          <button
             onClick={() => setFilterType(filterType === typeMawdoo ? null : typeMawdoo)}
             className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition border ${filterType === typeMawdoo ? 'bg-emerald-100 text-emerald-700 border-emerald-200 shadow-inner' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}
           >
             {typeMawdoo}
           </button>
           <div className="w-px h-5 bg-slate-200 mx-1"></div>
-          <button 
+          <button
             onClick={() => setHideIrrelevant(!hideIrrelevant)}
             className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition border flex items-center gap-1 ${hideIrrelevant ? 'bg-amber-100 text-amber-700 border-amber-200 shadow-inner' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}
             title="إخفاء قضايا لا شأن وخارج الاختصاص"
           >
             <EyeOff className="w-3 h-3" />
-            إخفاء اللاشأن
+            لا شأن
           </button>
         </div>
 
@@ -478,38 +478,38 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
               </button>
             )}
           </div>
-          
+
           <div className="relative">
-          <button 
-            onClick={() => setShowColSettings(!showColSettings)}
-            className="text-[10px] font-black px-3 py-1.5 rounded-lg transition border bg-white text-slate-600 border-slate-200 hover:bg-slate-100 flex items-center gap-1"
-          >
-            <Settings2 className="w-3 h-3" /> إعدادات الحقول
-          </button>
-          {showColSettings && (
-            <div className="absolute left-0 mt-1 w-48 bg-white border border-slate-200 shadow-xl rounded-xl p-2 z-50">
-              <p className="text-[9px] font-black text-slate-400 mb-2 border-b pb-1">أظهر/أخفِ الحقول</p>
-              <div className="space-y-1">
-                {ALL_COLUMNS.map(col => (
-                  <label key={col.id} className="flex items-center gap-2 text-[10px] font-bold text-slate-700 cursor-pointer p-1 hover:bg-slate-50 rounded">
-                    <input 
-                      type="checkbox" 
-                      checked={visibleColumns[col.id]}
-                      onChange={() => setVisibleColumns(prev => ({ ...prev, [col.id]: !prev[col.id] }))}
-                      className="rounded border-slate-300 text-navy-900 focus:ring-navy-900"
-                    />
-                    {col.label}
-                  </label>
-                ))}
+            <button
+              onClick={() => setShowColSettings(!showColSettings)}
+              className="text-[10px] font-black px-3 py-1.5 rounded-lg transition border bg-white text-slate-600 border-slate-200 hover:bg-slate-100 flex items-center gap-1"
+            >
+              <Settings2 className="w-3 h-3" /> إعدادات الحقول
+            </button>
+            {showColSettings && (
+              <div className="absolute left-0 mt-1 w-48 bg-white border border-slate-200 shadow-xl rounded-xl p-2 z-50">
+                <p className="text-[9px] font-black text-slate-400 mb-2 border-b pb-1">أظهر/أخفِ الحقول</p>
+                <div className="space-y-1">
+                  {ALL_COLUMNS.map(col => (
+                    <label key={col.id} className="flex items-center gap-2 text-[10px] font-bold text-slate-700 cursor-pointer p-1 hover:bg-slate-50 rounded">
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns[col.id]}
+                        onChange={() => setVisibleColumns(prev => ({ ...prev, [col.id]: !prev[col.id] }))}
+                        className="rounded border-slate-300 text-navy-900 focus:ring-navy-900"
+                      />
+                      {col.label}
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-        <div className="flex bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-           <button onClick={() => setZoomLevel(prev => Math.min(prev + 0.1, 1.5))} className="px-2 py-1 hover:bg-slate-100 text-slate-600 font-black text-[10px] border-l border-slate-200" title="تكبير">+</button>
-           <span className="px-2 py-1 text-[10px] font-bold text-slate-500 bg-slate-50">{Math.round(zoomLevel * 100)}%</span>
-           <button onClick={() => setZoomLevel(prev => Math.max(prev - 0.1, 0.7))} className="px-2 py-1 hover:bg-slate-100 text-slate-600 font-black text-[10px] border-r border-slate-200" title="تصغير">-</button>
-        </div>
+            )}
+          </div>
+          <div className="flex bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+            <button onClick={() => setZoomLevel(prev => Math.min(prev + 0.1, 1.5))} className="px-2 py-1 hover:bg-slate-100 text-slate-600 font-black text-[10px] border-l border-slate-200" title="تكبير">+</button>
+            <span className="px-2 py-1 text-[10px] font-bold text-slate-500 bg-slate-50">{Math.round(zoomLevel * 100)}%</span>
+            <button onClick={() => setZoomLevel(prev => Math.max(prev - 0.1, 0.7))} className="px-2 py-1 hover:bg-slate-100 text-slate-600 font-black text-[10px] border-r border-slate-200" title="تصغير">-</button>
+          </div>
         </div>
       </div>
 
@@ -522,8 +522,8 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
               <span className="text-[10px] font-bold text-indigo-600">ترحيل وتحديث جماعي:</span>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <button 
-                onClick={() => setBulkData({...bulkData, 'نوع الجلسة': bulkData['نوع الجلسة'] === typeFahs ? typeMawdoo : typeFahs})}
+              <button
+                onClick={() => setBulkData({ ...bulkData, 'نوع الجلسة': bulkData['نوع الجلسة'] === typeFahs ? typeMawdoo : typeFahs })}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100"
               >
                 <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${bulkData['نوع الجلسة'] === typeMawdoo ? 'bg-indigo-500' : 'bg-slate-300'}`}>
@@ -531,22 +531,22 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                 </div>
                 {bulkData['نوع الجلسة'] || typeFahs}
               </button>
-              
-              <input 
-                type="date" 
-                value={bulkData['تاريخ الجلسة']} 
-                onChange={e => setBulkData({...bulkData, 'تاريخ الجلسة': e.target.value})}
+
+              <input
+                type="date"
+                value={bulkData['تاريخ الجلسة']}
+                onChange={e => setBulkData({ ...bulkData, 'تاريخ الجلسة': e.target.value })}
                 className="text-xs font-bold p-1.5 rounded-lg border border-indigo-200 bg-white focus:outline-none focus:border-indigo-400"
               />
               <div className="relative flex items-center gap-1">
-                <input 
+                <input
                   list="decisions-list"
-                  placeholder="القرار" 
-                  value={bulkData['القرار']} 
-                  onChange={e => setBulkData({...bulkData, 'القرار': e.target.value})}
+                  placeholder="القرار"
+                  value={bulkData['القرار']}
+                  onChange={e => setBulkData({ ...bulkData, 'القرار': e.target.value })}
                   className="text-xs font-bold p-1.5 rounded-lg border border-indigo-200 bg-white focus:outline-none focus:border-indigo-400 w-48"
                 />
-                <button 
+                <button
                   onClick={() => setIsManageDecisionsOpen(true)}
                   className="p-1.5 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition"
                   title="إعدادات القرارات السريعة"
@@ -554,7 +554,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                   <Settings className="w-4 h-4" />
                 </button>
               </div>
-              <button 
+              <button
                 onClick={handleBulkSave}
                 disabled={isBulkSaving}
                 className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs font-black transition disabled:opacity-50"
@@ -570,14 +570,14 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
               </button>
             </div>
           </div>
-          
+
           <div className="flex flex-wrap gap-1.5 mt-1 border-t border-indigo-100 pt-2">
             <span className="text-[10px] font-bold text-slate-500 ml-2 mt-1">قرارات سريعة:</span>
             {defaultDecisions.map((opt, i) => (
-              <button 
+              <button
                 key={i}
-                type="button" 
-                onClick={() => setBulkData({...bulkData, 'القرار': opt})} 
+                type="button"
+                onClick={() => setBulkData({ ...bulkData, 'القرار': opt })}
                 className={`px-2 py-1 rounded-md text-[9px] font-bold transition-all ${bulkData['القرار'] === opt ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
               >
                 {opt}
@@ -653,21 +653,21 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
             {filteredCases.map((cObj, idx) => {
               const isSelected = selectedCaseIds.has(cObj.id);
               const isEditing = editingCaseId === cObj.id;
-              
+
               const role = String(cObj['الصفة'] || cObj['صفة'] || '');
               const isNoInterest = role === 'لا شأن';
               const fileLocation = cObj['مكان الملف'];
-              
+
               let rowBgColor = 'even:bg-slate-50/50 odd:bg-white hover:bg-indigo-50/30';
               if (fileLocation === 'غير موجود') rowBgColor = 'bg-rose-50/80 hover:bg-rose-100/80';
               else if (fileLocation === 'مؤقت') rowBgColor = 'bg-amber-50/80 hover:bg-amber-100/80';
               else if (fileLocation === 'خارج الاختصاص') rowBgColor = 'bg-indigo-50/80 hover:bg-indigo-100/80';
-              
+
               const hasViewingTask = viewingTasks?.some(t => t.status !== 'completed' && t.linkedCases?.includes(cObj.id));
 
               return (
-                <tr 
-                  key={cObj.id} 
+                <tr
+                  key={cObj.id}
                   className={`group transition-colors border-b border-slate-100 ${isSelected ? 'bg-indigo-100/80' : rowBgColor} ${isNoInterest ? 'opacity-50 grayscale' : ''}`}
                 >
                   <td className="px-3 py-2.5 text-center align-middle no-print">
@@ -678,10 +678,10 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                   {visibleColumns['الرول'] && (
                     <td className="px-3 py-2.5 text-[11px] font-black text-navy-900 text-center bg-slate-50/50">
                       {isEditing ? (
-                        <input 
-                          type="text" 
-                          value={editData['الرول'] || ''} 
-                          onChange={e => setEditData({...editData, 'الرول': e.target.value})}
+                        <input
+                          type="text"
+                          value={editData['الرول'] || ''}
+                          onChange={e => setEditData({ ...editData, 'الرول': e.target.value })}
                           className="w-10 text-center text-[10px] font-bold p-1 rounded border border-slate-300 bg-white focus:border-navy-900 outline-none mx-auto block"
                         />
                       ) : (
@@ -689,7 +689,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                       )}
                     </td>
                   )}
-                  
+
                   {visibleColumns['رقم الدعوى'] && (
                     <td className="px-3 py-2.5 text-xs font-black text-navy-900 cursor-pointer hover:text-indigo-600" onClick={() => !isEditing && setSelectedCaseId(cObj.id)}>
                       <div className="flex items-center gap-1.5 justify-center">
@@ -704,30 +704,30 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                   {visibleColumns['ضد'] && (
                     <td className="px-3 py-2.5 text-[11px] font-bold text-slate-700 truncate max-w-[120px]">{getFieldValueLocal(cObj, ['المدعى_عليه', 'المطعون ضده', 'المطعون ضدنا', 'مدعى علينا'])}</td>
                   )}
-                  
+
                   {visibleColumns['نوع الجلسة'] && (
                     <td className="px-3 py-2.5 text-[10px] font-bold text-slate-700">
                       {isEditing ? (
-                         <button 
-                           onClick={() => setEditData({...editData, 'نوع الجلسة': editData['نوع الجلسة'] === typeFahs ? typeMawdoo : typeFahs})}
-                           className="flex items-center justify-center gap-1 w-full p-1 rounded border border-slate-300 bg-white hover:bg-slate-100 focus:outline-none"
-                         >
-                           <RefreshCcw className="w-3 h-3 text-slate-400" />
-                           {editData['نوع الجلسة'] || typeFahs}
-                         </button>
+                        <button
+                          onClick={() => setEditData({ ...editData, 'نوع الجلسة': editData['نوع الجلسة'] === typeFahs ? typeMawdoo : typeFahs })}
+                          className="flex items-center justify-center gap-1 w-full p-1 rounded border border-slate-300 bg-white hover:bg-slate-100 focus:outline-none"
+                        >
+                          <RefreshCcw className="w-3 h-3 text-slate-400" />
+                          {editData['نوع الجلسة'] || typeFahs}
+                        </button>
                       ) : (
                         getFieldValueLocal(cObj, ['نوع الجلسة'])
                       )}
                     </td>
                   )}
-                  
+
                   {visibleColumns['تاريخ الجلسة'] && (
                     <td className="px-3 py-2.5 text-[10px] font-bold text-slate-700">
                       {isEditing ? (
-                         <input 
-                          type="date" 
-                          value={editData['آخر جلسة'] || ''} 
-                          onChange={e => setEditData({...editData, 'آخر جلسة': e.target.value})}
+                        <input
+                          type="date"
+                          value={editData['آخر جلسة'] || ''}
+                          onChange={e => setEditData({ ...editData, 'آخر جلسة': e.target.value })}
                           className="w-full text-[10px] font-bold p-1 rounded border border-slate-300 bg-white focus:border-navy-900 outline-none"
                         />
                       ) : (
@@ -735,19 +735,19 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                       )}
                     </td>
                   )}
-                  
+
                   {visibleColumns['القرار'] && (
                     <td className="px-3 py-2.5 text-[10px] font-bold text-amber-800 line-clamp-2 min-w-[200px]">
                       {isEditing ? (
                         <div className="flex items-center gap-1">
-                           <input 
+                          <input
                             list="decisions-list"
-                            value={editData['القرار'] || ''} 
-                            onChange={e => setEditData({...editData, 'القرار': e.target.value})}
+                            value={editData['القرار'] || ''}
+                            onChange={e => setEditData({ ...editData, 'القرار': e.target.value })}
                             className="w-full text-[10px] font-bold p-1 rounded border border-amber-300 bg-white focus:border-amber-600 outline-none"
                             placeholder="القرار..."
                           />
-                          <button 
+                          <button
                             onClick={() => setIsManageDecisionsOpen(true)}
                             className="p-1 rounded bg-amber-100 text-amber-700 hover:bg-amber-200 transition"
                             title="إعدادات القرارات السريعة"
@@ -769,7 +769,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                           <div className="flex gap-1">
                             <select
                               value={editData['_judgmentCategory'] || ''}
-                              onChange={e => { const val = e.target.value; if (!val) { setEditData(d => ({...d, '_judgmentCategory': '', '_judgmentType': ''})); } else { setEditData(d => applyDefaultRulesLocal('_judgmentCategory', val, { ...d, '_judgmentCategory': val, '_judgmentType': '' }, cObj)); } }}
+                              onChange={e => { const val = e.target.value; if (!val) { setEditData(d => ({ ...d, '_judgmentCategory': '', '_judgmentType': '' })); } else { setEditData(d => applyDefaultRulesLocal('_judgmentCategory', val, { ...d, '_judgmentCategory': val, '_judgmentType': '' }, cObj)); } }}
                               className="flex-1 text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
                             >
                               <option value="">-- فئة --</option>
@@ -777,7 +777,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                             </select>
                             <select
                               value={editData['_judgmentResult'] || ''}
-                              onChange={e => { const val = e.target.value; if (!val) { setEditData(d => ({...d, '_judgmentResult': ''})); } else { setEditData(d => applyDefaultRulesLocal('_judgmentResult', val, { ...d, '_judgmentResult': val }, cObj)); } }}
+                              onChange={e => { const val = e.target.value; if (!val) { setEditData(d => ({ ...d, '_judgmentResult': '' })); } else { setEditData(d => applyDefaultRulesLocal('_judgmentResult', val, { ...d, '_judgmentResult': val }, cObj)); } }}
                               className="flex-1 text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
                             >
                               <option value="">-- تصنيف الحكم --</option>
@@ -787,7 +787,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                           {/* Row 2: Type */}
                           <select
                             value={editData['_judgmentType'] || ''}
-                            onChange={e => { const val = e.target.value; if (!val) { setEditData(d => ({...d, '_judgmentType': ''})); } else { setEditData(d => applyDefaultRulesLocal('_judgmentType', val, { ...d, '_judgmentType': val }, cObj)); } }}
+                            onChange={e => { const val = e.target.value; if (!val) { setEditData(d => ({ ...d, '_judgmentType': '' })); } else { setEditData(d => applyDefaultRulesLocal('_judgmentType', val, { ...d, '_judgmentType': val }, cObj)); } }}
                             className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white focus:border-rose-500 outline-none"
                           >
                             <option value="">-- مختصر الحكم --</option>
@@ -798,7 +798,7 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                             <input
                               type="checkbox"
                               checked={editData['_isFinalJudgment'] || false}
-                              onChange={e => setEditData({...editData, '_isFinalJudgment': e.target.checked})}
+                              onChange={e => setEditData({ ...editData, '_isFinalJudgment': e.target.checked })}
                               className="rounded"
                             />
                             حكم نهائي في الدعوى
@@ -823,20 +823,20 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                       })()}
                     </td>
                   )}
-                  
+
                   {visibleColumns['منطوق الحكم'] && (
                     <td className="px-3 py-2.5 bg-rose-50/30 relative min-w-[200px]">
                       {isEditing ? (
-                        <textarea 
-                          value={editData['منطوق الحكم'] || ''} 
-                          onChange={e => setEditData({...editData, 'منطوق الحكم': e.target.value})}
+                        <textarea
+                          value={editData['منطوق الحكم'] || ''}
+                          onChange={e => setEditData({ ...editData, 'منطوق الحكم': e.target.value })}
                           className="w-full text-[10px] font-bold p-1 rounded border border-rose-200 bg-white resize-none focus:border-rose-500 outline-none"
                           rows={3}
                           placeholder="منطوق الحكم كاملاً..."
                         />
                       ) : (
                         <span className="text-[10px] font-bold text-slate-700 line-clamp-3" title={cObj.sessions?.find(s => s.date === date)?.judgment?.fullVerdict || cObj.sessions?.find(s => s.date === date)?.verdict || ''}>
-                           {cObj.sessions?.find(s => s.date === date)?.judgment?.fullVerdict || cObj.sessions?.find(s => s.date === date)?.verdict || ''}
+                          {cObj.sessions?.find(s => s.date === date)?.judgment?.fullVerdict || cObj.sessions?.find(s => s.date === date)?.verdict || ''}
                         </span>
                       )}
                     </td>
@@ -845,9 +845,9 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                   {visibleColumns['الملاحظات'] && (
                     <td className="px-3 py-2.5 text-[10px] font-bold text-slate-700">
                       {isEditing ? (
-                        <textarea 
-                          value={editData['الملاحظات'] || ''} 
-                          onChange={e => setEditData({...editData, 'الملاحظات': e.target.value})}
+                        <textarea
+                          value={editData['الملاحظات'] || ''}
+                          onChange={e => setEditData({ ...editData, 'الملاحظات': e.target.value })}
                           className="w-full text-[10px] font-bold p-1 rounded border border-slate-300 bg-white focus:border-navy-900 outline-none resize-none"
                           rows={2}
                           placeholder="ملاحظات..."
@@ -857,13 +857,13 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                       )}
                     </td>
                   )}
-                  
+
                   <td className="px-2 py-2.5 text-center no-print align-middle">
                     {isEditing ? (
                       <div className="flex flex-col items-center justify-center gap-1">
                         <div className="flex items-center gap-1 w-full justify-center">
-                           <button onClick={(e) => saveEditing(e, cObj)} title="حفظ" className="flex-1 h-6 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center hover:bg-emerald-200"><Check className="w-3 h-3" /></button>
-                           <button onClick={cancelEditing} title="إلغاء" className="flex-1 h-6 rounded bg-slate-100 text-slate-700 flex items-center justify-center hover:bg-slate-200"><X className="w-3 h-3" /></button>
+                          <button onClick={(e) => saveEditing(e, cObj)} title="حفظ" className="flex-1 h-6 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center hover:bg-emerald-200"><Check className="w-3 h-3" /></button>
+                          <button onClick={cancelEditing} title="إلغاء" className="flex-1 h-6 rounded bg-slate-100 text-slate-700 flex items-center justify-center hover:bg-slate-200"><X className="w-3 h-3" /></button>
                         </div>
                         {idx > 0 && (
                           <button onClick={(e) => copyAllFromPrevious(idx, e)} title="نسخ الجلسة من السابق (نوع، تاريخ، قرار)" className="w-full flex items-center justify-center gap-1 bg-amber-100 text-amber-700 hover:bg-amber-200 px-2 py-1 rounded text-[9px] font-black transition">
@@ -897,10 +897,10 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
       </div>
 
       {quickEditCaseId && (
-        <QuickEditCaseModal 
-          isOpen={!!quickEditCaseId} 
-          onClose={() => setQuickEditCaseId(null)} 
-          caseData={dayCases.find(c => c.id === quickEditCaseId)} 
+        <QuickEditCaseModal
+          isOpen={!!quickEditCaseId}
+          onClose={() => setQuickEditCaseId(null)}
+          caseData={dayCases.find(c => c.id === quickEditCaseId)}
         />
       )}
 
@@ -936,10 +936,10 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="p-4 space-y-4">
               <div className="flex gap-2">
-                <input 
+                <input
                   type="text"
                   value={newDecisionOption}
                   onChange={(e) => setNewDecisionOption(e.target.value)}
@@ -948,16 +948,16 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && newDecisionOption.trim() !== '') {
                       const updated = [...defaultDecisions, newDecisionOption.trim()];
-                      if(saveSettingsToFirebase) saveSettingsToFirebase({ decisions: updated });
+                      if (saveSettingsToFirebase) saveSettingsToFirebase({ decisions: updated });
                       setNewDecisionOption('');
                     }
                   }}
                 />
-                <button 
+                <button
                   onClick={() => {
                     if (newDecisionOption.trim() !== '') {
                       const updated = [...defaultDecisions, newDecisionOption.trim()];
-                      if(saveSettingsToFirebase) saveSettingsToFirebase({ decisions: updated });
+                      if (saveSettingsToFirebase) saveSettingsToFirebase({ decisions: updated });
                       setNewDecisionOption('');
                     }
                   }}
@@ -971,10 +971,10 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                 {defaultDecisions.map((opt, i) => (
                   <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100 group hover:border-amber-200 transition">
                     <span className="text-xs font-bold text-slate-700">{opt}</span>
-                    <button 
+                    <button
                       onClick={() => {
                         const updated = defaultDecisions.filter((_, idx) => idx !== i);
-                        if(saveSettingsToFirebase) saveSettingsToFirebase({ decisions: updated });
+                        if (saveSettingsToFirebase) saveSettingsToFirebase({ decisions: updated });
                       }}
                       className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition"
                       title="حذف"
@@ -990,10 +990,10 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
       )}
 
       {selectedCaseId && (
-        <CaseDetails 
-          isModal={true} 
-          modalCaseId={selectedCaseId} 
-          onCloseModal={() => setSelectedCaseId(null)} 
+        <CaseDetails
+          isModal={true}
+          modalCaseId={selectedCaseId}
+          onCloseModal={() => setSelectedCaseId(null)}
         />
       )}
     </div>

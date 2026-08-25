@@ -390,6 +390,8 @@ export function calculateDashboardStats(cases, settings) {
 
   return {
     winRate,
+    totalGoodJ,
+    totalBadJ,
     topClassifications,
     netTotal: cases.length,
     activeCasesCount,
