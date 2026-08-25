@@ -81,12 +81,12 @@ export const MultiTrendLine = ({ series }) => {
           <g key={si}>
             <defs>
               <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={s.color} stopOpacity="0.15" />
+                <stop offset="0%" stopColor={s.color} stopOpacity={s.fillOpacity || 0.15} />
                 <stop offset="100%" stopColor={s.color} stopOpacity="0" />
               </linearGradient>
             </defs>
             <path d={area} fill={`url(#${gradId})`} />
-            <path d={line} fill="none" stroke={s.color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={line} fill="none" stroke={s.color} strokeWidth={s.strokeWidth || 2.5} strokeLinecap="round" strokeLinejoin="round" />
             {pts.map((p, i) => (
               <g key={i}>
                 <circle cx={p.x} cy={p.y} r="3.5" fill="white" stroke={s.color} strokeWidth="2" />

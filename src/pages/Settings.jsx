@@ -104,24 +104,30 @@ export default function Settings() {
   const [localStatsMapping, setLocalStatsMapping] = useState(settings?.statsMapping?.length ? settings.statsMapping : [...DEFAULT_STATS_MAP]);
   
 
+  const isInitialized = React.useRef(false);
+
   // Sync settings when loaded
   React.useEffect(() => {
-        setLocalDecisions(settings?.decisions || []);
-        setLocalRollTypes(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
-            setLocalRoles(settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص']);
-    setLocalSessionTypes(settings?.sessionTypes || []);
-    setLocalFileLocations(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
-    setLocalCommonProcedures(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
-    setLocalCaseClassifications(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
-    setLocalJudgmentCategories(settings?.judgmentCategories || ['قرار فحص', 'حكم نهائي', 'حكم إجرائي', 'حكم منه للخصومة']);
-    setLocalJudgmentClassifications(settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'تمهيدي']);
-    setLocalJudgmentTypes(settings?.judgmentTypes || ['قبول', 'إلغاء', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'شطب', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'إحالة', 'إحالة للخبراء']);
-        
-    setLocalDeadlineRules(settings?.deadlineRules || [
-      { name: 'الطعن العادي', days: 60, targetRole: 'طاعنين', description: 'ميعاد الطعن العادي 60 يوماً' },
-      { name: 'تعجيل من الوقف الجزائي', days: 15, triggerAfterDays: 30, targetRole: 'طاعنين', description: 'يجب التعجيل خلال 15 يوماً بعد مرور شهر من الوقف' }
-    ]);
-    setLocalStatsMapping(settings?.statsMapping?.length ? settings.statsMapping : [...DEFAULT_STATS_MAP]);
+    if (isInitialized.current) return;
+    if (settings && Object.keys(settings).length > 0) {
+      isInitialized.current = true;
+      setLocalDecisions(settings?.decisions || []);
+      setLocalRollTypes(settings?.rollTypes || ['رول جلسة', 'حصر الفحص', 'حصر الموضوع', 'رول أحكام']);
+      setLocalRoles(settings?.roles || ['مطعون ضدنا', 'طاعنين', 'لا شأن', 'خارج الاختصاص']);
+      setLocalSessionTypes(settings?.sessionTypes || []);
+      setLocalFileLocations(settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']);
+      setLocalCommonProcedures(settings?.commonProcedures || ['إيداع مذكرة دفاع', 'تقديم حافظة مستندات', 'طلب تصوير ملف', 'سداد الأمانة', 'حضور الجلسة']);
+      setLocalCaseClassifications(settings?.caseClassifications || ['تسويات', 'بدلات', 'جزاءات', 'ترقيات', 'عقود', 'ضرائب']);
+      setLocalJudgmentCategories(settings?.judgmentCategories || ['قرار فحص', 'حكم نهائي', 'حكم إجرائي', 'حكم منه للخصومة']);
+      setLocalJudgmentClassifications(settings?.judgmentClassifications || ['صالح', 'ضد', 'مختلط', 'تمهيدي']);
+      setLocalJudgmentTypes(settings?.judgmentTypes || ['قبول', 'إلغاء', 'رفض', 'عدم قبول', 'سقوط الخصومة', 'شطب', 'اعتبار الدعوى كأن لم تكن', 'وقف جزائي', 'انقطاع سير الخصومة', 'إحالة', 'إحالة للخبراء']);
+          
+      setLocalDeadlineRules(settings?.deadlineRules || [
+        { name: 'الطعن العادي', days: 60, targetRole: 'طاعنين', description: 'ميعاد الطعن العادي 60 يوماً' },
+        { name: 'تعجيل من الوقف الجزائي', days: 15, triggerAfterDays: 30, targetRole: 'طاعنين', description: 'يجب التعجيل خلال 15 يوماً بعد مرور شهر من الوقف' }
+      ]);
+      setLocalStatsMapping(settings?.statsMapping?.length ? settings.statsMapping : [...DEFAULT_STATS_MAP]);
+    }
   }, [settings]);
 
   const handleSaveSettings = async () => {

@@ -293,8 +293,15 @@ export function calculateDashboardStats(cases, settings) {
       }
 
     } else if (isDecidedForJudgment) {
-      reservedCount++;
-      reservedCases.push(c);
+      if (lastSessionDate && lastSessionDate < today) {
+        unclassifiedJudgedCases.push(c);
+        judgmentsCount['غير مصنف'] = (judgmentsCount['غير مصنف'] || 0) + 1;
+        judgedCount++;
+        judgedCases.push(c);
+      } else {
+        reservedCount++;
+        reservedCases.push(c);
+      }
 
     } else {
       ongoingCount++;

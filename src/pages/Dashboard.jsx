@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, Award, Layers, TrendingUp, CalendarDays, AlertTriangle, Building2, Scale,
   PieChart, ClipboardList, CheckCircle2, ChevronLeft, Activity, Sparkles,
-  Printer, Settings2, Bell, Eye, EyeOff, BarChart3, FileText, Clock, Gavel,
+  Printer, Settings2, AlertCircle, Eye, EyeOff, BarChart3, FileText, Clock, Gavel,
   ChevronRight, Calendar, LogOut, X, Star, Filter
 } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
@@ -570,9 +570,9 @@ export default function Dashboard() {
             <button type="button" onClick={() => setShowQuickFilters(!showQuickFilters)} className={`w-12 h-[46px] rounded-xl flex items-center justify-center transition border shadow-sm shrink-0 ${showQuickFilters ? 'bg-amber-500 text-white border-amber-500' : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700'}`} title="الفلاتر السريعة">
               <Filter className="w-5 h-5" />
             </button>
-              {/* Alerts Bell Button */}
+              {/* Alerts Button */}
               <button type="button" onClick={() => setShowAlertsPanel(!showAlertsPanel)} className={`relative w-12 h-[46px] rounded-xl flex items-center justify-center transition border shadow-sm shrink-0 ${showAlertsPanel ? 'bg-rose-500 text-white border-rose-500' : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700'}`} title="التنبيهات">
-                <Bell className="w-5 h-5" />
+                <AlertCircle className="w-5 h-5" />
                 {totalAlertsCount > 0 && (
                   <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
@@ -995,8 +995,8 @@ export default function Dashboard() {
     </div>
     <div className="h-28">
       <MultiTrendLine series={[
-        { data: (stats.last6Months || []).map(d => d.good), color: '#10b981' },
-        { data: (stats.last6Months || []).map(d => d.bad), color: '#f43f5e' },
+        { data: (stats.last6Months || []).map(d => d.good), color: '#10b981', strokeWidth: 1.5, fillOpacity: 0.1 },
+        { data: (stats.last6Months || []).map(d => d.bad), color: '#f43f5e', strokeWidth: 2.5, fillOpacity: 0.2 },
       ]} />
     </div>
     <div className="flex justify-between mt-2 px-1">

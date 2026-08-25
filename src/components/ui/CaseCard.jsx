@@ -94,11 +94,13 @@ export default function CaseCard({
     .sort((a, b) => getSafeDateObj(b.date) - getSafeDateObj(a.date))[0];
   const finalStampData = latestJudgmentSession ? latestJudgmentSession.judgment : null;
   let stampColor = 'indigo';
+  let isDangerous = false;
   if (finalStampData) {
     const res = finalStampData.result || '';
     // Determine stamp color based on result and role classification
     if (res.includes('ضد') || res.includes('إجرائي خطير') || (isAppellant && (res.includes('وقف جزائي') || res.includes('اعتبار')))) {
       stampColor = 'rose';
+      if (isAppellant) isDangerous = true;
     } else if (res.includes('صالح') || (isAppellee && (res.includes('وقف جزائي') || res.includes('اعتبار')))) {
       stampColor = 'emerald';
     } else if (res.includes('مختلط')) {
@@ -106,6 +108,11 @@ export default function CaseCard({
     } else if (res.includes('لا شأن') || isNoInterest) {
       stampColor = 'slate';
     }
+  }
+
+  if (isDangerous) {
+    bgClass = 'bg-rose-50/90 hover:bg-rose-100/90';
+    borderClass = 'border-rose-500 border-[2px] shadow-sm shadow-rose-200';
   }
 
   const isMissing = fileLocation === 'غير موجود';
@@ -146,6 +153,7 @@ export default function CaseCard({
 
           <div className="flex flex-col gap-1 w-full">
             <div className="flex items-center gap-2">
+              {isDangerous && <AlertTriangle className="w-5 h-5 text-rose-600 animate-pulse shrink-0" title="حكم خطير (راجع المواعيد)" />}
               {c.isImportant && <Sparkles className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />}
               <span className="font-black text-navy-900 text-sm sm:text-base">{caseNum || 'بدون رقم'}</span>
               {year && <span className="text-xs font-bold text-slate-400">لسنة {year}</span>}
