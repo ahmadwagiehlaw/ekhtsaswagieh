@@ -7,7 +7,7 @@ import { autoDetermineRole } from '../../utils/caseUtils';
 
 export default function SettingsSystemTab() {
   const { settings, saveSettingsToFirebase, cases, saveBatchCasesToFirebase } = useAppContext();
-  const { currentUser, login, changePassword } = useAuth();
+  const { currentUser, userData, login, changePassword } = useAuth();
   const { toast, showConfirm, showPrompt } = useUI();
 
   const [localNumberFormat, setLocalNumberFormat] = useState('en');
@@ -15,6 +15,7 @@ export default function SettingsSystemTab() {
   const [localConsultantName, setLocalConsultantName] = useState('');
   const [localCourtDegree, setLocalCourtDegree] = useState('أول درجة');
   const [localCourtSpecialization, setLocalCourtSpecialization] = useState('قضاء إداري');
+  const [localDepartmentName, setLocalDepartmentName] = useState(settings?.departmentName || 'قسم الإدارية العليا');
   const [localReviewTasks, setLocalReviewTasks] = useState([]);
 
   const [localMemoCalculationMode, setLocalMemoCalculationMode] = useState(settings?.memoCalculationMode || 'session_date');
@@ -60,6 +61,7 @@ export default function SettingsSystemTab() {
     setLocalConsultantName(settings?.consultantName || '');
     setLocalCourtDegree(settings?.courtDegree || 'أول درجة');
     setLocalCourtSpecialization(settings?.courtSpecialization || 'قضاء إداري');
+    setLocalDepartmentName(settings?.departmentName || 'قسم الإدارية العليا');
     setLocalReviewTasks(settings?.reviewTasks || ['تصوير ملف', 'تقرير مفوضين', 'حكم أول درجة', 'تقرير خبراء', 'حافظة مستندات']);
 
     setLocalMemoCalculationMode(settings?.memoCalculationMode || 'session_date');
@@ -125,6 +127,7 @@ export default function SettingsSystemTab() {
       consultantName: localConsultantName,
       courtDegree: localCourtDegree,
       courtSpecialization: localCourtSpecialization,
+      departmentName: localDepartmentName,
       reviewTasks: localReviewTasks,
       memoCalculationMode: localMemoCalculationMode,
       scratchpadPosition: localScratchpadPosition,
@@ -184,7 +187,7 @@ export default function SettingsSystemTab() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-700">اسم المستشار / اسم القسم المطبوع:</label>
+              <label className="text-xs font-bold text-slate-700">اسم المستشار:</label>
               <input
                 type="text"
                 value={localConsultantName}
@@ -194,14 +197,34 @@ export default function SettingsSystemTab() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-700">درجة التقاضي الافتراضية للطباعة:</label>
+              <label className="text-xs font-bold text-slate-700">القسم:</label>
               <input
                 type="text"
-                value={localCourtDegree}
-                onChange={e => setLocalCourtDegree(e.target.value)}
+                value={localDepartmentName}
+                onChange={e => setLocalDepartmentName(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                placeholder="أول درجة / استئناف / نقض"
+                placeholder="مثال: قسم الإدارية العليا"
               />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-slate-700">درجة التقاضي:</label>
+              <div className="flex bg-slate-100 p-1 rounded-xl self-start w-full">
+                <button
+                  type="button"
+                  onClick={() => setLocalCourtDegree('أول درجة')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-black transition ${localCourtDegree === 'أول درجة' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  قضاء إداري (أول درجة)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLocalCourtDegree('ثان درجة')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-black transition ${localCourtDegree !== 'أول درجة' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  محكمة إدارية عليا
+                </button>
+              </div>
+              <p className="text-[10px] font-bold text-slate-400">بيحدد نوع الجلسات الافتراضي في التطبيق كله (فحص/موضوع للعليا، مفوضين/مرافعة لأول درجة).</p>
             </div>
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold text-slate-700">التخصص الافتراضي للطباعة:</label>
@@ -333,16 +356,18 @@ export default function SettingsSystemTab() {
       </div>
 
       {/* Migration button — Fix 5 */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="text-right">
-          <h3 className="font-bold text-sm text-amber-900">استكمال حقل الصفة تلقائياً للقضايا القديمة</h3>
-          <p className="text-xs text-amber-700 mt-1">يُستخدم مرة واحدة فقط لاستكمال حقل "الصفة" في القضايا التي أُضيفت قبل تفعيل هذه الميزة.</p>
+      {userData?.role === 'super_admin' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-right">
+            <h3 className="font-bold text-sm text-amber-900">استكمال حقل الصفة تلقائياً للقضايا القديمة</h3>
+            <p className="text-xs text-amber-700 mt-1">يُستخدم مرة واحدة فقط لاستكمال حقل "الصفة" في القضايا التي أُضيفت قبل تفعيل هذه الميزة.</p>
+          </div>
+          <button onClick={handleMigrateRoles} disabled={isMigrating} className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-lg text-xs whitespace-nowrap transition shadow-sm flex items-center gap-2 disabled:opacity-50">
+            <RefreshCw className={`w-3.5 h-3.5 ${isMigrating ? 'animate-spin' : ''}`} />
+            {isMigrating ? 'جاري المعالجة...' : 'استكمال حقل الصفة'}
+          </button>
         </div>
-        <button onClick={handleMigrateRoles} disabled={isMigrating} className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-lg text-xs whitespace-nowrap transition shadow-sm flex items-center gap-2 disabled:opacity-50">
-          <RefreshCw className={`w-3.5 h-3.5 ${isMigrating ? 'animate-spin' : ''}`} />
-          {isMigrating ? 'جاري المعالجة...' : 'استكمال حقل الصفة'}
-        </button>
-      </div>
+      )}
 
       {/* Save Settings Button */}
       <button onClick={handleSaveSystemSettings} disabled={isProcessing} className="w-full bg-navy-900 text-amber-300 font-bold py-3 rounded-xl shadow-sm text-sm hover:bg-navy-800 transition disabled:opacity-50">

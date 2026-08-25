@@ -87,7 +87,7 @@ export default function OnboardingModal() {
                 <LayoutDashboard className="w-6 h-6 text-emerald-600 shrink-0" />
                 <div className="text-right">
                   <p className="font-bold text-sm text-navy-900">لوحة التحكم (Dashboard)</p>
-                  <p className="text-[11px] font-semibold text-slate-500 leading-relaxed mt-1">تابع إحصائيات مكتبك بدقة: عدد الدعاوى، الأحكام، وتطور العمليات شهرياً مقارنة بالشهر السابق.</p>
+                  <p className="text-[11px] font-semibold text-slate-500 leading-relaxed mt-1">تابع إحصائيات قسمك بدقة: عدد الدعاوى، الأحكام، وتطور العمليات شهرياً مقارنة بالشهر السابق.</p>
                 </div>
               </div>
               <div className="flex gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 items-start">

@@ -59,7 +59,7 @@ export default function PrintReportModal({ stats, settings, selectedMonthStats, 
           <div className="text-center mb-5 pb-4 border-b-2 border-slate-900">
             <h1 className="text-2xl font-black text-slate-900">تقرير إحصائيات القسم</h1>
             <p className="text-sm font-bold text-slate-500 mt-1">شهر {monthLabel}</p>
-            <p className="text-xs font-black text-amber-600 mt-1">مكتب / {consultantName}</p>
+            <p className="text-xs font-black text-amber-600 mt-1">{settings?.departmentName || 'القسم'} / {consultantName}</p>
           </div>
           <p className="text-sm font-black text-slate-900 mb-3 pb-2 border-b-2 border-slate-900">المؤشرات الرئيسية</p>
           <div className="grid grid-cols-4 gap-3 mb-5">

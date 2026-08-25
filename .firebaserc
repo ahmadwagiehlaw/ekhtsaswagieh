@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "ekhtsasi-light"
-  }
+  },
+  "targets": {
+    "ekhtsasi-light": {
+      "hosting": {
+        "app": [
+          "ekhtsasi"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
