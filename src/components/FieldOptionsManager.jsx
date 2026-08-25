@@ -19,7 +19,8 @@ export default function FieldOptionsManager({ fieldKey, title, isOpen, onClose, 
       // Use settings array if defined, otherwise fallback to defaultOptions
       setOptions(settings[fieldKey] !== undefined ? settings[fieldKey] : defaultOptions);
     }
-  }, [isOpen, settings, fieldKey, defaultOptions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, fieldKey]);
 
   if (!isOpen) return null;
 

@@ -3,6 +3,7 @@ import { CalendarPlus, Scale, MessageSquare, X, FileText, Paperclip, Loader2, Bo
 import { formatDateString } from '../../utils/dateUtils';
 import { applyJudgmentDefaultRules } from '../../utils/judgmentRulesEngine';
 import JudgmentRulesModal from '../JudgmentRulesModal';
+import FieldOptionsManager from '../FieldOptionsManager';
 
 export default function SessionsTab({
   caseData,
@@ -32,10 +33,12 @@ export default function SessionsTab({
   showPrompt
 }) {
   const [isRulesOpen, setIsRulesOpen] = React.useState(false);
+  const [managingField, setManagingField] = React.useState(null);
 
   return (
     <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mx-4 sm:mx-0 animate-in fade-in slide-in-from-bottom-4 duration-300">
       <JudgmentRulesModal isOpen={isRulesOpen} onClose={() => setIsRulesOpen(false)} />
+      <FieldOptionsManager isOpen={!!managingField} onClose={() => setManagingField(null)} fieldKey={managingField?.key} title={managingField?.title} />
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
@@ -473,7 +476,10 @@ export default function SessionsTab({
 
                           <div className="grid grid-cols-2 gap-2 mb-2">
                             <div>
-                              <label className="text-[9px] font-bold text-slate-500 block mb-0.5">مختصر الحكم</label>
+                              <div className="flex justify-between items-center mb-0.5">
+                                <label className="text-[9px] font-bold text-slate-500 block">مختصر الحكم</label>
+                                <button onClick={() => setManagingField({ key: 'judgmentTypes', title: 'أنواع/مختصرات الحكم' })} className="text-slate-400 hover:text-indigo-600 transition" title="إدارة القائمة"><Settings className="w-3 h-3" /></button>
+                              </div>
                               <select
                                 value={type}
                                 onChange={e => handleTypeChange(e.target.value)}
@@ -484,7 +490,10 @@ export default function SessionsTab({
                               </select>
                             </div>
                             <div>
-                              <label className="text-[9px] font-bold text-slate-500 block mb-0.5">تصنيف الحكم</label>
+                              <div className="flex justify-between items-center mb-0.5">
+                                <label className="text-[9px] font-bold text-slate-500 block">تصنيف الحكم</label>
+                                <button onClick={() => setManagingField({ key: 'judgmentClassifications', title: 'تصنيفات الحكم' })} className="text-slate-400 hover:text-indigo-600 transition" title="إدارة القائمة"><Settings className="w-3 h-3" /></button>
+                              </div>
                               <select value={res} onChange={e => handleResChange(e.target.value)} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
                                 <option value="">-- اختر --</option>
                                 {(settings?.judgmentClassifications?.length ? settings.judgmentClassifications : ['صالح', 'ضد', 'مختلط', 'تمهيدي']).map(r => <option key={r} value={r}>{r}</option>)}
@@ -493,7 +502,10 @@ export default function SessionsTab({
                           </div>
                           
                           <div className="mb-2">
-                            <label className="text-[9px] font-bold text-slate-500 block mb-0.5">فئة الحكم</label>
+                            <div className="flex justify-between items-center mb-0.5">
+                              <label className="text-[9px] font-bold text-slate-500 block">فئة الحكم</label>
+                              <button onClick={() => setManagingField({ key: 'judgmentCategories', title: 'فئات الحكم' })} className="text-slate-400 hover:text-indigo-600 transition" title="إدارة القائمة"><Settings className="w-3 h-3" /></button>
+                            </div>
                             <select value={cat} onChange={e => handleCatChange(e.target.value)} className="w-full text-[10px] font-bold bg-white p-1.5 rounded-lg border border-rose-200 focus:outline-none focus:border-rose-400">
                               <option value="">-- اختر فئة الحكم --</option>
                               {Array.from(new Set([...(settings?.judgmentCategories?.length ? settings.judgmentCategories : ['قرار فحص', 'حكم نهائي', 'حكم إجرائي', 'حكم منه للخصومة'])])).map(c => <option key={c} value={c}>{c}</option>)}
