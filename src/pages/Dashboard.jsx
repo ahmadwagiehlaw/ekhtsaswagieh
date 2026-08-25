@@ -787,8 +787,11 @@ export default function Dashboard() {
               type="button"
                 onClick={() => {
                   if (day.cases.length > 0) {
-                    const dTime = day.date.getTime();
-                    window.sessionStorage.setItem('agenda_selectedDateKey', JSON.stringify(dTime));
+                    const yyyy = day.date.getFullYear();
+                    const mm = String(day.date.getMonth() + 1).padStart(2, '0');
+                    const dd = String(day.date.getDate()).padStart(2, '0');
+                    const dateStr = `${yyyy}-${mm}-${dd}`;
+                    window.sessionStorage.setItem('agenda_selectedDateKey', JSON.stringify(dateStr));
                     navigate('/agenda');
                   }
                 }}
