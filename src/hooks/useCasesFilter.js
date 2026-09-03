@@ -78,20 +78,21 @@ export default function useCasesFilter({
       });
     }
 
-    if (roleFilter !== 'all') {
-      result = result.filter(c => {
-        const role = String(c['الصفة'] || c['صفة'] || '').trim();
-        const appRole = settings?.roles?.[0] || 'طاعن';
-        const apeRole = settings?.roles?.[1] || 'مطعون ضدنا';
-        if (roleFilter === 'appellant') {
-          return role.includes(appRole) || role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
-        } else if (roleFilter === 'appellee') {
-          return role.includes(apeRole) || role.includes('مطعون') || role.includes('مستأنف ضده') || role.includes('مدعى عليه') || role.includes('مدعى علينا');
-        } else if (roleFilter === 'none') {
-          return !role || role === '-' || role === '---' || role === 'غير محدد';
-        }
-        return true;
-      });
+    if (roleFilter && roleFilter !== 'all') {
+      const roles = roleFilter.split(',').filter(x => x && x !== 'all');
+      if (roles.length > 0) {
+        result = result.filter(c => {
+          const role = String(c['الصفة'] || c['صفة'] || '').trim();
+          const appRole = settings?.roles?.[0] || 'طاعن';
+          const apeRole = settings?.roles?.[1] || 'مطعون ضدنا';
+          return roles.some(r => {
+            if (r === 'appellant') return role.includes(appRole) || role.includes('طاعن') || role.includes('مستأنف') || role.includes('مدعي');
+            if (r === 'appellee') return role.includes(apeRole) || role.includes('مطعون') || role.includes('مستأنف ضده') || role.includes('مدعى عليه') || role.includes('مدعى علينا');
+            if (r === 'none') return !role || role === '-' || role === '---' || role === 'غير محدد';
+            return false;
+          });
+        });
+      }
     }
 
     if (showSessionlessOnly) {
@@ -153,45 +154,71 @@ export default function useCasesFilter({
       });
     }
 
+    // ── Multi-value filters with exclude: support ──────────────────────────
+
     if (locationFilter && locationFilter !== 'all') {
-      result = result.filter(c => {
-        const loc = String(getFileLocation(c)).trim();
-        if (locationFilter === 'missing') return loc === 'غير موجود' || loc === 'مقيدة' || loc === '';
-        if (locationFilter === 'temp') return loc === 'ملف مؤقت';
-        return loc === locationFilter;
-      });
+      const isExclude = locationFilter.startsWith('exclude:');
+      const rawVal = isExclude ? locationFilter.slice('exclude:'.length) : locationFilter;
+      const locs = rawVal.split(',').filter(x => x && x !== 'all');
+      if (locs.length > 0) {
+        result = result.filter(c => {
+          const loc = String(getFileLocation(c)).trim();
+          const matches = locs.some(l => {
+            if (l === 'missing') return loc === 'غير موجود' || loc === 'مقيدة' || loc === '';
+            if (l === 'temp') return loc === 'ملف مؤقت';
+            return loc === l;
+          });
+          return isExclude ? !matches : matches;
+        });
+      }
     }
 
     if (sessionTypeFilter && sessionTypeFilter !== 'all') {
-      result = result.filter(c => {
-        const decision = String(getCaseDecision(c)).trim();
-        const sessionType = String(getSessionType(c)).trim();
-        
-        if (sessionTypeFilter === 'judgment') return decision.includes('للحكم') || decision.includes('حكم') || sessionType.includes('حكم');
-        
-        return sessionType.includes(sessionTypeFilter) || decision.includes(sessionTypeFilter);
-      });
+      const isExclude = sessionTypeFilter.startsWith('exclude:');
+      const rawVal = isExclude ? sessionTypeFilter.slice('exclude:'.length) : sessionTypeFilter;
+      const types = rawVal.split(',').filter(x => x && x !== 'all');
+      if (types.length > 0) {
+        result = result.filter(c => {
+          const decision = String(getCaseDecision(c)).trim();
+          const sessionType = String(getSessionType(c)).trim();
+          const matches = types.some(t => {
+            if (t === 'judgment') return decision.includes('للحكم') || decision.includes('حكم') || sessionType.includes('حكم');
+            return sessionType.includes(t) || decision.includes(t);
+          });
+          return isExclude ? !matches : matches;
+        });
+      }
     }
 
     if (decisionFilter) {
-      const q = decisionFilter.toLowerCase();
-      result = result.filter(c => {
-        const decision = String(getCaseDecision(c)).toLowerCase();
-        return decision.includes(q);
-      });
+      const qs = decisionFilter.toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+      if (qs.length > 0) {
+        result = result.filter(c => {
+          const decision = String(getCaseDecision(c)).toLowerCase();
+          return qs.some(q => decision.includes(q));
+        });
+      }
     }
 
-    if (quickDateFilter) {
-      result = result.filter(c => {
-        const dStr = getSessionDate(c);
-        if (!dStr) return false;
-        const d = getSafeDateObj(dStr);
-        if (!d) return false;
-        const pad = n => n.toString().padStart(2, '0');
-        const dISO = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-        return dISO === quickDateFilter;
-      });
+    if (quickDateFilter && quickDateFilter !== 'all') {
+      const isExclude = quickDateFilter.startsWith('exclude:');
+      const rawVal = isExclude ? quickDateFilter.slice('exclude:'.length) : quickDateFilter;
+      const dates = rawVal.split(',').filter(Boolean);
+      if (dates.length > 0) {
+        result = result.filter(c => {
+          const dStr = getSessionDate(c);
+          if (!dStr) return isExclude;
+          const d = getSafeDateObj(dStr);
+          if (!d) return isExclude;
+          const pad = n => n.toString().padStart(2, '0');
+          const dISO = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+          const matches = dates.includes(dISO);
+          return isExclude ? !matches : matches;
+        });
+      }
     }
+
+    // ── Advanced search params ─────────────────────────────────────────────
 
     if (advancedParams) {
       const { caseNo, year, opponentName, opponentRole, decision, sessionDateStart, sessionDateEnd, court, location, requiredTask, requiredTaskType } = advancedParams;
@@ -264,26 +291,28 @@ export default function useCasesFilter({
       result = result.filter(c => {
         const caseNo = c['رقم الدعوى'] || c['رقم القضية'] || c['رقم_الدعوى'] || '';
         const year = c['السنة'] || c['سنة'] || c['year'] || '';
-        const appName = c['المدعي'] || c['الطاعن'] || c['المستأنف'] || '';
-        const applee = c['المدعى عليه'] || c['المطعون ضده'] || c['المدعى_عليه'] || '';
-        const subject = c['موضوع الدعوى'] || '';
-        const classification = c['تصنيف الدعوى'] || '';
-        const srchStr = `${caseNo} ${year} ${appName} ${applee} ${subject} ${classification} ${c.id || ''}`.toLowerCase();
-        return srchStr.includes(q);
+        const appellant = c['الطاعن'] || c['المدعي'] || c['المستأنف'] || '';
+        const appellee = c['المطعون ضده'] || c['المدعى عليه'] || '';
+        const decision = getCaseDecision(c);
+        const sessionType = getSessionType(c);
+        const fileLocation = getFileLocation(c);
+
+        return [caseNo, year, appellant, appellee, decision, sessionType, fileLocation]
+          .some(v => String(v || '').toLowerCase().includes(q));
       });
     }
 
     return result;
   }, [
-    cases, debouncedSearchQuery, roleFilter, advancedParams, showOngoingOnly,
-    showWithAttachmentsOnly, showImportantOnly, showSessionlessOnly, showPastSessionsOnly,
-    showMissingRoleOnly, showJudgmentsOnly, locationFilter, sessionTypeFilter,
-    decisionFilter, quickDateFilter, activeShoba, settings, globalTasks
+    cases, settings, globalTasks, activeShoba,
+    roleFilter, showOngoingOnly, showWithAttachmentsOnly,
+    locationFilter,
+    sessionTypeFilter,
+    decisionFilter,
+    quickDateFilter,
+    showSessionlessOnly, showJudgmentsOnly, showImportantOnly,
+    showPastSessionsOnly, showMissingRoleOnly, advancedParams, debouncedSearchQuery
   ]);
 
-  return {
-    uniqueLocations,
-    uniqueDates,
-    filteredCases
-  };
+  return { uniqueLocations, uniqueDates, filteredCases };
 }

@@ -5,6 +5,7 @@ import { useUI } from '../context/UIContext';
 import { useNavigate } from 'react-router-dom';
 import FieldOptionsManager from './FieldOptionsManager';
 import StrictSelectField from './StrictSelectField';
+import SmartDateInput from './SmartDateInput';
 
 export default function QuickEditCaseModal({ isOpen, onClose, caseData }) {
   const { schema, saveCaseToFirebase, settings, cases } = useAppContext();
@@ -116,8 +117,8 @@ export default function QuickEditCaseModal({ isOpen, onClose, caseData }) {
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 resize-none transition"
                     />
                   ) : field.type === 'date' ? (
-                    <input 
-                      type="date"
+                    <SmartDateInput 
+                      
                       value={formData[field.id] || ''}
                       onChange={(e) => setFormData({...formData, [field.id]: e.target.value})}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition"

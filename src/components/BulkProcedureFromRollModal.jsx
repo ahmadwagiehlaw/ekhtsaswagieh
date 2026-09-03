@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, ClipboardList, Bell, Eye, Save } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
+import SmartDateInput from './SmartDateInput';
 
 const ACTION_TYPES = [
   { id: 'procedure', label: 'إجراء', icon: ClipboardList, color: 'indigo', description: 'إيداع مذكرة، تقديم مستندات، سداد أمانة، إلخ' },
@@ -154,7 +155,7 @@ export default function BulkProcedureFromRollModal({ isOpen, onClose, selectedCa
 
           <div>
             <label className="text-xs font-black text-navy-900 block mb-1">تاريخ التنفيذ</label>
-            <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+            <SmartDateInput  value={dueDate} onChange={e => setDueDate(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400" />
           </div>
 

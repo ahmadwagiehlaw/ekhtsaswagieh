@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, X, FileText, ChevronLeft, Gavel, Clock, Sparkles } from 'lucide-react';
+import { Search, X, FileText, ChevronLeft, Gavel, Clock, Sparkles, Plus } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 
 // Helper to get a field value from multiple possible keys
@@ -25,7 +25,7 @@ function Highlight({ text, query }) {
   );
 }
 
-export default function GlobalCaseSearchPanel({ isOpen, onClose, onSelectCase }) {
+export default function GlobalCaseSearchPanel({ isOpen, onClose, onSelectCase, onOpenAddCase }) {
   const { cases } = useAppContext();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -47,10 +47,19 @@ export default function GlobalCaseSearchPanel({ isOpen, onClose, onSelectCase })
     return () => clearTimeout(t);
   }, [query]);
 
-  // Escape to close
+  // Escape to close and / to focus
   useEffect(() => {
     if (!isOpen) return;
-    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e) => { 
+      if (e.key === 'Escape') onClose(); 
+      if (e.key === '/' || e.key === '\\') {
+        const tag = document.activeElement?.tagName?.toLowerCase();
+        if (tag !== 'input' && tag !== 'textarea') {
+          e.preventDefault();
+          inputRef.current?.focus();
+        }
+      }
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, onClose]);
@@ -123,6 +132,8 @@ export default function GlobalCaseSearchPanel({ isOpen, onClose, onSelectCase })
               type="text"
               value={query}
               onChange={e => setQuery(e.target.value)}
+              onClick={e => e.target.select()}
+              onFocus={e => e.target.select()}
               placeholder="ابحث في جميع الدعاوى..."
               className="w-full bg-white/10 border border-white/20 rounded-xl py-2.5 pr-10 pl-9 text-sm font-bold text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 transition"
               dir="rtl"
@@ -193,6 +204,21 @@ export default function GlobalCaseSearchPanel({ isOpen, onClose, onSelectCase })
               </div>
               <p className="text-sm font-black text-slate-500">لا توجد نتائج لـ "{debouncedQuery}"</p>
               <p className="text-xs text-slate-400 font-bold">جرّب البحث برقم الدعوى أو اسم الطاعن</p>
+              
+              {onOpenAddCase && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    // Pass the query only if it contains numbers to avoid filling with names
+                    const isNumberLike = /[0-9]/.test(query);
+                    onOpenAddCase(isNumberLike ? query.trim() : '');
+                  }}
+                  className="mt-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl text-[13px] font-black flex items-center gap-2 transition shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  إضافة دعوى جديدة
+                </button>
+              )}
             </div>
           )}
 

@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppState';
 import { applyJudgmentDefaultRules } from '../utils/judgmentRulesEngine';
 import JudgmentRulesModal from './JudgmentRulesModal';
 import { useUI } from '../context/UIContext';
+import SmartDateInput from './SmartDateInput';
 
 export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onClearSelection }) {
   const { settings, saveBatchCasesToFirebase, cases } = useAppContext();
@@ -440,8 +441,8 @@ export default function BulkEditCasesModal({ isOpen, onClose, selectedCases, onC
                 </button>
               </div>
 
-              <input 
-                type="date" 
+              <SmartDateInput 
+                 
                 disabled={!fieldsToUpdate.sessionDate}
                 value={values.sessionDate}
                 onChange={e => setValues({ ...values, sessionDate: e.target.value })}

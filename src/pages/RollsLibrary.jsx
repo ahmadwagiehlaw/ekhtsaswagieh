@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { BookOpen, Upload, Trash2, Edit3, Calendar, FileText, X, ExternalLink, Gavel, RotateCw } from 'lucide-react';
+import { BookOpen, Upload, Trash2, Edit3, Calendar, FileText, X, ExternalLink, Gavel, RotateCw, Plus } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { uploadToR2, deleteFromR2 } from '../lib/r2';
 import { formatDateString } from '../utils/dateUtils';
 import imageCompression from 'browser-image-compression';
+import SmartDateInput from '../components/SmartDateInput';
 
 export default function RollsLibrary() {
   const { rolls, cases, saveRollToFirebase, deleteRollFromFirebase, isAdmin, currentUser, settings, currentUserPermissions } = useAppContext();
@@ -50,6 +51,12 @@ export default function RollsLibrary() {
     }
 
     const finalRollType = `${baseType} - ${circuitType}`;
+
+    const isDuplicate = rolls.some(r => r.date === rollDate && r.type === finalRollType);
+    if (isDuplicate) {
+      toast('هناك رول مسجل مسبقاً بنفس التاريخ والنوع', 'error');
+      return;
+    }
 
     setIsUploading(true);
     try {
@@ -97,6 +104,13 @@ export default function RollsLibrary() {
       return;
     }
     const finalRollType = `${baseType} - ${circuitType}`;
+    
+    // Check for duplicates, ignoring the roll currently being edited
+    const isDuplicate = rolls.some(r => r.id !== editingRoll.id && r.date === rollDate && r.type === finalRollType);
+    if (isDuplicate) {
+      toast('هناك رول مسجل مسبقاً بنفس التاريخ والنوع', 'error');
+      return;
+    }
     
     setIsUploading(true);
     try {
@@ -358,8 +372,8 @@ export default function RollsLibrary() {
             <div className="p-5 space-y-4">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-500">تاريخ الرول</label>
-                <input 
-                  type="date"
+                <SmartDateInput 
+                  
                   value={rollDate}
                   onChange={e => setRollDate(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-bold text-navy-900"
@@ -620,6 +634,20 @@ export default function RollsLibrary() {
             
           </div>
         </div>
+      )}
+
+      {/* Floating Action Button (Add Roll) */}
+      {canManageRolls && (
+        <button 
+          onClick={() => {
+            setIsUploadModalOpen(true);
+            setRollDate(new Date().toISOString().split('T')[0]);
+          }}
+          className="fixed bottom-24 left-6 md:left-8 w-14 h-14 bg-indigo-600 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-indigo-700 hover:-translate-y-1 transition-all z-40"
+          title="إضافة رول جديد"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
       )}
     </div>
   );

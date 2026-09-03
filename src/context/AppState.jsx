@@ -262,6 +262,51 @@ export const AppProvider = ({ children }) => {
       }
 
       // Sync root fields with sessions
+
+      // KEY FIX: If root session fields were provided in caseData (no sessions array given),
+      // we MUST propagate them to the latest session BEFORE syncSessionRootFields runs.
+      // Previously we only propagated "changed" fields, but syncSessionRootFields always
+      // overwrites root fields from sessions — so even a non-changed value would revert.
+      // Now we propagate ANY field that is explicitly present in caseData.
+      if (caseData && !caseData.sessions && payload.sessions && payload.sessions.length > 0) {
+        const rootSessionKey = Object.keys(payload).find(k => k === 'آخر جلسة' || k === 'تاريخ الجلسة') || 'آخر جلسة';
+        const rootDecisionKey = Object.keys(payload).find(k => k === 'القرار' || k === 'قرار الجلسة' || k === 'المنطوق') || 'القرار';
+        const rootRollKey = Object.keys(payload).find(k => k === 'الرول' || k === 'رول') || 'الرول';
+        const rootTypeKey = Object.keys(payload).find(k => k === 'نوع الجلسة' || k === 'نوع_الجلسة') || 'نوع الجلسة';
+
+        const hasDate = caseData[rootSessionKey] !== undefined;
+        const hasDecision = caseData[rootDecisionKey] !== undefined;
+        const hasRoll = caseData[rootRollKey] !== undefined;
+        const hasType = caseData[rootTypeKey] !== undefined;
+
+        if (hasDate || hasDecision || hasRoll || hasType) {
+          // Find latest session
+          let latestIdx = 0;
+          let latestDate = new Date(0);
+          payload.sessions.forEach((s, idx) => {
+            const d = new Date(s.date || 0);
+            if (d > latestDate) {
+              latestDate = d;
+              latestIdx = idx;
+            }
+          });
+
+          // Propagate ALL provided root fields to latest session
+          // (not just "changed" ones — syncSessionRootFields will overwrite root from sessions)
+          const newSessions = payload.sessions.map((s, idx) => {
+            if (idx !== latestIdx) return s;
+            return {
+              ...s,
+              ...(hasDate ? { date: caseData[rootSessionKey] } : {}),
+              ...(hasDecision ? { decision: caseData[rootDecisionKey] } : {}),
+              ...(hasRoll ? { roll: caseData[rootRollKey] } : {}),
+              ...(hasType ? { type: caseData[rootTypeKey] } : {}),
+            };
+          });
+          payload.sessions = newSessions;
+        }
+      }
+
       payload = syncSessionRootFields(payload);
 
       const isNew = !cases.some(c => c.id === caseId);

@@ -9,6 +9,7 @@ import { uploadToR2 } from '../lib/r2';
 import QuickEditCaseModal from './QuickEditCaseModal';
 import GlobalTemplatePrintModal from './GlobalTemplatePrintModal';
 import CaseDetails from '../pages/CaseDetails';
+import SmartDateInput from './SmartDateInput';
 
 const ALL_COLUMNS = [
   { id: 'الرول', label: 'الرول', defaultVisible: true },
@@ -532,8 +533,8 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                 {bulkData['نوع الجلسة'] || typeFahs}
               </button>
 
-              <input
-                type="date"
+              <SmartDateInput
+                
                 value={bulkData['تاريخ الجلسة']}
                 onChange={e => setBulkData({ ...bulkData, 'تاريخ الجلسة': e.target.value })}
                 className="text-xs font-bold p-1.5 rounded-lg border border-indigo-200 bg-white focus:outline-none focus:border-indigo-400"
@@ -724,8 +725,8 @@ export default function SessionTable({ dayCases, date, onDateClick, onFilteredCa
                   {visibleColumns['تاريخ الجلسة'] && (
                     <td className="px-3 py-2.5 text-[10px] font-bold text-slate-700">
                       {isEditing ? (
-                        <input
-                          type="date"
+                        <SmartDateInput
+                          
                           value={editData['آخر جلسة'] || ''}
                           onChange={e => setEditData({ ...editData, 'آخر جلسة': e.target.value })}
                           className="w-full text-[10px] font-bold p-1 rounded border border-slate-300 bg-white focus:border-navy-900 outline-none"

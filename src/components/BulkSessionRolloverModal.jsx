@@ -1,19 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { X, CalendarDays, CheckCircle2, ChevronRight, Save } from 'lucide-react';
+import { X, CalendarDays, CheckCircle2, ChevronRight, Save, RefreshCcw } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { getSafeDateObj, formatDateString } from '../utils/dateUtils';
+import SmartDateInput from './SmartDateInput';
 
 export default function BulkSessionRolloverModal({ isOpen, onClose, initialDateKey, initialSelectedIds }) {
-  const { cases, saveBatchCasesToFirebase } = useAppContext();
+  const { cases, saveBatchCasesToFirebase, settings } = useAppContext();
   const { toast } = useUI();
   
   const [sourceDate, setSourceDate] = useState(initialDateKey || '');
   const [targetDate, setTargetDate] = useState('');
   const [targetDecision, setTargetDecision] = useState('');
+  const [targetSessionType, setTargetSessionType] = useState('');
+  const sessionTypes = settings?.sessionTypes || ['موضوع', 'فحص', 'حكم', 'تحضير', 'خبير'];
   const [selectedCaseIds, setSelectedCaseIds] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  
+  const dynamicDecisions = React.useMemo(() => {
+    if (!cases) return [];
+    const unique = new Set(settings?.decisions || []);
+    cases.forEach(c => {
+      const v = c['القرار'] || c['قرار الجلسة'] || c['المنطوق'];
+      if (v && typeof v === 'string') unique.add(v.trim());
+      if (c.sessions) {
+        c.sessions.forEach(s => {
+          if (s.decision) unique.add(s.decision.trim());
+        });
+      }
+    });
+    return Array.from(unique).filter(Boolean);
+  }, [cases, settings]);
   useEffect(() => {
     if (isOpen) {
       if (initialDateKey) setSourceDate(initialDateKey);
@@ -37,6 +55,21 @@ export default function BulkSessionRolloverModal({ isOpen, onClose, initialDateK
     const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     return key === sourceDate;
   });
+
+
+  const handleCopyFromPrevious = () => {
+    try {
+      const last = JSON.parse(window.sessionStorage.getItem('lastRolledSession'));
+      if (last) {
+        setTargetDate(last.date || '');
+        setTargetDecision(last.decision || '');
+        setTargetSessionType(last.type || '');
+        toast("تم نسخ بيانات آخر ترحيل", "success");
+      } else {
+        toast("لا يوجد ترحيل سابق لنسخه", "error");
+      }
+    } catch(e) {}
+  };
 
   const toggleSelection = (id) => {
     setSelectedCaseIds(prev => 
@@ -73,11 +106,13 @@ export default function BulkSessionRolloverModal({ isOpen, onClose, initialDateK
       const sessionKey = Object.keys(caseData).find(k => k === 'آخر جلسة' || k === 'تاريخ الجلسة' || k === 'أخر جلسة') || 'آخر جلسة';
       const decisionKey = Object.keys(caseData).find(k => k === 'القرار' || k === 'قرار الجلسة' || k === 'المنطوق') || 'القرار';
 
+      const sessionTypeStr = targetSessionType || (caseData['نوع الجلسة'] || '');
       const existingSessions = caseData.sessions || [];
       const newSession = {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
         date: targetDate,
         decision: targetDecision,
+        type: sessionTypeStr,
         notes: "تم الترحيل جماعياً",
         createdAt: new Date().toISOString()
       };
@@ -91,12 +126,14 @@ export default function BulkSessionRolloverModal({ isOpen, onClose, initialDateK
       
       if (targetDecision) {
         updateData[decisionKey] = targetDecision;
+      updateData['نوع الجلسة'] = sessionTypeStr;
       }
 
       updates.push({ id: caseData.id, ...updateData });
     });
 
     const success = await saveBatchCasesToFirebase(updates);
+      window.sessionStorage.setItem('lastRolledSession', JSON.stringify({ date: targetDate, decision: targetDecision, type: targetSessionType }));
     setIsSaving(false);
 
     if (success) {
@@ -131,8 +168,8 @@ export default function BulkSessionRolloverModal({ isOpen, onClose, initialDateK
           {/* Step 1: Source */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-4">
             <label className="text-[11px] font-black text-slate-500 block mb-1.5">1. تاريخ الجلسة الحالية (مصدر القضايا)</label>
-            <input 
-              type="date"
+            <SmartDateInput 
+              
               value={sourceDate}
               onChange={(e) => {
                 setSourceDate(e.target.value);
@@ -189,25 +226,56 @@ export default function BulkSessionRolloverModal({ isOpen, onClose, initialDateK
               
               <div className="space-y-3">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-600 block mb-1">تاريخ الجلسة الجديدة *</label>
-                  <input 
-                    type="date"
+                  <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-bold text-slate-600 block">تاريخ الجلسة الجديدة *</label>
+                  <button type="button" onClick={() => setTargetDate(sourceDate)} className="text-[10px] text-amber-700 font-black bg-amber-50 px-2 py-0.5 rounded shadow-sm hover:bg-amber-100 transition flex items-center gap-1"><RefreshCcw className="w-3 h-3" />نفس جلسة اليوم</button>
+                </div>
+                <SmartDateInput 
+                  
                     required
                     value={targetDate}
                     onChange={(e) => setTargetDate(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
                   />
                 </div>
-                <div>
+                <div className="flex flex-col md:flex-row gap-3">
+<div className="flex-1">
                   <label className="text-[10px] font-bold text-slate-600 block mb-1">القرار الموحد (اختياري)</label>
-                  <input 
-                    type="text"
-                    value={targetDecision}
+                  <datalist id="bulk-decisions-list">
+  {dynamicDecisions.map(d => <option key={d} value={d} />)}
+</datalist>
+<input
+  type="text"
+  value={targetDecision}
+                    list="bulk-decisions-list"
                     onChange={(e) => setTargetDecision(e.target.value)}
                     placeholder="مثال: تأجيل للاطلاع والرد"
                     className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
                   />
                 </div>
+              <div className="flex-1">
+                <label className="text-[10px] font-bold text-slate-600 block mb-1">نوع الجلسة الموحد (اختياري)</label>
+                <select
+  value={targetSessionType}
+  onChange={(e) => setTargetSessionType(e.target.value)}
+  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+>
+  <option value="">(افتراضي من الدعوى)</option>
+  {settings?.sessionTypes ? settings.sessionTypes.map(t => (
+    <option key={t} value={t}>{t}</option>
+  )) : ['فحص', 'موضوع', 'مفوضين', 'مرافعة'].map(t => (
+    <option key={t} value={t}>{t}</option>
+  ))}
+</select>
+              </div>
+              </div>
+<button
+                type="button"
+                onClick={handleCopyFromPrevious}
+                className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-4 py-2.5 rounded-xl text-xs font-black transition mt-2 shadow-sm"
+              >
+                <RefreshCcw className="w-3.5 h-3.5" /> نسخ من السابق
+              </button>
               </div>
             </div>
           )}

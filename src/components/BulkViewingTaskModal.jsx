@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ClipboardList, CheckCircle2, Save, FileText, Camera, Settings } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
+import SmartDateInput from './SmartDateInput';
 
 export default function BulkViewingTaskModal({ isOpen, onClose, selectedCaseIds, cases, sessionDate }) {
   const { saveViewingTask, saveSettingsToFirebase, settings, currentUser } = useAppContext();
@@ -177,8 +178,8 @@ export default function BulkViewingTaskModal({ isOpen, onClose, selectedCaseIds,
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-[11px] font-black text-slate-500 block mb-1.5">تاريخ الاستحقاق / الجلسة</label>
-              <input 
-                type="date"
+              <SmartDateInput 
+                
                 value={dueDate}
                 onChange={e => setDueDate(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"

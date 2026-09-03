@@ -1,22 +1,53 @@
 import React, { useState, useMemo } from 'react';
-import { X, Save, Plus, Check, Trash2, MapPin, Settings2 } from 'lucide-react';
+import { X, Save, Plus, Check, Trash2, MapPin, Settings2, Camera, Image as ImageIcon } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { useNavigate } from 'react-router-dom';
 import SmartAutocomplete from './SmartAutocomplete';
+import CaseDocuments from './CaseDocuments';
 import FieldOptionsManager from './FieldOptionsManager';
 import StrictSelectField from './StrictSelectField';
 import * as CASE_FIELDS from '../constants/caseFields';
+import SmartDateInput from './SmartDateInput';
 import { autoDetermineRole } from '../utils/caseUtils';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { uploadToR2 } from '../lib/r2';
+import imageCompression from 'browser-image-compression';
 
-export default function AddCaseModal({ isOpen, onClose }) {
+export default function AddCaseModal({ isOpen, onClose, initialCaseNo }) {
   const { schema, createNewCase, cases, saveCaseToFirebase, settings } = useAppContext();
   const { toast } = useUI();
+  const parseInitialCaseAndYear = (val) => {
+    if (!val) return { no: '', year: '' };
+    // Allow slash, backslash, or dash
+    const match = val.match(/([0-9]+)[\/\-\\]([0-9]+)/);
+    if (match) {
+      return { no: match[1], year: match[2] };
+    }
+    return { no: val.replace(/[^\d]/g, ''), year: '' };
+  };
+
+  const initialParsed = parseInitialCaseAndYear(initialCaseNo);
+
   const [formData, setFormData] = useState({
     joinedCasesList: [],
-    defendantsList: []
+    defendantsList: [],
+    'رقم الدعوى': initialParsed.no,
+    'السنة': initialParsed.year
   });
+
+  useEffect(() => {
+    if (isOpen && initialCaseNo) {
+       const parsed = parseInitialCaseAndYear(initialCaseNo);
+       setFormData(prev => {
+          const newData = { ...prev };
+          if (!newData['رقم الدعوى']) newData['رقم الدعوى'] = parsed.no;
+          if (!newData['السنة'] && parsed.year) newData['السنة'] = parsed.year;
+          return newData;
+       });
+    }
+  }, [isOpen, initialCaseNo]);
+
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('📌 بيانات أساسية');
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
@@ -24,11 +55,49 @@ export default function AddCaseModal({ isOpen, onClose }) {
   const [customLocation, setCustomLocation] = useState('');
   const [newDefName, setNewDefName] = useState('');
   const [newPlaintName, setNewPlaintName] = useState('');
+  const [showNewPlaintInput, setShowNewPlaintInput] = useState(false);
+  const [showNewDefInput, setShowNewDefInput] = useState(false);
   const [activeDefId, setActiveDefId] = useState(null);
   const [newJoinedNo, setNewJoinedNo] = useState('');
   const [newJoinedYear, setNewJoinedYear] = useState('');
   const [managingField, setManagingField] = useState(null);
+  const [pastedFile, setPastedFile] = useState(null);
+  const [draftDocs, setDraftDocs] = useState([]);
   const navigate = useNavigate();
+
+  // Global Paste Handler for the AddCaseModal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handlePaste = (e) => {
+      // Ignore paste if user is typing in an input or textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1 || items[i].type.indexOf('pdf') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            const isImage = file.type.startsWith('image/');
+            const originalName = file?.name || (isImage ? 'image.png' : 'document.pdf');
+            const fileName = (originalName === 'image.png' || originalName === 'document.pdf') ? `pasted-file-${Date.now()}${isImage ? '.png' : '.pdf'}` : originalName;
+            const newFile = new File([file], fileName, { type: file.type });
+
+            setPastedFile(newFile);
+            setActiveTab('📄 أوراق الدعوى'); // Switch to documents tab
+            e.preventDefault();
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [isOpen]);
 
   useEffect(() => {
     const pNames = (formData.plaintiffsList || []).map(p => p.name).filter(Boolean);
@@ -77,12 +146,57 @@ export default function AddCaseModal({ isOpen, onClose }) {
     }
     try {
       const savedCaseId = await createNewCase(dataToSave);
-      setIsSaving(false);
+      
       if (savedCaseId) {
+        
+        let coverImageUrl = null;
+        let finalDocs = [];
+        
+        // Upload draft documents if any
+        if (draftDocs && draftDocs.length > 0) {
+          try {
+            for (const d of draftDocs) {
+              let urlToSave = null;
+              
+              if (d.fileType === 'image') {
+                const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+                const compressedFile = await imageCompression(d.file, options);
+                const fileName = `cases/${savedCaseId}/${d.id}_${Date.now()}.jpg`;
+                urlToSave = await uploadToR2(compressedFile, fileName);
+                
+                // Use the first image as cover image
+                if (!coverImageUrl && urlToSave) {
+                  coverImageUrl = urlToSave;
+                }
+              } else {
+                const fileName = `cases/${savedCaseId}/${d.id}_${Date.now()}.pdf`;
+                urlToSave = await uploadToR2(d.file, fileName);
+              }
+              
+              if (urlToSave) {
+                finalDocs.push({ ...d, url: urlToSave, file: undefined });
+              }
+            }
+            
+            const payload = { documents: finalDocs };
+            if (coverImageUrl) {
+              payload.coverImage = coverImageUrl;
+            }
+            
+            await saveCaseToFirebase(savedCaseId, payload);
+          } catch(err) {
+            console.error("Error uploading documents:", err);
+            toast("تم حفظ القضية لكن فشل رفع بعض المرفقات", "warning");
+          }
+        }
+
+        setIsSaving(false);
         if (dataToSave['مكان الملف'] && String(dataToSave['مكان الملف']).trim() !== '') {
           // User already selected the location in the form, skip the prompt
           toast("تمت إضافة القضية بنجاح!", "success");
           setFormData({});
+          setDraftDocs([]);
+          setPastedFile(null);
           onClose();
         } else {
           setCreatedCaseId(savedCaseId);
@@ -137,6 +251,8 @@ export default function AddCaseModal({ isOpen, onClose }) {
                       setIsSaving(false);
                       toast("تم تحديث مكان الملف بنجاح!", "success");
                       setFormData({});
+                      setDraftDocs([]);
+                      setPastedFile(null);
                       setShowLocationPrompt(false);
                       onClose();
                     }}
@@ -163,6 +279,8 @@ export default function AddCaseModal({ isOpen, onClose }) {
                     setIsSaving(false);
                     toast("تم تحديث مكان الملف بنجاح!", "success");
                     setFormData({});
+                    setDraftDocs([]);
+                    setPastedFile(null);
                     setShowLocationPrompt(false);
                     setCustomLocation('');
                     onClose();
@@ -177,6 +295,8 @@ export default function AddCaseModal({ isOpen, onClose }) {
               <button
                 onClick={() => {
                   setFormData({});
+                  setDraftDocs([]);
+                  setPastedFile(null);
                   setShowLocationPrompt(false);
                   onClose();
                 }}
@@ -294,8 +414,8 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 resize-none transition"
                               />
                             ) : (field.type === 'date') || field.id === 'آخر جلسة' || field.id === 'تاريخ آخر جلسة' || field.id === 'جلسة حكم أول درجة' ? (
-                              <input
-                                type="date"
+                              <SmartDateInput
+                                id={`date-${field.id}`}
                                 value={val}
                                 onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition"
@@ -364,14 +484,16 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                           <div key={plaint.id || idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 relative group">
                                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                               <div className="flex-1">
-                                                <input
-                                                  type="text"
+                                                <SmartAutocomplete
+                                                  id={`plaint-${idx}`}
                                                   value={plaint.name}
-                                                  onChange={e => {
+                                                  onChange={v => {
                                                     const list = [...(formData.plaintiffsList || [])];
-                                                    list[idx].name = e.target.value;
+                                                    list[idx].name = v;
                                                     setFormData({ ...formData, plaintiffsList: list });
                                                   }}
+                                                  cases={cases}
+                                                  fieldPaths={['المدعي', 'الطاعن', 'المستأنف']}
                                                   placeholder="اسم المدعي"
                                                   className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none focus:border-indigo-400"
                                                 />
@@ -393,25 +515,53 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                           </div>
                                         ))}
                                         <div className="flex items-center gap-2 mt-2">
-                                          <input
-                                            type="text"
-                                            value={newPlaintName}
-                                            onChange={e => setNewPlaintName(e.target.value)}
-                                            placeholder="اسم المدعي الجديد..."
-                                            className="flex-1 bg-white border border-indigo-200 shadow-sm rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-400"
-                                          />
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              if (!newPlaintName.trim()) return;
-                                              const newList = [...(formData.plaintiffsList || []), { id: Date.now().toString(), name: newPlaintName }];
-                                              setFormData({ ...formData, plaintiffsList: newList });
-                                              setNewPlaintName('');
-                                            }}
-                                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition whitespace-nowrap"
-                                          >
-                                            + إضافة
-                                          </button>
+                                          {((formData.plaintiffsList || []).length === 0 || showNewPlaintInput) ? (
+                                            <>
+                                              <div className="flex-1 min-w-0">
+                                                <SmartAutocomplete
+                                                  id="newPlaintName"
+                                                  value={newPlaintName}
+                                                  onChange={v => setNewPlaintName(v)}
+                                                  onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                      e.preventDefault();
+                                                      if (!newPlaintName.trim()) return;
+                                                      const newList = [...(formData.plaintiffsList || []), { id: Date.now().toString(), name: newPlaintName }];
+                                                      setFormData({ ...formData, plaintiffsList: newList });
+                                                      setNewPlaintName('');
+                                                      setShowNewPlaintInput(false);
+                                                    }
+                                                  }}
+                                                  cases={cases}
+                                                  fieldPaths={['المدعي', 'الطاعن', 'المستأنف']}
+                                                  placeholder="اسم المدعي الجديد..."
+                                                  className="w-full bg-white border border-indigo-200 shadow-sm rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-400"
+                                                />
+                                              </div>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  if (!newPlaintName.trim()) return;
+                                                  const newList = [...(formData.plaintiffsList || []), { id: Date.now().toString(), name: newPlaintName }];
+                                                  setFormData({ ...formData, plaintiffsList: newList });
+                                                  setNewPlaintName('');
+                                                  setShowNewPlaintInput(false);
+                                                }}
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition whitespace-nowrap"
+                                              >
+                                                + إضافة
+                                              </button>
+                                            </>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => setShowNewPlaintInput(true)}
+                                              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-500 border border-slate-300 border-dashed py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2"
+                                            >
+                                              <Plus className="w-4 h-4" />
+                                              إضافة مدعي آخر
+                                            </button>
+                                          )}
                                         </div>
                                       </div>
                                     </div>
@@ -424,14 +574,16 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                           <div key={def.id || idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 relative group">
                                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                               <div className="flex-1">
-                                                <input
-                                                  type="text"
+                                                <SmartAutocomplete
+                                                  id={`def-${idx}`}
                                                   value={def.name}
-                                                  onChange={e => {
+                                                  onChange={v => {
                                                     const list = [...(formData.defendantsList || [])];
-                                                    list[idx].name = e.target.value;
+                                                    list[idx].name = v;
                                                     setFormData({ ...formData, defendantsList: list });
                                                   }}
+                                                  cases={cases}
+                                                  fieldPaths={['المدعى عليه', 'المطعون ضده', 'المدعى_عليه']}
                                                   placeholder="اسم المدعى عليه"
                                                   className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none focus:border-indigo-400"
                                                 />
@@ -494,25 +646,53 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                         ))}
 
                                         <div className="flex items-center gap-2 mt-2">
-                                          <input
-                                            type="text"
-                                            value={newDefName}
-                                            onChange={e => setNewDefName(e.target.value)}
-                                            placeholder="اسم المدعى عليه الجديد..."
-                                            className="flex-1 bg-white border border-indigo-200 shadow-sm rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-400"
-                                          />
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              if (!newDefName.trim()) return;
-                                              const newList = [...(formData.defendantsList || []), { id: Date.now().toString(), name: newDefName, address: '', chosenAddress: '' }];
-                                              setFormData({ ...formData, defendantsList: newList });
-                                              setNewDefName('');
-                                            }}
-                                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition whitespace-nowrap"
-                                          >
-                                            + إضافة
-                                          </button>
+                                          {((formData.defendantsList || []).length === 0 || showNewDefInput) ? (
+                                            <>
+                                              <div className="flex-1 min-w-0">
+                                                <SmartAutocomplete
+                                                  id="newDefName"
+                                                  value={newDefName}
+                                                  onChange={v => setNewDefName(v)}
+                                                  onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                      e.preventDefault();
+                                                      if (!newDefName.trim()) return;
+                                                      const newList = [...(formData.defendantsList || []), { id: Date.now().toString(), name: newDefName, address: '', chosenAddress: '' }];
+                                                      setFormData({ ...formData, defendantsList: newList });
+                                                      setNewDefName('');
+                                                      setShowNewDefInput(false);
+                                                    }
+                                                  }}
+                                                  cases={cases}
+                                                  fieldPaths={['المدعى عليه', 'المطعون ضده', 'المدعى_عليه']}
+                                                  placeholder="اسم المدعى عليه الجديد..."
+                                                  className="w-full bg-white border border-indigo-200 shadow-sm rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-400"
+                                                />
+                                              </div>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  if (!newDefName.trim()) return;
+                                                  const newList = [...(formData.defendantsList || []), { id: Date.now().toString(), name: newDefName, address: '', chosenAddress: '' }];
+                                                  setFormData({ ...formData, defendantsList: newList });
+                                                  setNewDefName('');
+                                                  setShowNewDefInput(false);
+                                                }}
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition whitespace-nowrap"
+                                              >
+                                                + إضافة
+                                              </button>
+                                            </>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => setShowNewDefInput(true)}
+                                              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-500 border border-slate-300 border-dashed py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2"
+                                            >
+                                              <Plus className="w-4 h-4" />
+                                              إضافة مدعى عليه آخر
+                                            </button>
+                                          )}
                                         </div>
                                       </div>
                                     </div>
@@ -574,15 +754,11 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                     ))}
                                   </div>
                                 ) : ['القرار', 'مكان الملف', 'تصنيف الحكم', 'نوع الحكم'].includes(field.id) ? (
-                                  <StrictSelectField
+                                  <SmartAutocomplete
                                     label={field.label}
                                     value={val}
-                                    options={
-                                      field.id === 'القرار' ? (settings?.decisions || []) :
-                                        field.id === 'مكان الملف' ? (settings?.fileLocations || []) :
-                                          field.id === 'تصنيف الحكم' ? (settings?.judgmentCategories || ['قطعي', 'تمهيدي']) :
-                                            field.id === 'نوع الحكم' ? (settings?.judgmentTypes || ['قبول', 'رفض']) : []
-                                    }
+                                    cases={cases}
+                                    fieldPaths={field.id === 'القرار' ? ['القرار', 'قرار الجلسة', 'المنطوق'] : [field.id]}
                                     onChange={(v) => setFormData({ ...formData, [field.id]: v })}
                                     onManage={() => {
                                       const keyMap = {
@@ -593,6 +769,7 @@ export default function AddCaseModal({ isOpen, onClose }) {
                                       };
                                       setManagingField({ key: keyMap[field.id], title: field.label });
                                     }}
+                                    placeholder={field.label + "..."}
                                   />
                                 ) : (
                                   <SmartAutocomplete
@@ -617,6 +794,16 @@ export default function AddCaseModal({ isOpen, onClose }) {
                     </div>
                   );
                 })}
+
+                {activeTab === '📄 أوراق الدعوى' && (
+                  <CaseDocuments
+                    isDraft={true}
+                    draftDocs={draftDocs}
+                    setDraftDocs={setDraftDocs}
+                    pastedFile={pastedFile}
+                    setPastedFile={setPastedFile}
+                  />
+                )}
               </div>
             </form>
           )}

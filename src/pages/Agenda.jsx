@@ -14,6 +14,7 @@ import { getSafeDateObj } from '../utils/dateUtils';
 import { printViewingTasksList } from '../utils/printViewingTasks';
 import { useUI } from '../context/UIContext';
 import useSessionState from '../hooks/useSessionState';
+import SmartDateInput from '../components/SmartDateInput';
 
 const ARABIC_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 const ARABIC_DAYS_LONG = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
@@ -326,7 +327,7 @@ export default function Agenda() {
             <div className="h-4 w-px bg-slate-200 hidden sm:block mx-1" />
             <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 sm:mr-auto">
               <span className="text-[10px] font-bold text-slate-400">انتقال سريع:</span>
-              <input type="date" onChange={e => { if (e.target.value) { setCurrentDate(new Date(e.target.value)); setSelectedDateKey(e.target.value); }}} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-navy-900 w-full sm:w-[130px]" />
+              <SmartDateInput  onChange={e => { if (e.target.value) { setCurrentDate(new Date(e.target.value)); setSelectedDateKey(e.target.value); }}} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-navy-900 w-full sm:w-[130px]" />
             </div>
           </div>
 

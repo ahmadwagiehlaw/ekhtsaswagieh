@@ -21,6 +21,7 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [initialAddCaseNo, setInitialAddCaseNo] = useState('');
   const [isTasksModalOpen, setIsTasksModalOpen] = useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [previewCaseId, setPreviewCaseId] = useState(null); // case opened from global search panel
@@ -48,6 +49,7 @@ export default function Layout() {
   // Hide bottom nav on case details page for full screen view, just like the original app
   const isDetailsPage = location.pathname.startsWith('/case/');
   const isFilesPage = location.pathname === '/files';
+  const isRollsPage = location.pathname.startsWith('/rolls');
 
   // Global "/" shortcut — opens search panel on all pages except /files
   // (on /files the page itself handles the shortcut to focus its own input)
@@ -158,9 +160,12 @@ export default function Layout() {
       <OnboardingModal />
 
       {/* Floating Action Button (Add Case) */}
-      {!isDetailsPage && canEditData && (
+      {!isDetailsPage && !isRollsPage && canEditData && (
         <button 
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => {
+            setInitialAddCaseNo('');
+            setIsAddModalOpen(true);
+          }}
           className="fixed bottom-24 left-6 md:left-8 w-14 h-14 bg-amber-500 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-amber-600 hover:-translate-y-1 transition-all z-40"
           title="إضافة دعوى جديدة"
         >
@@ -178,6 +183,10 @@ export default function Layout() {
         onSelectCase={(id) => {
           setPreviewCaseId(id);
           // Keep search panel open so user can go back to results
+        }}
+        onOpenAddCase={(caseNo) => {
+          setInitialAddCaseNo(caseNo || '');
+          setIsAddModalOpen(true);
         }}
       />
 
@@ -234,7 +243,14 @@ export default function Layout() {
 
       {/* Add Case Modal */}
       {isAddModalOpen && (
-        <AddCaseModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+        <AddCaseModal 
+          isOpen={isAddModalOpen} 
+          onClose={() => {
+            setIsAddModalOpen(false);
+            setInitialAddCaseNo('');
+          }} 
+          initialCaseNo={initialAddCaseNo}
+        />
       )}
 
       {/* Bottom Navigation (Dark Theme) */}

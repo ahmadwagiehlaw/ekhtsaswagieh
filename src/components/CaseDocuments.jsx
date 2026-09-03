@@ -18,13 +18,13 @@ const getDocTypeStyle = (type) => {
   return { color: 'text-indigo-600', bg: 'bg-indigo-100', icon: FileText };
 };
 
-export default function CaseDocuments({ caseId, pastedFile, setPastedFile }) {
+export default function CaseDocuments({ caseId, pastedFile, setPastedFile, isDraft, draftDocs, setDraftDocs }) {
   const { cases, saveCaseToFirebase, currentUser, isAdmin, currentUserPermissions, settings } = useAppContext();
-  const canEditData = isAdmin || currentUserPermissions?.canEditData;
+  const canEditData = isAdmin || currentUserPermissions?.canEditData || isDraft;
   const { toast, showConfirm } = useUI();
 
-  const caseData = cases.find(c => c.id === caseId);
-  const documents = caseData?.documents || [];
+  const caseData = isDraft ? {} : (cases.find(c => c.id === caseId) || {});
+  const documents = isDraft ? (draftDocs || []) : (caseData?.documents || []);
 
   const judicialDocs = settings?.judicialDocs || defaultJudicial;
   const adminDocs = settings?.adminDocs || defaultAdmin;
@@ -74,7 +74,11 @@ export default function CaseDocuments({ caseId, pastedFile, setPastedFile }) {
     if (editingDoc) {
       try {
         const updatedDocs = documents.map(d => d.id === editingDoc.id ? { ...d, type: docType, title: docTitle.trim() !== '' ? docTitle.trim() : docType } : d);
-        await saveCaseToFirebase(caseId, { documents: updatedDocs });
+        if (isDraft) {
+          setDraftDocs(updatedDocs);
+        } else {
+          await saveCaseToFirebase(caseId, { documents: updatedDocs });
+        }
         toast('تم تحديث بيانات المستند بنجاح', 'success');
         closeModal();
       } catch (error) {
@@ -112,6 +116,28 @@ export default function CaseDocuments({ caseId, pastedFile, setPastedFile }) {
       const safeDocType = docType.replace(/[\/\\?%*:|"<>\s]/g, '_');
       const newFileName = `${caseNum ? caseNum + '-' : ''}${safeDocType}_${Date.now()}${extension}`;
       fileToUpload = new File([fileToUpload], newFileName, { type: finalType });
+
+      if (isDraft) {
+        const newDoc = {
+          id: Date.now().toString(),
+          file: fileToUpload,
+          url: URL.createObjectURL(fileToUpload),
+          type: docType || 'مستند إضافي',
+          title: docTitle.trim() !== '' ? docTitle.trim() : (docType || 'مستند إضافي'),
+          uploadedAt: new Date().toISOString(),
+          uploadedBy: currentUser || 'مجهول',
+          fileType: finalType.startsWith('image/') ? 'image' : 'pdf'
+        };
+        setDraftDocs([...(draftDocs || []), newDoc]);
+        toast('تم إضافة الملف بنجاح', 'success');
+        setDocTitle('');
+        setDocType('ملف الدعوى');
+        setIsUploading(false);
+        closeModal();
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        if (cameraInputRef.current) cameraInputRef.current.value = '';
+        return;
+      }
 
       const url = await uploadToR2(fileToUpload, 'ekhtsasi-light-files');
 
@@ -162,6 +188,12 @@ export default function CaseDocuments({ caseId, pastedFile, setPastedFile }) {
   const handleDelete = async (doc) => {
     const confirmed = await showConfirm('تأكيد الحذف', 'هل أنت متأكد من حذف هذا الملف نهائياً؟', 'delete_document');
     if (!confirmed) return;
+
+    if (isDraft) {
+      setDraftDocs((draftDocs || []).filter(d => d.id !== doc.id));
+      toast('تم حذف الملف', 'info');
+      return;
+    }
 
     try {
       await deleteFromR2(doc.url, 'ekhtsasi-light-files');

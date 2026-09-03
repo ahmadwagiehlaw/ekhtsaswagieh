@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Bell, AlertTriangle, CheckCircle2, CalendarPlus } from 'lucide-react';
 import { useUI } from '../context/UIContext';
 import { useAppContext } from '../context/AppState';
+import SmartDateInput from './SmartDateInput';
 
 export default function AlertsModal({ isOpen, onClose, caseData }) {
   const { saveCaseToFirebase, isAdmin, currentUserPermissions } = useAppContext();
@@ -139,8 +140,8 @@ export default function AlertsModal({ isOpen, onClose, caseData }) {
                 <CalendarPlus className="w-4 h-4" /> إضافة تنبيه جديد:
               </h4>
               <div className="flex flex-col gap-3">
-                <input 
-                  type="date" 
+                <SmartDateInput 
+                   
                   value={newAlert.date}
                   onChange={e => setNewAlert({...newAlert, date: e.target.value})}
                   className="bg-white border border-rose-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:ring-rose-500"

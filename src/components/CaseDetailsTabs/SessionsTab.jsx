@@ -1,6 +1,8 @@
 import React from 'react';
 import { CalendarPlus, Scale, MessageSquare, X, FileText, Paperclip, Loader2, BookOpen, Save, Edit3, Trash2, Settings } from 'lucide-react';
 import { formatDateString } from '../../utils/dateUtils';
+import { uploadToR2 } from '../../lib/r2';
+import SmartDateInput from '../SmartDateInput';
 import { applyJudgmentDefaultRules } from '../../utils/judgmentRulesEngine';
 import JudgmentRulesModal from '../JudgmentRulesModal';
 import FieldOptionsManager from '../FieldOptionsManager';
@@ -96,8 +98,8 @@ export default function SessionsTab({
                           </div>
 
                           {/* Date Edit */}
-                          <input
-                            type="date"
+                          <SmartDateInput
+                            id={`session-date-${idx}`}
                             value={editSessionData.date ?? session.date ?? ''}
                             onChange={(e) => setEditSessionData({ ...editSessionData, date: e.target.value })}
                             className="text-[10px] font-black text-slate-500 bg-white px-2 py-1 rounded-md border border-slate-200 w-[110px] text-center focus:outline-none focus:border-amber-400"

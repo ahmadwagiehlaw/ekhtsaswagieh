@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppState';
 import { useGeneralTasks } from '../hooks/useGeneralTasks';
 import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
+import SmartDateInput from './SmartDateInput';
 
 export default function GlobalTasksModal({ isOpen, onClose }) {
   const { completeTask, uncompleteTask, saveTask, deleteTask } = useGeneralTasks();
@@ -154,8 +155,8 @@ export default function GlobalTasksModal({ isOpen, onClose }) {
                     <option value="important">مهمة</option>
                     <option value="urgent">عاجلة جداً</option>
                  </select>
-                 <input 
-                    type="date"
+                 <SmartDateInput 
+                    
                     value={newTask.dueDate}
                     onChange={e => setNewTask({...newTask, dueDate: e.target.value})}
                     className="flex-1 bg-white border border-indigo-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"

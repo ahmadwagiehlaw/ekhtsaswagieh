@@ -3,6 +3,7 @@ import { BarChart2, Printer, Search, FileText, Calendar, Filter, Download } from
 import { useAppContext } from '../context/AppState';
 import { formatDateString } from '../utils/dateUtils';
 import SmartDocumentsTab from '../components/SmartDocumentsTab';
+import SmartDateInput from '../components/SmartDateInput';
 
 export default function Reports() {
   const { cases, settings, globalTasks, viewingTasks, PREDEFINED_TASKS } = useAppContext();
@@ -294,8 +295,8 @@ export default function Reports() {
           {(reportType === 'prep' || reportType === 'tasks' || reportType === 'viewing_tasks') && (
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500">تاريخ الجلسة</label>
-              <input 
-                type="date" 
+              <SmartDateInput 
+                 
                 value={targetDate}
                 onChange={(e) => setTargetDate(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"

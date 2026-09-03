@@ -15,7 +15,7 @@ import FieldOptionsManager from '../components/FieldOptionsManager';
 import StrictSelectField from '../components/StrictSelectField';
 import { formatDateString, getSafeDateObj } from '../utils/dateUtils';
 import { localizeNumber } from '../utils/numberUtils';
-import { calculateLitigationStage, autoDetermineRole } from '../utils/caseUtils';
+import { calculateLitigationStage, autoDetermineRole, syncLatestSessionToCaseData } from '../utils/caseUtils';
 import { calculateCaseAlerts } from '../utils/statsUtils';
 import { uploadToR2 } from '../lib/r2';
 import imageCompression from 'browser-image-compression';
@@ -449,9 +449,9 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
     }
   }
   const content = (
-    <div className={`space-y-4 mx-auto pb-6 animate-in fade-in zoom-in-95 duration-300 ${isModal ? 'max-w-full' : 'max-w-3xl'}`}>
+    <div className={`space-y-4 mx-auto pb-6 animate-in fade-in zoom-in-95 duration-300 ${isModal ? 'max-w-full w-full' : 'max-w-3xl'}`}>
       {/* Header */}
-      <div className={`bg-white border-b border-slate-200 sticky top-0 z-50 px-4 py-3 shadow-sm flex items-center justify-between no-print ${isModal ? 'rounded-t-3xl' : ''}`}>
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-50 px-4 py-3 shadow-sm flex items-center justify-between no-print">
         <button
           onClick={isModal ? onCloseModal : () => navigate(-1)}
           className="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 flex items-center justify-center transition active:scale-95"
@@ -1130,8 +1130,11 @@ export default function CaseDetails({ isModal, modalCaseId, onCloseModal }) {
 
   if (isModal) {
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-        <div className="bg-slate-50 rounded-3xl w-full max-w-5xl h-[96vh] flex flex-col shadow-2xl border border-slate-200 overflow-y-auto custom-scrollbar relative">
+      <div className="fixed inset-0 z-[100] flex justify-end bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onCloseModal}>
+        <div 
+          className="bg-slate-50 w-full max-w-2xl h-full flex flex-col shadow-2xl border-r border-slate-200 overflow-y-auto custom-scrollbar relative animate-in slide-in-from-left duration-300"
+          onClick={(e) => e.stopPropagation()}
+        >
           {content}
         </div>
       </div>

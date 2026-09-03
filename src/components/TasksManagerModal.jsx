@@ -6,6 +6,7 @@ import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
 import { useLocation } from 'react-router-dom';
 import UploadDocumentModal from './UploadDocumentModal';
+import SmartDateInput from './SmartDateInput';
 
 const EgyptianDateInput = ({ value, onChange, className }) => {
   const inputRef = React.useRef(null);
@@ -49,9 +50,9 @@ const EgyptianDateInput = ({ value, onChange, className }) => {
       </span>
       <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
       
-      <input
+      <SmartDateInput
         ref={inputRef}
-        type="date"
+        
         value={value || ''}
         onChange={onChange}
         className="absolute bottom-0 left-0 w-0 h-0 opacity-0 pointer-events-none"

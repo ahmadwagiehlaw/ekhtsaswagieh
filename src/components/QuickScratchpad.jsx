@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppState';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import SmartDateInput from './SmartDateInput';
 
 export default function QuickScratchpad() {
   const [isOpen, setIsOpen] = useState(false);
@@ -118,8 +119,8 @@ export default function QuickScratchpad() {
                   </div>
                   <div className="flex items-center justify-between border-t border-slate-100 pt-2 mt-1">
                     <span className="text-[9px] font-bold text-slate-400">{new Date(note.createdAt).toLocaleDateString('ar-EG')}</span>
-                    <input 
-                      type="date" 
+                    <SmartDateInput 
+                       
                       value={note.reminderDate || ''} 
                       onChange={e => saveNotes(notes.map(n => n.id === note.id ? {...n, reminderDate: e.target.value} : n))}
                       className={`border rounded-lg px-2 py-1 text-[10px] font-bold outline-none transition ${isAlert ? 'border-rose-300 bg-rose-50 text-rose-700 focus:border-rose-500' : 'border-slate-200 text-slate-600 bg-slate-50 focus:border-amber-400'}`} 

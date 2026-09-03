@@ -20,6 +20,7 @@ import BulkSessionRolloverModal from './BulkSessionRolloverModal';
 import BulkJudgmentRegistrationModal from './BulkJudgmentRegistrationModal';
 import QuickAddCaseModal from './QuickAddCaseModal';
 import GlobalRollSearchModal from './GlobalRollSearchModal';
+import SmartDateInput from './SmartDateInput';
 
 const getFieldVal = (obj, keys) => {
   for (const k of keys) {
@@ -77,7 +78,7 @@ function usePasteImage(onImage) {
 
 // Judgment image paste zone component
 function ImagePasteZone({ caseId, sessionDate, caseData, onImageSaved }) {
-  const { saveCaseToFirebase } = useAppContext();
+  const { saveCaseToFirebase, viewingTasks, globalTasks } = useAppContext();
   const { toast } = useUI();
   const [isUploading, setIsUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -178,7 +179,7 @@ function ImagePasteZone({ caseId, sessionDate, caseData, onImageSaved }) {
 }
 
 export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
-  const { cases, saveCaseToFirebase, settings, deleteCaseFromFirebase } = useAppContext();
+  const { cases, saveCaseToFirebase, settings, deleteCaseFromFirebase, viewingTasks = [], globalTasks = [] } = useAppContext();
   const { showPrompt, toast, showConfirm } = useUI();
   const navigate = useNavigate();
 
@@ -256,6 +257,36 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
       return !isSessionRecorded(session);
     }).length;
   }, [judgmentCases, date]);
+
+  
+  
+  const allRollDates = useMemo(() => {
+    const dates = new Set();
+    cases.forEach(c => {
+      const sd = getFieldVal(c, ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة', 'تاريخ الحكم']);
+      if (sd) dates.add(sd);
+      if (c.sessions) {
+        c.sessions.forEach(s => { if (s.date) dates.add(s.date); });
+      }
+    });
+    return Array.from(dates).sort((a, b) => new Date(a) - new Date(b));
+  }, [cases]);
+  
+  const pendingViewingCaseIds = useMemo(() => {
+    const ids = new Set();
+    viewingTasks?.forEach(t => {
+      if (t.status !== 'completed') t.linkedCases?.forEach(id => ids.add(id));
+    });
+    return ids;
+  }, [viewingTasks]);
+
+  const pendingOtherTaskCaseIds = useMemo(() => {
+    const ids = new Set();
+    globalTasks?.forEach(t => {
+      if (t.status !== 'completed') t.linkedCases?.forEach(id => ids.add(id));
+    });
+    return ids;
+  }, [globalTasks]);
 
   const filteredCases = useMemo(() => {
     let result = judgmentCases;
@@ -463,15 +494,20 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
           <button
             onClick={() => {
               const d = getSafeDateObj(date);
-              if (d) { d.setDate(d.getDate() - 1); onDateChange(d.toISOString().split('T')[0]); }
+              if (d) { 
+                  const targetDate = d.toISOString().split('T')[0];
+                  const prevDate = allRollDates.slice().reverse().find(dt => dt < targetDate);
+                  if (prevDate) onDateChange(prevDate);
+                  else { d.setDate(d.getDate() - 1); onDateChange(d.toISOString().split('T')[0]); }
+                }
             }}
             className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition"
           >
             <ChevronRight className="w-4 h-4 text-slate-600" />
           </button>
           <div className="text-center">
-            <input
-              type="date"
+            <SmartDateInput
+              
               value={date}
               onChange={e => onDateChange(e.target.value)}
               className="text-sm font-black text-navy-900 bg-transparent border-none outline-none cursor-pointer text-center"
@@ -481,7 +517,12 @@ export default function JudgmentsRollTab({ date, onDateChange, allCasesMap }) {
           <button
             onClick={() => {
               const d = getSafeDateObj(date);
-              if (d) { d.setDate(d.getDate() + 1); onDateChange(d.toISOString().split('T')[0]); }
+              if (d) { 
+                  const targetDate = d.toISOString().split('T')[0];
+                  const nextDate = allRollDates.find(dt => dt > targetDate);
+                  if (nextDate) onDateChange(nextDate);
+                  else { d.setDate(d.getDate() + 1); onDateChange(d.toISOString().split('T')[0]); }
+                }
             }}
             className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition"
           >

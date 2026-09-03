@@ -10,7 +10,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom';
 import {
   EyeOff, Edit3, Check, X, ChevronRight, ChevronLeft, Search,
-  CheckSquare, Square, ClipboardList, Bell, Eye, CopyPlus,
+  CheckCircle2, CheckSquare, Square, ClipboardList, Bell, Eye, CopyPlus,
   Printer, ExternalLink, Save, RefreshCcw, AlertCircle, Plus, Trash2,
   ArrowUpDown, ArrowUp, ArrowDown, Columns, Settings2, FileText, Camera
 } from 'lucide-react';
@@ -25,6 +25,7 @@ import ExportPDFModal from './ExportPDFModal';
 import QuickAddCaseModal from './QuickAddCaseModal';
 import GlobalRollSearchModal from './GlobalRollSearchModal';
 import GlobalTemplatePrintModal from './GlobalTemplatePrintModal';
+import SmartDateInput from './SmartDateInput';
 
 const PREDEFINED_DECISIONS = [
   'للحكم', 'تصريح', 'للإعلان', 'للاطلاع', 'للإخطار',
@@ -95,6 +96,8 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   const [isBulkViewingOpen, setIsBulkViewingOpen] = useState(false);
   const [isPrintViewOpen, setIsPrintViewOpen] = useState(false);
   const [isRolloverOpen, setIsRolloverOpen] = useState(false);
+  const [singleRollCase, setSingleRollCase] = useState(null);
+  const [singleRollData, setSingleRollData] = useState({ date: '', decision: '', type: '' });
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
@@ -118,6 +121,81 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
   };
 
   const toggleCol = (key) => setVisibleCols(p => ({ ...p, [key]: !p[key] }));
+
+  
+  // ─── PERFORMANCE: Pre-calculate tasks and suggestions ───
+  const pendingViewingCaseIds = useMemo(() => {
+    const ids = new Set();
+    viewingTasks?.forEach(t => {
+      if (t.status !== 'completed') t.linkedCases?.forEach(id => ids.add(id));
+    });
+    return ids;
+  }, [viewingTasks]);
+
+  const pendingOtherTaskCaseIds = useMemo(() => {
+    const ids = new Set();
+    globalTasks?.forEach(t => {
+      if (t.status !== 'completed') t.linkedCases?.forEach(id => ids.add(id));
+    });
+    return ids;
+  }, [globalTasks]);
+
+  const decisionOptions = settings?.decisions || PREDEFINED_DECISIONS;
+  const currentCourtDegree = settings?.courtDegree || 'أول درجة';
+  const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
+  const sessionTypes = settings?.sessionTypes || (isSupreme ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة']);
+  const typeFahs = sessionTypes[0] || 'فحص';
+
+  
+  const dynamicSessionTypes = useMemo(() => {
+    const unique = new Set(sessionTypes); // start with defaults
+    cases.forEach(c => {
+      const v = c['نوع الجلسة'] || c['نوع_الجلسة'];
+      if (v && typeof v === 'string') unique.add(v.trim());
+      if (c.sessions) {
+        c.sessions.forEach(s => {
+          if (s.type) unique.add(s.type.trim());
+        });
+      }
+    });
+    return Array.from(unique).filter(Boolean).sort();
+  }, [cases, sessionTypes]);
+
+  
+  const allRollDates = useMemo(() => {
+    const dates = new Set();
+    cases.forEach(c => {
+      const sd = getFieldVal(c, ['آخر جلسة', 'تاريخ الجلسة', 'أخر جلسة']);
+      if (sd) dates.add(sd);
+      if (c.sessions) {
+        c.sessions.forEach(s => { if (s.date) dates.add(s.date); });
+      }
+    });
+    return Array.from(dates).sort((a, b) => new Date(a) - new Date(b));
+  }, [cases]);
+  
+  const dynamicDecisions = useMemo(() => {
+    const unique = new Set(decisionOptions); // start with settings defaults
+    cases.forEach(c => {
+      const v = c['القرار'] || c['قرار الجلسة'] || c['المنطوق'];
+      if (v && typeof v === 'string') unique.add(v.trim());
+      if (c.sessions) {
+        c.sessions.forEach(s => {
+          if (s.decision) unique.add(s.decision.trim());
+        });
+      }
+    });
+    return Array.from(unique).filter(Boolean);
+  }, [cases, decisionOptions]);
+
+  const dynamicFileLocations = useMemo(() => {
+    const unique = new Set(settings?.fileLocationOptions || ['في المكتب', 'مؤقت', 'غير موجود', 'خارج الاختصاص', 'بالمحكمة']);
+    cases.forEach(c => {
+      const v = c['مكان الملف'];
+      if (v && typeof v === 'string') unique.add(v.trim());
+    });
+    return Array.from(unique).filter(Boolean);
+  }, [cases, settings]);
 
   const filteredCases = useMemo(() => {
     let result = dayCases;
@@ -177,11 +255,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
     else setSelectedIds(new Set(filteredCases.map(c => c.id)));
   };
 
-  const decisionOptions = settings?.decisions || PREDEFINED_DECISIONS;
-  const currentCourtDegree = settings?.courtDegree || 'أول درجة';
-  const isSupreme = currentCourtDegree === 'ثان درجة' || currentCourtDegree === 'عليا' || currentCourtDegree === 'الإدارية العليا';
-  const sessionTypes = settings?.sessionTypes || (isSupreme ? ['فحص', 'موضوع'] : ['مفوضين', 'مرافعة']);
-  const typeFahs = sessionTypes[0] || 'فحص';
+  
 
   // '/' keyboard shortcut → focus search
   useEffect(() => {
@@ -372,15 +446,20 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
           <button
             onClick={() => {
               const d = getSafeDateObj(date);
-              if (d) { d.setDate(d.getDate() - 1); onDateChange(d.toISOString().split('T')[0]); }
+              if (d) { 
+                  const targetDate = d.toISOString().split('T')[0];
+                  const prevDate = allRollDates.slice().reverse().find(dt => dt < targetDate);
+                  if (prevDate) onDateChange(prevDate);
+                  else { d.setDate(d.getDate() - 1); onDateChange(d.toISOString().split('T')[0]); }
+                }
             }}
             className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition"
           >
             <ChevronRight className="w-4 h-4 text-slate-600" />
           </button>
           <div className="text-center">
-            <input
-              type="date"
+            <SmartDateInput
+              
               value={date}
               onChange={e => onDateChange(e.target.value)}
               className="text-sm font-black text-navy-900 bg-transparent border-none outline-none cursor-pointer text-center"
@@ -390,7 +469,12 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
           <button
             onClick={() => {
               const d = getSafeDateObj(date);
-              if (d) { d.setDate(d.getDate() + 1); onDateChange(d.toISOString().split('T')[0]); }
+              if (d) { 
+                  const targetDate = d.toISOString().split('T')[0];
+                  const nextDate = allRollDates.find(dt => dt > targetDate);
+                  if (nextDate) onDateChange(nextDate);
+                  else { d.setDate(d.getDate() + 1); onDateChange(d.toISOString().split('T')[0]); }
+                }
             }}
             className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition"
           >
@@ -798,7 +882,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                           <div>
                             <input
                               autoFocus
-                              list={`dec-${cObj.id}`}
+                              list="dynamic-decisions-list"
                               value={cellValue}
                               onChange={e => setCellValue(e.target.value)}
                               onKeyDown={e => handleCellKey(e, cObj, 'القرار')}
@@ -822,9 +906,9 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                     {visibleCols.nextDate && (
                       <td className="px-2 py-2 cursor-text w-32" onClick={() => !isCell('آخر جلسة') && openCell(cObj, 'آخر جلسة')} title="انقر للتعديل">
                         {isCell('آخر جلسة') ? (
-                          <input
+                          <SmartDateInput
                             autoFocus
-                            type="date"
+                            
                             value={cellValue}
                             onChange={e => setCellValue(e.target.value)}
                             onKeyDown={e => handleCellKey(e, cObj, 'آخر جلسة')}
@@ -878,7 +962,7 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                             className="text-[10px] font-bold p-1 rounded border-2 border-indigo-400 w-full outline-none bg-white shadow-sm"
                           >
                             <option value="">— اختر —</option>
-                            {(settings?.fileLocationOptions || FILE_LOCATION_OPTIONS).map(o => <option key={o} value={o}>{o}</option>)}
+                            {dynamicFileLocations.map(o => <option key={o} value={o}>{o}</option>)}
                           </select>
                         ) : (
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full cursor-pointer ${fileLocation === 'غير موجود' ? 'bg-rose-100 text-rose-700' :
@@ -932,24 +1016,17 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
                           </>
                         ) : (
                           <>
-                            {/* Copy from previous row */}
-                            {idx > 0 && (
-                              <button
-                                onClick={() => {
-                                  const prev = filteredCases[idx - 1];
-                                  const copied = {
-                                    'نوع الجلسة': getFieldVal(prev, ['نوع الجلسة']) || typeFahs,
-                                    'آخر جلسة': getFieldVal(prev, ['آخر جلسة', 'تاريخ الجلسة']) || '',
-                                    'القرار': getFieldVal(prev, ['القرار']) || '',
-                                  };
-                                  setRowCache(p => ({ ...p, [cObj.id]: { ...(p[cObj.id] || {}), ...copied } }));
-                                }}
-                                className="w-7 h-7 bg-slate-100 hover:bg-indigo-100 text-slate-500 hover:text-indigo-600 rounded-lg flex items-center justify-center transition"
-                                title="نسخ من السابق"
-                              >
-                                <RefreshCcw className="w-3 h-3" />
-                              </button>
-                            )}
+                  {/* Roll Single Case */}
+                  <button
+                    onClick={() => {
+                      setSingleRollCase(cObj);
+                      setSingleRollData({ date: '', decision: '', type: cObj['نوع الجلسة'] || 'موضوع' });
+                    }}
+                    className="w-7 h-7 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center transition"
+                    title="ترحيل الجلسة"
+                  >
+                    <CopyPlus className="w-3.5 h-3.5" />
+                  </button>
                           </>
                         )}
                       </div>
@@ -961,6 +1038,18 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
           </table>
         </div>
       </div>
+
+      
+      {/* Global Datalists for AutoComplete */}
+      <datalist id="dynamic-session-types">
+        {dynamicSessionTypes.map(d => <option key={d} value={d} />)}
+      </datalist>
+      <datalist id="dynamic-decisions-list">
+        {dynamicDecisions.map(d => <option key={d} value={d} />)}
+      </datalist>
+      <datalist id="dynamic-file-locations-list">
+        {dynamicFileLocations.map(d => <option key={d} value={d} />)}
+      </datalist>
 
       {/* Modals */}
       <BulkProcedureFromRollModal
@@ -1048,6 +1137,137 @@ export default function SessionsRollTab({ date, onDateChange, allCasesMap }) {
           </div>
         </div>
       )}
+
+      {/* Single Roll Modal */}
+      {singleRollCase && (
+        <div className="fixed inset-0 bg-slate-900/40 z-[999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" dir="rtl">
+            <div className="bg-slate-50 px-5 py-4 flex items-center justify-between border-b border-slate-100">
+              <h3 className="font-black text-slate-700 flex items-center gap-2">
+                <CopyPlus className="w-4 h-4 text-indigo-500" />
+                ترحيل الجلسة
+              </h3>
+              <button onClick={() => setSingleRollCase(null)} className="text-slate-400 hover:text-rose-500 transition">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-5 space-y-4">
+              <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 flex items-center justify-between">
+                <div>
+                  <span className="text-[9px] font-bold text-indigo-400 block">رقم الدعوى</span>
+                  <p className="text-xs font-black text-indigo-900">{singleRollCase['رقم الدعوى']} / {singleRollCase['السنة']}</p>
+                </div>
+                <div className="text-left">
+                  <span className="text-[9px] font-bold text-indigo-400 block">الخصم</span>
+                  <p className="text-[10px] font-bold text-indigo-900 truncate max-w-[120px]">{singleRollCase['المدعى_عليه'] || singleRollCase['المدعى عليه']}</p>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-bold text-slate-600 block">تاريخ الجلسة القادمة *</label>
+                    <button type="button" onClick={() => setSingleRollData(p => ({ ...p, date: date }))} className="text-[10px] text-indigo-600 font-black bg-indigo-50 px-2 py-0.5 rounded shadow-sm hover:bg-indigo-100 transition flex items-center gap-1"><RefreshCcw className="w-3 h-3" />نفس جلسة اليوم</button>
+                  </div>
+                  <SmartDateInput
+                    
+                  autoFocus
+                  value={singleRollData.date}
+                  onChange={e => setSingleRollData(p => ({ ...p, date: e.target.value }))}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-navy-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-600 block mb-1">القرار</label>
+                <input
+                  type="text"
+                  list="dynamic-decisions-list"
+                  value={singleRollData.decision}
+                  onChange={e => setSingleRollData(p => ({ ...p, decision: e.target.value }))}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-navy-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                  placeholder="مثال: تأجيل للاطلاع والرد"
+                />
+                
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-600 block mb-1">نوع الجلسة</label>
+                <input
+                  list="dynamic-session-types"
+                  value={singleRollData.type}
+                  onChange={e => setSingleRollData(p => ({ ...p, type: e.target.value }))}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-navy-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                  placeholder="نوع الجلسة..."
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    const last = JSON.parse(window.sessionStorage.getItem('lastRolledSession'));
+                    if (last) {
+                      setSingleRollData({ date: last.date || '', decision: last.decision || '', type: last.type || '' });
+                      toast("تم نسخ بيانات آخر ترحيل", "success");
+                    } else {
+                      toast("لا يوجد ترحيل سابق لنسخه", "error");
+                    }
+                  } catch(e) {}
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-xs font-black transition mt-2 shadow-sm"
+              >
+                <RefreshCcw className="w-3.5 h-3.5" /> نسخ من السابق
+              </button>
+            </div>
+            
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-2">
+              <button
+                onClick={async () => {
+                  if (!singleRollData.date) { toast("أدخل تاريخ الجلسة القادمة", "error"); return; }
+                  setSavingId(singleRollCase.id);
+                  try {
+                    const sessionKey = Object.keys(singleRollCase).find(k => k === 'آخر جلسة' || k === 'تاريخ الجلسة' || k === 'أخر جلسة') || 'آخر جلسة';
+                    const decisionKey = Object.keys(singleRollCase).find(k => k === 'القرار' || k === 'قرار الجلسة' || k === 'المنطوق') || 'القرار';
+                    const existingSessions = singleRollCase.sessions || [];
+                    
+                    const sessionTypeStr = singleRollData.type || (singleRollCase['نوع الجلسة'] || '');
+
+                    const newSession = {
+                      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                      date: singleRollData.date,
+                      decision: singleRollData.decision,
+                      type: sessionTypeStr,
+                      notes: "تم الترحيل",
+                      createdAt: new Date().toISOString()
+                    };
+                    const updatedCase = {
+                      ...singleRollCase,
+                      [sessionKey]: singleRollData.date,
+                      [decisionKey]: singleRollData.decision,
+                      'نوع الجلسة': sessionTypeStr,
+                      sessions: [...existingSessions, newSession]
+                    };
+                    await saveCaseToFirebase(singleRollCase.id, updatedCase);
+                    window.sessionStorage.setItem('lastRolledSession', JSON.stringify(singleRollData));
+                    toast("تم الترحيل بنجاح", "success");
+                    setSingleRollCase(null);
+                  } catch (err) {
+                    toast("حدث خطأ", "error");
+                  }
+                  setSavingId(null);
+                }}
+                disabled={savingId === singleRollCase.id}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-2.5 text-xs font-black transition flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {savingId === singleRollCase.id ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                تأكيد الترحيل
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

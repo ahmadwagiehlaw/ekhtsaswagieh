@@ -4,6 +4,7 @@ import StrictSelectField from '../StrictSelectField';
 import SmartAutocomplete from '../SmartAutocomplete';
 import { formatDateString, getSafeDateObj } from '../../utils/dateUtils';
 import { localizeNumber } from '../../utils/numberUtils';
+import SmartDateInput from '../SmartDateInput';
 
 export default function CaseInfoTab({
   setActiveTab,
@@ -196,8 +197,8 @@ export default function CaseInfoTab({
                           <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">جلسة حكم أول درجة</span>
                           {isEditing ? (
                             <div className="mt-1">
-                              <input
-                                type="date"
+                              <SmartDateInput
+                                
                                 value={editData['جلسة حكم أول درجة'] && getSafeDateObj(editData['جلسة حكم أول درجة']) ? getSafeDateObj(editData['جلسة حكم أول درجة']).toISOString().split('T')[0] : ''}
                                 onChange={(e) => setEditData({ ...editData, 'جلسة حكم أول درجة': e.target.value })}
                                 className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-slate-400 transition shadow-sm h-[38px]"
@@ -336,7 +337,7 @@ export default function CaseInfoTab({
                       <div className="col-span-6 sm:col-span-4 relative">
                         <span className="absolute -top-5 right-1 text-[10px] font-black text-slate-500">تاريخ رفع الدعوى</span>
                         {isEditing ? (
-                          <input type="date" value={editData['تاريخ رفع الدعوى'] && getSafeDateObj(editData['تاريخ رفع الدعوى']) ? getSafeDateObj(editData['تاريخ رفع الدعوى']).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({ ...editData, ['تاريخ رفع الدعوى']: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition h-[38px] mt-0.5" />
+                          <SmartDateInput  value={editData['تاريخ رفع الدعوى'] && getSafeDateObj(editData['تاريخ رفع الدعوى']) ? getSafeDateObj(editData['تاريخ رفع الدعوى']).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({ ...editData, ['تاريخ رفع الدعوى']: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition h-[38px] mt-0.5" />
                         ) : (
                           <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 text-xs font-bold text-navy-900 min-h-[42px] flex items-center justify-center">
                             {localizeNumber(formatDateString(editData['تاريخ رفع الدعوى']), settings?.numberFormat) || '---'}
@@ -709,28 +710,32 @@ export default function CaseInfoTab({
                               placeholder="اختر الصفة..."
                             />
                           ) : field.id === 'نوع الجلسة' ? (
-                            <StrictSelectField
+                            <SmartAutocomplete
                               label={field.label}
                               value={val}
                               onChange={v => setEditData({ ...editData, [field.id]: v })}
-                              options={settings?.sessionTypes || ['فحص', 'موضوع']}
+                              cases={cases}
+                              fieldPaths={['نوع الجلسة', 'نوع_الجلسة']}
                               onManage={() => setManagingField('sessionTypes')}
-                              placeholder="اختر نوع الجلسة..."
+                              placeholder="نوع الجلسة..."
                             />
-                          ) : field.id === 'القرار' && settings?.decisions ? (
-                            <StrictSelectField
+                          ) : field.id === 'القرار' ? (
+                            <SmartAutocomplete
+                              label={field.label}
                               value={val}
                               onChange={v => setEditData({ ...editData, [field.id]: v })}
-                              options={settings.decisions}
+                              cases={cases}
+                              fieldPaths={['القرار', 'قرار الجلسة', 'المنطوق']}
                               onManage={() => setManagingField('decisions')}
-                              placeholder="اختر القرار..."
+                              placeholder="القرار..."
                             />
                           ) : field.id === 'مكان الملف' ? (
-                            <StrictSelectField
+                            <SmartAutocomplete
                               label={field.label}
                               value={val}
                               onChange={v => setEditData({ ...editData, [field.id]: v })}
-                              options={settings?.fileLocations || ['شعبة الحفظ', 'الأحكام', 'أصلي']}
+                              cases={cases}
+                              fieldPaths={['مكان الملف']}
                               onManage={() => setManagingField('fileLocations')}
                               placeholder="اختر مكان الملف..."
                             />
@@ -757,7 +762,7 @@ export default function CaseInfoTab({
                           ) : field.type === 'textarea' ? (
                             <textarea value={val} onChange={(e) => setEditData({ ...editData, [field.id]: e.target.value })} rows={3} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 resize-none transition" />
                           ) : field.type === 'date' || field.id.includes('تاريخ') || field.id.includes('جلسة') ? (
-                            <input type="date" value={val && getSafeDateObj(val) ? getSafeDateObj(val).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({ ...editData, [field.id]: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
+                            <SmartDateInput  value={val && getSafeDateObj(val) ? getSafeDateObj(val).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({ ...editData, [field.id]: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 transition" />
                           ) : ['رقم الدعوى', 'رقم القضية', 'رقم_الدعوى'].includes(field.id) ? (
                             <div className="flex items-center gap-2">
                               <div className="flex-[2]">

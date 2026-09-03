@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Plus, AlertCircle, Check } from 'lucide-react';
 import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
+import SmartDateInput from './SmartDateInput';
 
 const currentYear = new Date().getFullYear();
 
@@ -293,8 +294,8 @@ export default function QuickAddCaseModal({ isOpen, onClose, prefillDate }) {
               {/* Session date */}
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-500 block">تاريخ الجلسة</label>
-                <input
-                  type="date"
+                <SmartDateInput
+                  
                   value={formData['آخر جلسة']}
                   onChange={e => handleChange('آخر جلسة', e.target.value)}
                   className="w-full text-sm font-bold p-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition outline-none"

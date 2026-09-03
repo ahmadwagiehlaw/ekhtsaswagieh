@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppState';
 import { useUI } from '../context/UIContext';
 import { uploadToR2 } from '../lib/r2';
 import { syncLatestSessionToCaseData } from '../utils/caseUtils';
+import SmartDateInput from './SmartDateInput';
 
 import imageCompression from 'browser-image-compression';
 
@@ -162,9 +163,8 @@ export default function AddSessionModal({ isOpen, onClose, caseData }) {
             <div className="flex gap-3">
               <div className="flex-[2]">
                 <label className="text-[11px] font-black text-slate-500 block mb-1.5">تاريخ الجلسة *</label>
-                <input 
-                  type="date"
-                  required
+                <SmartDateInput 
+                  id="session-date-input"
                   value={sessionDate}
                   onChange={(e) => setSessionDate(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"

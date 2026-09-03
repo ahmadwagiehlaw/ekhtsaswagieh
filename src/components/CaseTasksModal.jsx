@@ -5,6 +5,7 @@ import { useGeneralTasks } from '../hooks/useGeneralTasks';
 import { useUI } from '../context/UIContext';
 import { formatDateString } from '../utils/dateUtils';
 import UploadDocumentModal from './UploadDocumentModal';
+import SmartDateInput from './SmartDateInput';
 
 export default function CaseTasksModal({ isOpen, onClose, caseData }) {
   const { completeTask, uncompleteTask, saveTask, deleteTask } = useGeneralTasks();
@@ -253,8 +254,8 @@ export default function CaseTasksModal({ isOpen, onClose, caseData }) {
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-slate-500 block mb-1">تاريخ التنفيذ</label>
-                      <input 
-                        type="date"
+                      <SmartDateInput 
+                        
                         value={newTask.dueDate}
                         onChange={e => setNewTask({...newTask, dueDate: e.target.value})}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { getSafeDateObj } from '../utils/dateUtils';
-import { getCaseNo, getCaseYear, getSessionDate, getAppellantName, getCaseRoll } from '../utils/caseUtils';
+import { getCaseNo, getCaseYear, getSessionDate, getAppellantName, getCaseRoll, getCaseDecision, getSessionType, getFileLocation } from '../utils/caseUtils';
 
 import { getPrimaryValue } from '../utils/helpers';
 
@@ -81,6 +81,42 @@ export default function useCasesSort({ filteredCases, sortBy, quickDateFilter })
         const diff = dA.getTime() - dB.getTime();
         if (diff === 0) return getSessionRollNumber(a) - getSessionRollNumber(b);
         return diff;
+      }
+      if (sortBy === 'sessionType_asc') {
+        const vA = String(getSessionType(a) || '').trim();
+        const vB = String(getSessionType(b) || '').trim();
+        return vA.localeCompare(vB, 'ar');
+      }
+      if (sortBy === 'sessionType_desc') {
+        const vA = String(getSessionType(a) || '').trim();
+        const vB = String(getSessionType(b) || '').trim();
+        return vB.localeCompare(vA, 'ar');
+      }
+      if (sortBy === 'decision_asc') {
+        const vA = String(getCaseDecision(a) || '').trim();
+        const vB = String(getCaseDecision(b) || '').trim();
+        return vA.localeCompare(vB, 'ar');
+      }
+      if (sortBy === 'decision_desc') {
+        const vA = String(getCaseDecision(a) || '').trim();
+        const vB = String(getCaseDecision(b) || '').trim();
+        return vB.localeCompare(vA, 'ar');
+      }
+      if (sortBy === 'location_asc') {
+        const vA = String(getFileLocation(a) || '').trim();
+        const vB = String(getFileLocation(b) || '').trim();
+        return vA.localeCompare(vB, 'ar');
+      }
+      if (sortBy === 'location_desc') {
+        const vA = String(getFileLocation(a) || '').trim();
+        const vB = String(getFileLocation(b) || '').trim();
+        return vB.localeCompare(vA, 'ar');
+      }
+      if (sortBy === 'roll_asc') {
+        return getSessionRollNumber(a) - getSessionRollNumber(b);
+      }
+      if (sortBy === 'roll_desc') {
+        return getSessionRollNumber(b) - getSessionRollNumber(a);
       }
       return 0;
     });

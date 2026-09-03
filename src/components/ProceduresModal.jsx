@@ -5,6 +5,7 @@ import { useUI } from '../context/UIContext';
 import { uploadToR2 } from '../lib/r2';
 import imageCompression from 'browser-image-compression';
 import { formatDateString } from '../utils/dateUtils';
+import SmartDateInput from './SmartDateInput';
 
 export default function ProceduresModal({ isOpen, onClose, caseData, setCaseData }) {
   const { saveCaseToFirebase, settings, isAdmin, currentUserPermissions } = useAppContext();
@@ -238,8 +239,8 @@ export default function ProceduresModal({ isOpen, onClose, caseData, setCaseData
                 <div className="space-y-3">
                   <div className="flex flex-col sm:flex-row gap-3">
                     <div className="flex-1 flex gap-2">
-                      <input 
-                        type="date" 
+                      <SmartDateInput 
+                         
                         value={newProcedure.date}
                         onChange={e => setNewProcedure({...newProcedure, date: e.target.value})}
                         className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-navy-900 focus:outline-none focus:border-indigo-400 focus:bg-white flex-[1] transition"

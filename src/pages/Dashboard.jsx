@@ -360,6 +360,7 @@ export default function Dashboard() {
         </div>
         <form onSubmit={handleSearch} className="relative">
           <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+            onClick={e => e.target.select()} onFocus={e => e.target.select()}
             placeholder="البحث السريع عن الملفات..."
             className="w-full bg-white border-2 border-slate-200 rounded-2xl py-4 pl-14 pr-6 text-sm font-bold focus:outline-none focus:border-emerald-500 transition shadow-sm text-navy-900" />
           <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white hover:bg-emerald-700 transition">
@@ -554,6 +555,7 @@ export default function Dashboard() {
           <form onSubmit={handleSearch} className="flex gap-2">
             <div className="relative flex-1">
               <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                onClick={e => e.target.select()} onFocus={e => e.target.select()}
                 placeholder="ابحث برقم الدعوى أو الخصم..."
                 className="w-full bg-slate-800/50 text-white placeholder-slate-400 border border-slate-700/50 rounded-xl py-3 pl-12 pr-12 text-sm font-bold focus:outline-none focus:border-amber-500/50 focus:bg-slate-800 transition-all" />
               <button type="submit" className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg flex items-center justify-center text-amber-500 hover:text-amber-400 hover:bg-slate-700 transition">

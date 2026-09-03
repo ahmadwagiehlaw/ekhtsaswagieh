@@ -17,6 +17,9 @@ import CaseDetails from './CaseDetails';
 import CaseCard from '../components/ui/CaseCard';
 import useSessionState from '../hooks/useSessionState';
 import useDebounce from '../hooks/useDebounce';
+import MultiFilterChips from '../components/MultiFilterChips';
+import SmartDateInput from '../components/SmartDateInput';
+
 
 export default function Files() {
   const { cases, schema, deleteCaseFromFirebase, saveCaseToFirebase, globalHideNoInterest, setGlobalHideNoInterest, settings, globalTasks, viewingTasks } = useAppContext();
@@ -449,8 +452,8 @@ export default function Files() {
           <div className="flex gap-2 w-full sm:w-auto flex-1 sm:max-w-md justify-end">
             {isDateSearchOpen || quickDateFilter ? (
               <div className="relative w-full sm:max-w-[150px] flex items-center gap-1 bg-slate-50 border border-slate-300 rounded-xl px-1">
-                <input
-                  type="date"
+                <SmartDateInput
+                  
                   title="تاريخ الجلسة"
                   value={quickDateFilter}
                   onChange={(e) => setQuickDateFilter(e.target.value)}
@@ -494,6 +497,8 @@ export default function Files() {
                 placeholder="بحث في القضايا... (اضغط / للبحث)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onClick={e => e.target.select()}
+                onFocus={e => e.target.select()}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2 pl-20 pr-10 text-xs font-bold text-navy-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
               />
 
@@ -530,65 +535,65 @@ export default function Files() {
               )}
             </div>
 
-            {/* Grid 5 dropdowns */}
+            {/* Grid 5 dropdowns - now with multi-value chips */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 mb-5">
-              
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-500">تاريخ الجلسة</label>
-                <select
-                  value={quickDateFilter}
-                  onChange={(e) => setQuickDateFilter(e.target.value)}
-                  className={`w-full p-2.5 rounded-xl text-xs font-bold border outline-none ${quickDateFilter ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-700 focus:border-indigo-400'}`}
-                >
-                  <option value="">الكل</option>
-                  {uniqueDates.map(dateStr => (
-                    <option key={dateStr} value={dateStr}>{dateStr}</option>
-                  ))}
-                </select>
-              </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-500">مكان الملف</label>
-                <select
-                  value={locationFilter}
-                  onChange={(e) => setLocationFilter(e.target.value)}
-                  className={`w-full p-2.5 rounded-xl text-xs font-bold border outline-none ${locationFilter !== 'all' ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-700 focus:border-indigo-400'}`}
-                >
-                  <option value="all">الكل</option>
-                  <option value="missing">مقيدة (غير موجود)</option>
-                  <option value="temp">ملف مؤقت</option>
-                  {uniqueLocations.map(loc => (
-                    <option key={loc} value={loc}>{loc}</option>
-                  ))}
-                </select>
-              </div>
+              {/* تاريخ الجلسة - multi */}
+              <MultiFilterChips
+                label="تاريخ الجلسة"
+                value={quickDateFilter || 'all'}
+                onChange={(v) => setQuickDateFilter(v === 'all' ? '' : v)}
+                options={uniqueDates.map(d => ({ value: d, label: d }))}
+                allValue="all"
+                allLabel="الكل"
+                placeholder="اختر..."
+              />
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-500">نوع الجلسة</label>
-                <select
-                  value={sessionTypeFilter}
-                  onChange={(e) => setSessionTypeFilter(e.target.value)}
-                  className={`w-full p-2.5 rounded-xl text-xs font-bold border outline-none ${sessionTypeFilter !== 'all' ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-700 focus:border-indigo-400'}`}
-                >
-                  <option value="all">الكل</option>
-                  <option value="judgment">للحكم</option>
-                  {settings?.sessionTypes?.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
+              {/* مكان الملف - multi */}
+              <MultiFilterChips
+                label="مكان الملف"
+                value={locationFilter}
+                onChange={setLocationFilter}
+                options={[
+                  { value: 'missing', label: 'مقيدة (غير موجود)' },
+                  { value: 'temp', label: 'ملف مؤقت' },
+                  ...uniqueLocations.map(loc => ({ value: loc, label: loc }))
+                ]}
+                allValue="all"
+                allLabel="الكل"
+                placeholder="اختر..."
+              />
 
+              {/* نوع الجلسة - multi */}
+              <MultiFilterChips
+                label="نوع الجلسة"
+                value={sessionTypeFilter}
+                onChange={setSessionTypeFilter}
+                options={[
+                  { value: 'judgment', label: 'للحكم' },
+                  ...(settings?.sessionTypes?.map(t => ({ value: t, label: t })) || [])
+                ]}
+                allValue="all"
+                allLabel="الكل"
+                placeholder="اختر..."
+              />
+
+              {/* القرار / المنطوق - نص مع chips */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-slate-500">القرار / المنطوق</label>
                 <input
                   type="text"
-                  placeholder="كلمات مفتاحية..."
+                  placeholder="كلمات مفتاحية، مفصولة بفاصلة..."
                   value={decisionFilter}
                   onChange={(e) => setDecisionFilter(e.target.value)}
                   className={`w-full p-2.5 rounded-xl text-xs font-bold border outline-none ${decisionFilter ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-700 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'}`}
                 />
+                {decisionFilter && decisionFilter.includes(',') && (
+                  <p className="text-[9px] text-indigo-500 font-bold">يبحث في أي من: {decisionFilter.split(',').filter(Boolean).join(' / ')}</p>
+                )}
               </div>
 
+              {/* الصفة */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-slate-500">الصفة</label>
                 <select
@@ -604,6 +609,7 @@ export default function Files() {
               </div>
               
             </div>
+
 
             {/* Quick Filter Toggles */}
             <div className="flex flex-wrap items-center gap-2">
@@ -716,6 +722,37 @@ export default function Files() {
               >
                 <Clock className="w-3.5 h-3.5" />
                 <span>تاريخ الجلسة {sortBy === 'date_desc' ? '▼ الأحدث' : sortBy === 'date_asc' ? '▲ الأقدم' : ''}</span>
+              </button>
+              <button
+                onClick={() => setSortBy(prev => prev === 'sessionType_asc' ? 'sessionType_desc' : 'sessionType_asc')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${sortBy.startsWith('sessionType') ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              >
+                <CalendarDays className="w-3.5 h-3.5" />
+                <span>نوع الجلسة {sortBy === 'sessionType_asc' ? '▲' : sortBy === 'sessionType_desc' ? '▼' : ''}</span>
+              </button>
+
+              <button
+                onClick={() => setSortBy(prev => prev === 'decision_asc' ? 'decision_desc' : 'decision_asc')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${sortBy.startsWith('decision') ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              >
+                <Gavel className="w-3.5 h-3.5" />
+                <span>القرار {sortBy === 'decision_asc' ? '▲' : sortBy === 'decision_desc' ? '▼' : ''}</span>
+              </button>
+
+              <button
+                onClick={() => setSortBy(prev => prev === 'location_asc' ? 'location_desc' : 'location_asc')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${sortBy.startsWith('location') ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>مكان الملف {sortBy === 'location_asc' ? '▲' : sortBy === 'location_desc' ? '▼' : ''}</span>
+              </button>
+
+              <button
+                onClick={() => setSortBy(prev => prev === 'roll_asc' ? 'roll_desc' : 'roll_asc')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border ${sortBy.startsWith('roll') ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              >
+                <ArrowUpDown className="w-3.5 h-3.5" />
+                <span>الرول {sortBy === 'roll_asc' ? '▲' : sortBy === 'roll_desc' ? '▼' : ''}</span>
               </button>
             </div>
           </div>
@@ -894,14 +931,14 @@ export default function Files() {
       <ExportPDFModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
-        data={filteredCases}
+        data={sortedCases}
         defaultTitle="تقرير القضايا"
       />
 
       <ExportPDFModal
         isOpen={isSelectionReportModalOpen}
         onClose={() => setIsSelectionReportModalOpen(false)}
-        data={cases.filter(c => selectedCaseIds.includes(c.id))}
+        data={sortedCases.filter(c => selectedCaseIds.includes(c.id))}
         defaultTitle="تقرير القضايا المحددة"
       />
 
